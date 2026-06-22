@@ -6,11 +6,13 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { 
       prompt, 
-      aspectRatio = '1:1', 
+      aspectRatio = '1:1',
+      imageSize = '1K',
       numberOfImages = 1,
       style = 'None',
       quality = 'Standard',
-      referenceImage = null,
+      thinkingLevel = 'minimal',
+      referenceImages = [],
       personGeneration = 'DONT_ALLOW'
     } = body;
 
@@ -40,23 +42,42 @@ export async function POST(request: Request) {
     // Build the contents array
     const contents: any[] = [finalPrompt];
     
-    if (referenceImage) {
-      // referenceImage should be a base64 string "data:image/png;base64,iVBORw0KGgo..."
-      const match = referenceImage.match(/^data:(image\/[a-zA-Z]+);base64,(.+)$/);
-      if (match) {
-        contents.push({
-          inlineData: {
-            mimeType: match[1],
-            data: match[2]
+    // Process reference images (support up to 3 for composition control)
+    if (Array.isArray(referenceImages) && referenceImages.length > 0) {
+      for (const refImage of referenceImages.slice(0, 3)) {
+        if (refImage && typeof refImage === 'string') {
+          const match = refImage.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
+          if (match) {
+            contents.push({
+              inlineData: {
+                mimeType: match[1],
+                data: match[2]
+              }
+            });
           }
-        });
+        }
       }
     }
 
     const count = Math.min(Math.max(1, numberOfImages), 4); // Limit between 1 and 4
     
+    // Validate image size
+    const validSizes = ['512', '1K', '2K', '4K'];
+    const finalImageSize = validSizes.includes(imageSize) ? imageSize : '1K';
+
+    // Build the response format configuration
+    const responseFormatConfig: any = {
+      image: {
+        aspectRatio: aspectRatio
+      }
+    };
+    
+    // Add imageSize if not 1K (default)
+    if (finalImageSize !== '1K') {
+      responseFormatConfig.image.imageSize = finalImageSize;
+    }
+    
     // We make parallel requests to ensure we get exactly the requested number of images
-    // as the API sometimes ignores numberOfImages parameter.
     const promises = Array.from({ length: count }).map(() => {
       return ai.models.generateContent({
         model: "gemini-3.1-flash-image", 
@@ -64,13 +85,15 @@ export async function POST(request: Request) {
         config: {
           responseModalities: ["IMAGE"],
           personGeneration: personGeneration || 'DONT_ALLOW',
-          response_format: {
-            image: { aspect_ratio: aspectRatio }
+          responseFormat: responseFormatConfig,
+          thinkingConfig: {
+            thinkingLevel: ['high', 'minimal'].includes(thinkingLevel) ? thinkingLevel : 'minimal',
+            includeThoughts: false
           }
         } as any
       }).catch(e => {
         console.error("Single image generation failed:", e);
-        return null; // Handle individual failures gracefully
+        return null;
       });
     });
 

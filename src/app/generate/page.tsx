@@ -37,7 +37,13 @@ const ASPECT_RATIO_DESCRIPTIONS: Record<string, string> = {
   '4:5': 'Vertical portrait - Ideal for mobile ads, Instagram Stories (slightly wider), and mobile app marketing.',
   '9:16': 'Full mobile story - Optimized for vertical video platforms (TikTok, Instagram Reels, YouTube Shorts) and mobile-first content.',
   '16:9': 'Wide landscape - Standard for desktop web, YouTube thumbnails, presentation slides, and web banner ads.',
-  '2:3': 'Pinterest-style - Optimized specifically for Pinterest pins and tall vertical designs. Pinterest favors this ratio.'
+  '2:3': 'Pinterest-style - Optimized specifically for Pinterest pins and tall vertical designs. Pinterest favors this ratio.',
+  '3:2': 'Classic landscape - Horizontal orientation, slightly wider than 16:9. Good for presentations and print.',
+  '4:3': 'Standard screen - Traditional aspect ratio for older displays and some professional work.',
+  '3:4': 'Portrait variant - Taller vertical format, similar to 9:16 but slightly wider.',
+  '5:4': 'Classic monitor - Historical standard monitor ratio, useful for certain layouts.',
+  '1:4': 'Ultra-tall - Extreme vertical for tall banners and narrow columns.',
+  '4:1': 'Ultra-wide - Extreme horizontal for panoramic and wide banners.'
 };
 
 export default function GenerateImagePage() {
@@ -46,8 +52,10 @@ export default function GenerateImagePage() {
   const [aspectRatio, setAspectRatio] = useState('1:1');
   const [numberOfImages, setNumberOfImages] = useState(4);
   const [isPremium, setIsPremium] = useState(false);
+  const [imageSize, setImageSize] = useState('1K');
+  const [thinkingLevel, setThinkingLevel] = useState('minimal');
   
-  const [referenceImage, setReferenceImage] = useState<string | null>(null);
+  const [referenceImages, setReferenceImages] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [imageUrls, setImageUrls] = useState<string[]>([]);
@@ -55,19 +63,23 @@ export default function GenerateImagePage() {
   const [error, setError] = useState<string | null>(null);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setReferenceImage(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+    const files = e.target.files;
+    if (files) {
+      Array.from(files).forEach((file, index) => {
+        // Limit to 3 reference images
+        if (referenceImages.length + index < 3) {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            setReferenceImages(prev => [...prev, reader.result as string]);
+          };
+          reader.readAsDataURL(file);
+        }
+      });
     }
   };
 
-  const clearReferenceImage = () => {
-    setReferenceImage(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
+  const clearReferenceImage = (index: number) => {
+    setReferenceImages(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleGenerate = async (e: React.FormEvent) => {
@@ -89,8 +101,10 @@ export default function GenerateImagePage() {
           style,
           aspectRatio,
           numberOfImages,
+          imageSize,
+          thinkingLevel,
           quality: isPremium ? 'Premium' : 'Standard',
-          referenceImage
+          referenceImages
         }),
       });
 
@@ -171,30 +185,42 @@ export default function GenerateImagePage() {
                 />
               </div>
 
-              {/* 2. Reference Image */}
+              {/* 2. Reference Images */}
               <div className="space-y-2">
-                <Label className="text-xs font-semibold">Reference (Optional)</Label>
-                {!referenceImage ? (
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-semibold">References ({referenceImages.length}/3)</Label>
+                  {referenceImages.length > 0 && (
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setReferenceImages([])} className="h-6 text-xs text-destructive px-1">
+                      Clear all
+                    </Button>
+                  )}
+                </div>
+                {referenceImages.length < 3 ? (
                   <div 
                     className="border-2 border-dashed rounded-lg p-3 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-muted/50 transition-colors"
                     onClick={() => fileInputRef.current?.click()}
                   >
                     <Upload className="w-5 h-5 text-muted-foreground mb-1" />
-                    <p className="text-xs font-medium">Drag or browse</p>
+                    <p className="text-xs font-medium">Add reference (up to 3)</p>
                   </div>
-                ) : (
-                  <div className="relative rounded-lg border bg-muted/20 p-1 overflow-hidden flex items-center justify-center h-20 group">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={referenceImage} alt="Reference" className="max-h-full object-contain rounded-md" />
-                    <Button 
-                      type="button"
-                      variant="destructive" 
-                      size="icon" 
-                      className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity h-5 w-5"
-                      onClick={clearReferenceImage}
-                    >
-                      <X className="w-2.5 h-2.5" />
-                    </Button>
+                ) : null}
+                {referenceImages.length > 0 && (
+                  <div className="flex gap-1 flex-wrap">
+                    {referenceImages.map((img, idx) => (
+                      <div key={idx} className="relative group rounded-lg border bg-muted/20 p-0.5 overflow-hidden flex items-center justify-center h-16 w-16">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={img} alt={`Ref ${idx+1}`} className="max-h-full object-contain rounded" />
+                        <Button 
+                          type="button"
+                          variant="destructive" 
+                          size="icon" 
+                          className="absolute -top-1.5 -right-1.5 opacity-0 group-hover:opacity-100 transition-opacity h-5 w-5"
+                          onClick={() => clearReferenceImage(idx)}
+                        >
+                          <X className="w-2 h-2" />
+                        </Button>
+                      </div>
+                    ))}
                   </div>
                 )}
                 <input 
@@ -202,6 +228,7 @@ export default function GenerateImagePage() {
                   ref={fileInputRef} 
                   className="hidden" 
                   accept="image/*"
+                  multiple
                   onChange={handleImageUpload} 
                 />
               </div>
@@ -279,6 +306,40 @@ export default function GenerateImagePage() {
                     />
                     <span className={`text-[10px] font-medium ${isPremium ? 'text-primary' : 'text-muted-foreground'}`}>Prm</span>
                   </div>
+                </div>
+              </div>
+
+              {/* 7. Image Size */}
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold">Resolution</Label>
+                <div className="flex gap-1">
+                  {['512', '1K', '2K', '4K'].map(size => (
+                    <Button 
+                      key={size}
+                      type="button" 
+                      variant={imageSize === size ? "default" : "outline"} 
+                      onClick={() => setImageSize(size)}
+                      className="flex-1 h-8 text-xs"
+                      size="sm"
+                      title={size === '512' ? '0.5K - Fast, compact' : size === '1K' ? '1K - Balanced (default)' : size === '2K' ? '2K - High quality' : '4K - Maximum quality'}
+                    >
+                      {size}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 8. Thinking Level */}
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold">Thinking</Label>
+                <div className="flex items-center justify-between rounded-lg border p-1.5 bg-muted/20 h-8">
+                  <span className={`text-[10px] font-medium ${thinkingLevel === 'minimal' ? 'text-foreground' : 'text-muted-foreground'}`}>Fast</span>
+                  <Switch
+                    checked={thinkingLevel === 'high'}
+                    onCheckedChange={(checked) => setThinkingLevel(checked ? 'high' : 'minimal')}
+                    disabled={isLoading}
+                  />
+                  <span className={`text-[10px] font-medium ${thinkingLevel === 'high' ? 'text-primary' : 'text-muted-foreground'}`}>Deep</span>
                 </div>
               </div>
 

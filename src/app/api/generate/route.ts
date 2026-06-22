@@ -65,34 +65,45 @@ export async function POST(request: Request) {
     const validSizes = ['512', '1K', '2K', '4K'];
     const finalImageSize = validSizes.includes(imageSize) ? imageSize : '1K';
 
-    // Build the response format configuration
-    const responseFormatConfig: any = {
-      image: {
-        aspectRatio: aspectRatio
-      }
+// Build the image configuration (this is the correct schema for the API)
+    const imageConfig: any = {
+      aspectRatio: aspectRatio
     };
     
     // Add imageSize if not 1K (default)
     if (finalImageSize !== '1K') {
-      responseFormatConfig.image.imageSize = finalImageSize;
+      imageConfig.imageSize = finalImageSize;
     }
-    
+
+    console.log("[Generate API] Request parameters:");
+    console.log("- Prompt length:", finalPrompt.length);
+    console.log("- Aspect Ratio:", aspectRatio);
+    console.log("- Image Size:", finalImageSize);
+    console.log("- Count:", count);
+    console.log("- Thinking Level:", thinkingLevel);
+    console.log("- References count:", referenceImages.length);
+    console.log("- Full imageConfig object:", JSON.stringify(imageConfig));
+
     // We make parallel requests to ensure we get exactly the requested number of images
-    const promises = Array.from({ length: count }).map(() => {
+    const promises = Array.from({ length: count }).map((_, index) => {
+      console.log(`[Generate API] Starting generation for image ${index + 1}/${count}`);
       return ai.models.generateContent({
         model: "gemini-3.1-flash-image", 
         contents,
         config: {
           responseModalities: ["IMAGE"],
           personGeneration: personGeneration || 'DONT_ALLOW',
-          responseFormat: responseFormatConfig,
+          imageConfig: imageConfig,
           thinkingConfig: {
             thinkingLevel: ['high', 'minimal'].includes(thinkingLevel) ? thinkingLevel : 'minimal',
             includeThoughts: false
           }
         } as any
+      }).then(res => {
+        console.log(`[Generate API] Successfully completed image ${index + 1}/${count}`);
+        return res;
       }).catch(e => {
-        console.error("Single image generation failed:", e);
+        console.error(`[Generate API] Single image generation failed for image ${index + 1}:`, e);
         return null;
       });
     });

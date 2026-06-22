@@ -3,7 +3,16 @@ import { GoogleGenAI } from "@google/genai";
 
 export async function POST(request: Request) {
   try {
-    const { prompt } = await request.json();
+    const body = await request.json();
+    const { 
+      prompt, 
+      aspectRatio = '1:1', 
+      numberOfImages = 1,
+      style = 'None',
+      quality = 'Standard',
+      referenceImage = null,
+      personGeneration = 'DONT_ALLOW'
+    } = body;
 
     if (!prompt) {
       return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
@@ -17,37 +26,76 @@ export async function POST(request: Request) {
       }, { status: 500 });
     }
 
-    // Initialize the official Google Gen AI SDK
     const ai = new GoogleGenAI({ apiKey });
 
-    // Call the Gemini API for image generation
-    const response = await ai.models.generateContent({
-      model: "gemini-3.1-flash-image", // Nano Banana 2
-      contents: prompt,
+    // Construct the locked prompt based on style and quality
+    let finalPrompt = prompt;
+    if (style !== 'None') {
+      finalPrompt += `\n\nStyle: ${style}.`;
+    }
+    if (quality === 'Premium') {
+      finalPrompt += `\n\nQuality: Ultra high quality, 4k resolution, photorealistic, highly detailed, masterpiece, professional marketing asset.`;
+    }
+
+    // Build the contents array
+    const contents: any[] = [finalPrompt];
+    
+    if (referenceImage) {
+      // referenceImage should be a base64 string "data:image/png;base64,iVBORw0KGgo..."
+      const match = referenceImage.match(/^data:(image\/[a-zA-Z]+);base64,(.+)$/);
+      if (match) {
+        contents.push({
+          inlineData: {
+            mimeType: match[1],
+            data: match[2]
+          }
+        });
+      }
+    }
+
+    const count = Math.min(Math.max(1, numberOfImages), 4); // Limit between 1 and 4
+    
+    // We make parallel requests to ensure we get exactly the requested number of images
+    // as the API sometimes ignores numberOfImages parameter.
+    const promises = Array.from({ length: count }).map(() => {
+      return ai.models.generateContent({
+        model: "gemini-3.1-flash-image", 
+        contents,
+        config: {
+          responseModalities: ["IMAGE"],
+          personGeneration: personGeneration || 'DONT_ALLOW',
+          response_format: {
+            image: { aspect_ratio: aspectRatio }
+          }
+        } as any
+      }).catch(e => {
+        console.error("Single image generation failed:", e);
+        return null; // Handle individual failures gracefully
+      });
     });
 
-    let base64Image = null;
-    let mimeType = 'image/png';
+    const responses = await Promise.all(promises);
+    const imageUrls: string[] = [];
 
-    // Parse the response to extract the image
-    if (response.candidates && response.candidates[0]?.content?.parts) {
-      for (const part of response.candidates[0].content.parts) {
-        if (part.inlineData) {
-          base64Image = part.inlineData.data;
-          mimeType = part.inlineData.mimeType || mimeType;
-          break;
+    for (const response of responses) {
+      if (!response) continue;
+      
+      if (response.candidates && response.candidates[0]?.content?.parts) {
+        for (const part of response.candidates[0].content.parts) {
+          if (part.inlineData) {
+            const mimeType = part.inlineData.mimeType || 'image/jpeg';
+            imageUrls.push(`data:${mimeType};base64,${part.inlineData.data}`);
+            break; // Just one image per response
+          }
         }
       }
     }
 
-    if (!base64Image) {
-      throw new Error('API did not return an image.');
+    if (imageUrls.length === 0) {
+      throw new Error('API did not return any images.');
     }
 
-    // Format as a data URL for the frontend <img> tag
-    const imageUrl = `data:${mimeType};base64,${base64Image}`;
-
-    return NextResponse.json({ imageUrl });
+    return NextResponse.json({ imageUrls });
   } catch (error: any) {
     console.error('Error generating image:', error);
     return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });

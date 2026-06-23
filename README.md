@@ -1,36 +1,66 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ViewCreator - Decoupled Architecture
 
-## Getting Started
+This repository has been reorganized from a monolithic Next.js application into two distinct, decoupled projects:
 
-First, run the development server:
+1. **`viewcreator-ui`**: The frontend client-side Next.js 16.2.9 application containing the promotional landing pages and the AI Studio (image generation UI).
+2. **`viewcreator-api`**: The backend image generation service powered by Express, TypeScript, and the Google Gemini API (`gemini-3.1-flash-image`).
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+---
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🚀 How to Run the Projects
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 1. Backend API (`viewcreator-api`)
+The backend handles the connection with Google Gemini and processes image generation requests.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. Navigate to the API folder:
+   ```bash
+   cd viewcreator-api
+   ```
+2. Create and configure your `.env` file (copying `.env.example`):
+   ```bash
+   cp .env.example .env
+   ```
+3. Set your Google Gemini API key:
+   ```env
+   GEMINI_NANO_BANANA_API_KEY=your_actual_api_key_here
+   ```
+4. Install dependencies:
+   ```bash
+   npm install
+   ```
+5. Run the development server:
+   ```bash
+   npm run dev
+   ```
+   The API will be available at `http://localhost:3001`.
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+### 2. Frontend UI (`viewcreator-ui`)
+The frontend contains the landing pages and interactive image generator dashboard.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. Navigate to the UI folder:
+   ```bash
+   cd viewcreator-ui
+   ```
+2. Configure your environment variables if needed (defaults to calling local API at `http://localhost:3001`):
+   ```bash
+   cp .env.example .env.local
+   ```
+3. Install dependencies:
+   ```bash
+   npm install
+   ```
+4. Run the development server:
+   ```bash
+   npm run dev
+   ```
+   Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
+## ⚙️ Communication and Configuration
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- The UI is configured to call the API server via the `NEXT_PUBLIC_API_URL` environment variable.
+- In production, deploy `viewcreator-api` as a server/container (e.g., Google Cloud Run, Railway, Heroku) and deploy `viewcreator-ui` to Vercel/Netlify.
+- Update `NEXT_PUBLIC_API_URL` on the UI deployment to point to your deployed backend.

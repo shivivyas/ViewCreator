@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect, type PointerEvent } from "react";
 import { useRouter } from "next/navigation";
 import { 
   ArrowLeft, 
@@ -10,7 +10,9 @@ import {
   Download, 
   Loader2, 
   Check, 
-  X 
+  X,
+  Undo2,
+  Redo2
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -40,6 +42,48 @@ export default function EditImagePage() {
   const [instruction, setInstruction] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Undo/Redo Edit Session History Stack
+  const [history, setHistory] = useState<string[]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+
+  // Initialize history on mount
+  useEffect(() => {
+    const initialImg = previewUrl || selectedImage;
+    if (initialImg && history.length === 0) {
+      setHistory([initialImg]);
+      setHistoryIndex(0);
+    }
+  }, [previewUrl, selectedImage, history.length]);
+
+  const pushToHistory = (newUrl: string) => {
+    const newHistory = history.slice(0, historyIndex + 1);
+    setHistory([...newHistory, newUrl]);
+    setHistoryIndex(newHistory.length);
+  };
+
+  const handleUndo = () => {
+    if (historyIndex > 0) {
+      const prevIndex = historyIndex - 1;
+      setHistoryIndex(prevIndex);
+      const url = history[prevIndex];
+      setPreviewImageUrl(url);
+      updateState({ previewUrl: url });
+    }
+  };
+
+  const handleRedo = () => {
+    if (historyIndex < history.length - 1) {
+      const nextIndex = historyIndex + 1;
+      setHistoryIndex(nextIndex);
+      const url = history[nextIndex];
+      setPreviewImageUrl(url);
+      updateState({ previewUrl: url });
+    }
+  };
+
+  const canUndo = historyIndex > 0;
+  const canRedo = historyIndex < history.length - 1;
 
   // Crop Mode States
   const [isCropMode, setIsCropMode] = useState(false);
@@ -107,6 +151,7 @@ export default function EditImagePage() {
       setPreviewImageUrl(updatedUrl);
       updateState({ previewUrl: updatedUrl, editInstruction: instruction });
       setInstruction("");
+      pushToHistory(updatedUrl);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Something went wrong applying your edits.");
     } finally {
@@ -117,7 +162,7 @@ export default function EditImagePage() {
   // -------------------------------------------------------------
   // CROP INTERACTIVE BOX LOGIC (POINTER EVENTS)
   // -------------------------------------------------------------
-  const handleBoxPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+  const handleBoxPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     // If clicking directly on a handle, let the handle pointer down deal with it
     if ((e.target as HTMLElement).closest('.crop-handle')) {
       return;
@@ -132,7 +177,7 @@ export default function EditImagePage() {
     });
   };
 
-  const handleBoxPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+  const handleBoxPointerMove = (e: PointerEvent<HTMLDivElement>) => {
     if (!dragStart || !cropContainerRef.current) return;
     e.stopPropagation();
     
@@ -150,13 +195,13 @@ export default function EditImagePage() {
     }));
   };
 
-  const handleBoxPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+  const handleBoxPointerUp = (e: PointerEvent<HTMLDivElement>) => {
     e.stopPropagation();
     e.currentTarget.releasePointerCapture(e.pointerId);
     setDragStart(null);
   };
 
-  const handleHandlePointerDown = (e: React.PointerEvent<HTMLDivElement>, handle: 'tl' | 'tr' | 'bl' | 'br') => {
+  const handleHandlePointerDown = (e: PointerEvent<HTMLDivElement>, handle: 'tl' | 'tr' | 'bl' | 'br') => {
     e.stopPropagation();
     e.currentTarget.setPointerCapture(e.pointerId);
     setResizeStart({
@@ -170,7 +215,7 @@ export default function EditImagePage() {
     });
   };
 
-  const handleHandlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+  const handleHandlePointerMove = (e: PointerEvent<HTMLDivElement>) => {
     if (!resizeStart || !cropContainerRef.current) return;
     e.stopPropagation();
 
@@ -209,7 +254,7 @@ export default function EditImagePage() {
     setCrop(nextCrop);
   };
 
-  const handleHandlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+  const handleHandlePointerUp = (e: PointerEvent<HTMLDivElement>) => {
     e.stopPropagation();
     e.currentTarget.releasePointerCapture(e.pointerId);
     setResizeStart(null);
@@ -247,6 +292,7 @@ export default function EditImagePage() {
         setPreviewImageUrl(croppedDataUrl);
         updateState({ previewUrl: croppedDataUrl });
         setIsCropMode(false);
+        pushToHistory(croppedDataUrl);
       } catch (e) {
         console.error("Canvas export failed:", e);
         setError("Cross-origin security block: Try running backend in local proxy mode.");
@@ -265,6 +311,7 @@ export default function EditImagePage() {
       setCrop({ x: 10, y: 10, width: 80, height: 80 });
       setIsCropMode(false);
       setError(null);
+      pushToHistory(selectedImage);
     }
   };
 
@@ -313,7 +360,27 @@ export default function EditImagePage() {
           </Button>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            onClick={handleUndo}
+            disabled={!canUndo}
+            className="h-9 px-3 text-xs font-semibold"
+          >
+            <Undo2 className="w-4 h-4 mr-1.5" />
+            <span>Undo</span>
+          </Button>
+
+          <Button
+            variant="ghost"
+            onClick={handleRedo}
+            disabled={!canRedo}
+            className="h-9 px-3 text-xs font-semibold"
+          >
+            <Redo2 className="w-4 h-4 mr-1.5" />
+            <span>Redo</span>
+          </Button>
+
           <Button 
             variant="ghost"
             onClick={handleReset}

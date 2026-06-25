@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAppDispatch } from '@/store/hooks';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { setImageEditorState } from '@/store/slices/image-editor-slice';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -46,9 +46,13 @@ const ASPECT_RATIO_DESCRIPTIONS: Record<string, string> = {
 };
 
 export default function GenerateImagePage() {
-  const [prompt, setPrompt] = useState('');
-  const [style, setStyle] = useState('Product Photo');
-  const [aspectRatio, setAspectRatio] = useState('1:1');
+  const dispatch = useAppDispatch();
+  const router = useRouter();
+  const editorState = useAppSelector((state) => state.imageEditor);
+
+  const [prompt, setPrompt] = useState(editorState.basePrompt || '');
+  const [style, setStyle] = useState(editorState.style || 'Product Photo');
+  const [aspectRatio, setAspectRatio] = useState(editorState.aspectRatio || '1:1');
   const [numberOfImages, setNumberOfImages] = useState(4);
   const [isPremium, setIsPremium] = useState(false);
   const [imageSize, setImageSize] = useState('1K');
@@ -57,12 +61,16 @@ export default function GenerateImagePage() {
   const [referenceImages, setReferenceImages] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [imageUrls, setImageUrls] = useState<string[]>([]);
+  const [imageUrls, setImageUrls] = useState<string[]>(editorState.imageUrls || []);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const dispatch = useAppDispatch();
-  const router = useRouter();
+  // Sync state to redux when fetching new images
+  useEffect(() => {
+    if (imageUrls.length > 0) {
+      dispatch(setImageEditorState({ imageUrls, basePrompt: prompt, style, aspectRatio }));
+    }
+  }, [imageUrls, prompt, style, aspectRatio, dispatch]);
 
   const handleSelectImage = (index: number) => {
     dispatch(

@@ -282,13 +282,13 @@ export default function EditImagePage() {
 
   if (!selectedImage) {
     return (
-      <div className="min-h-screen bg-[#0b1326] flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-[#171f33] border border-white/5 p-8 rounded-2xl text-center shadow-2xl space-y-6">
-          <h2 className="text-xl font-bold text-white">No image loaded</h2>
-          <p className="text-sm text-[#cbc3d7]">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-card border text-card-foreground p-8 rounded-2xl text-center shadow-sm space-y-6">
+          <h2 className="text-xl font-bold">No image loaded</h2>
+          <p className="text-sm text-muted-foreground">
             Please return to the studio and click on any generated image to open the editor.
           </p>
-          <Button onClick={handleBack} className="w-full bg-[#d0bcff] hover:bg-[#d0bcff]/80 text-[#3c0091] font-semibold py-2.5 rounded-full">
+          <Button onClick={handleBack} className="w-full py-2.5 rounded-full">
             Return to Studio
           </Button>
         </div>
@@ -297,40 +297,39 @@ export default function EditImagePage() {
   }
 
   return (
-    <div className="h-screen w-screen bg-[#060b16] text-[#dae2fd] flex flex-col overflow-hidden font-sans select-none relative">
+    <div className="h-screen w-screen bg-background text-foreground flex flex-col overflow-hidden font-sans select-none relative">
       
-      {/* Radial ambient glow */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(139,92,246,0.02),transparent_60%)] pointer-events-none" />
-
       {/* Header bar */}
-      <header className="h-16 border-b border-white/5 bg-[#0b1326]/60 backdrop-blur-xl flex items-center justify-between px-6 shrink-0 z-30">
+      <header className="h-16 border-b bg-card/60 backdrop-blur-xl flex items-center justify-between px-6 shrink-0 z-30">
         <div className="flex items-center gap-4">
-          <button 
+          <Button 
+            variant="ghost"
             onClick={handleBack}
-            className="flex items-center gap-2 text-[#d0bcff] hover:text-white transition-colors duration-200"
+            className="flex items-center gap-2 transition-colors duration-200 hover:bg-muted"
             title="Go back"
           >
             <ArrowLeft className="w-5 h-5" />
-            <span className="font-bold text-base tracking-tight">Lumina Zen Editor</span>
-          </button>
+            <span className="font-bold text-base tracking-tight">AI Editor</span>
+          </Button>
         </div>
 
         <div className="flex items-center gap-3">
-          <button 
+          <Button 
+            variant="ghost"
             onClick={handleReset}
-            className="p-2 text-xs font-semibold text-[#cbc3d7] hover:text-white hover:bg-white/5 rounded-lg transition-all flex items-center gap-1.5 px-3 h-9"
+            className="h-9 px-3 text-xs font-semibold"
           >
-            <RotateCcw className="w-4 h-4" />
+            <RotateCcw className="w-4 h-4 mr-1.5" />
             <span>Revert Original</span>
-          </button>
+          </Button>
           
-          <button 
+          <Button 
             onClick={handleExport} 
-            className="px-6 py-2 text-xs bg-[#d0bcff] hover:bg-[#d0bcff]/90 text-[#3c0091] rounded-full font-bold shadow-lg transition-all active:scale-95 h-9 flex items-center"
+            className="h-9 px-6 rounded-full font-bold shadow-sm transition-all active:scale-95"
           >
             <Download className="w-3.5 h-3.5 mr-1.5" />
             <span>Export</span>
-          </button>
+          </Button>
         </div>
       </header>
 
@@ -338,57 +337,61 @@ export default function EditImagePage() {
       <main className="flex-1 flex overflow-hidden min-h-0 relative">
         
         {/* Left Hand Actions & Options Panel */}
-        <aside className="w-80 border-r border-white/5 bg-[#0b1326]/40 backdrop-blur-md p-6 flex flex-col gap-6 shrink-0 z-20 overflow-y-auto">
+        <aside className="w-80 border-r bg-card/40 backdrop-blur-md p-6 flex flex-col gap-6 shrink-0 z-20 overflow-y-auto">
           
           {/* Section: Interactive Crop tool */}
           <div className="space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-white/40">Canvas Crop Tool</h3>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Canvas Crop Tool</h3>
             
             {!isCropMode ? (
-              <button
+              <Button
+                variant="outline"
                 onClick={() => setIsCropMode(true)}
-                className="w-full py-3 px-4 bg-white/5 hover:bg-white/10 rounded-xl border border-white/5 flex items-center justify-between text-xs font-semibold transition-all group"
+                className="w-full py-3 px-4 flex items-center justify-between text-xs font-semibold group h-auto"
               >
                 <div className="flex items-center gap-2">
-                  <Crop className="w-4 h-4 text-[#d0bcff] group-hover:rotate-12 transition-transform" />
+                  <Crop className="w-4 h-4 text-primary group-hover:rotate-12 transition-transform" />
                   <span>Activate Crop Overlay</span>
                 </div>
-                <span className="text-[10px] text-[#cbc3d7]/50 font-mono">C</span>
-              </button>
+                <span className="text-[10px] text-muted-foreground font-mono">C</span>
+              </Button>
             ) : (
-              <div className="space-y-2 p-1.5 bg-white/5 rounded-xl border border-[#d0bcff]/20">
-                <div className="flex items-center justify-between px-2 py-1">
-                  <span className="text-[10px] font-bold text-[#d0bcff] uppercase">Crop Mode Active</span>
-                  <span className="text-[9px] font-mono opacity-50">{Math.round(crop.width)}% x {Math.round(crop.height)}%</span>
+              <div className="space-y-2 p-3 bg-muted/50 rounded-xl border">
+                <div className="flex items-center justify-between px-1 py-1">
+                  <span className="text-[10px] font-bold text-primary uppercase">Crop Mode Active</span>
+                  <span className="text-[9px] font-mono opacity-50 text-muted-foreground">{Math.round(crop.width)}% x {Math.round(crop.height)}%</span>
                 </div>
                 
                 <div className="grid grid-cols-2 gap-2 pt-1">
-                  <button
+                  <Button
+                    size="sm"
                     onClick={executeCrop}
-                    className="py-2 px-3 bg-gradient-to-r from-[#8B5CF6] to-[#6d3bd7] text-white text-[11px] font-bold rounded-lg hover:opacity-95 flex items-center justify-center gap-1"
+                    className="text-[11px] font-bold h-8"
                   >
-                    <Check className="w-3.5 h-3.5" />
+                    <Check className="w-3.5 h-3.5 mr-1" />
                     Apply Crop
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
                     onClick={() => setIsCropMode(false)}
-                    className="py-2 px-3 bg-white/5 text-[#cbc3d7] hover:text-white text-[11px] font-semibold rounded-lg hover:bg-white/10 flex items-center justify-center gap-1"
+                    className="text-[11px] font-semibold h-8"
                   >
-                    <X className="w-3.5 h-3.5" />
+                    <X className="w-3.5 h-3.5 mr-1" />
                     Cancel
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}
           </div>
 
-          <div className="h-px bg-white/5" />
+          <div className="h-px bg-border" />
 
           {/* Section: Gemini AI Canvas Edit */}
           <div className="space-y-3 flex-1 flex flex-col min-h-0">
             <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-white/40">Gemini AI Prompt Editor</h3>
-              <Sparkles className="w-3.5 h-3.5 text-[#d0bcff] animate-pulse" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Gemini AI Prompt Editor</h3>
+              <Sparkles className="w-3.5 h-3.5 text-primary animate-pulse" />
             </div>
 
             <p className="text-xs text-[#cbc3d7] leading-relaxed">

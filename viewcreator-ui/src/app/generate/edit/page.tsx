@@ -43,43 +43,81 @@ export default function EditImagePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Save / Unsaved change state
+  const [lastSavedUrl, setLastSavedUrl] = useState<string | null>(previewUrl || selectedImage || null);
+  const [isSaved, setIsSaved] = useState(true);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+
   // Undo/Redo Edit Session History Stack
   const [history, setHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
 
-  // Initialize history on mount
+  // Initialize history and saved state on mount
   useEffect(() => {
     const initialImg = previewUrl || selectedImage;
-    if (initialImg && history.length === 0) {
-      setHistory([initialImg]);
-      setHistoryIndex(0);
+    if (initialImg) {
+      if (history.length === 0) {
+        setHistory([initialImg]);
+        setHistoryIndex(0);
+      }
+      setLastSavedUrl(initialImg);
+      setIsSaved(true);
     }
   }, [previewUrl, selectedImage, history.length]);
+
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!isSaved) {
+        event.preventDefault();
+        event.returnValue = "";
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isSaved]);
 
   const pushToHistory = (newUrl: string) => {
     const newHistory = history.slice(0, historyIndex + 1);
     setHistory([...newHistory, newUrl]);
     setHistoryIndex(newHistory.length);
+    setIsSaved(newUrl === lastSavedUrl);
   };
 
   const handleUndo = () => {
     if (historyIndex > 0) {
       const prevIndex = historyIndex - 1;
-      setHistoryIndex(prevIndex);
       const url = history[prevIndex];
+      setHistoryIndex(prevIndex);
       setPreviewImageUrl(url);
-      updateState({ previewUrl: url });
+      setIsSaved(url === lastSavedUrl);
     }
   };
 
   const handleRedo = () => {
     if (historyIndex < history.length - 1) {
       const nextIndex = historyIndex + 1;
-      setHistoryIndex(nextIndex);
       const url = history[nextIndex];
+      setHistoryIndex(nextIndex);
       setPreviewImageUrl(url);
-      updateState({ previewUrl: url });
+      setIsSaved(url === lastSavedUrl);
     }
+  };
+
+  const handleSave = () => {
+    if (!previewImageUrl || typeof selectedIndex !== "number") return;
+
+    // Replace the item at selectedIndex with the saved previewImageUrl
+    const updatedImageUrls = [...imageUrls];
+    updatedImageUrls[selectedIndex] = previewImageUrl;
+
+    updateState({ 
+      previewUrl: previewImageUrl, 
+      editInstruction: instruction,
+      imageUrls: updatedImageUrls
+    });
+    setLastSavedUrl(previewImageUrl);
+    setIsSaved(true);
   };
 
   const canUndo = historyIndex > 0;
@@ -110,6 +148,21 @@ export default function EditImagePage() {
   };
 
   const handleBack = () => {
+    if (!isSaved) {
+      setShowConfirmModal(true);
+      return;
+    }
+    router.push("/generate");
+  };
+
+  const handleDiscardAndLeave = () => {
+    setShowConfirmModal(false);
+    router.push("/generate");
+  };
+
+  const handleSaveAndLeave = () => {
+    handleSave();
+    setShowConfirmModal(false);
     router.push("/generate");
   };
 
@@ -149,7 +202,6 @@ export default function EditImagePage() {
 
       const updatedUrl = data.imageUrls?.[0] ?? currentImage;
       setPreviewImageUrl(updatedUrl);
-      updateState({ previewUrl: updatedUrl, editInstruction: instruction });
       setInstruction("");
       pushToHistory(updatedUrl);
     } catch (err: unknown) {
@@ -290,7 +342,6 @@ export default function EditImagePage() {
       try {
         const croppedDataUrl = canvas.toDataURL("image/png");
         setPreviewImageUrl(croppedDataUrl);
-        updateState({ previewUrl: croppedDataUrl });
         setIsCropMode(false);
         pushToHistory(croppedDataUrl);
       } catch (e) {
@@ -307,10 +358,10 @@ export default function EditImagePage() {
   const handleReset = () => {
     if (selectedImage) {
       setPreviewImageUrl(selectedImage);
-      updateState({ previewUrl: selectedImage });
       setCrop({ x: 10, y: 10, width: 80, height: 80 });
       setIsCropMode(false);
       setError(null);
+      setIsSaved(selectedImage === lastSavedUrl);
       pushToHistory(selectedImage);
     }
   };
@@ -381,7 +432,21 @@ export default function EditImagePage() {
             <span>Redo</span>
           </Button>
 
-          <Button 
+          <Button
+            variant={isSaved ? "outline" : "default"}
+            onClick={handleSave}
+            disabled={isSaved || !previewImageUrl}
+            className={`h-9 px-4 text-xs font-bold rounded-full transition-all active:scale-95 ${
+              !isSaved 
+                ? "bg-primary text-primary-foreground shadow-md hover:bg-primary/90" 
+                : "text-muted-foreground border-muted bg-transparent"
+            }`}
+          >
+            <Check className="w-4 h-4 mr-1.5" />
+            <span>{isSaved ? "Saved" : "Save Changes"}</span>
+          </Button>
+
+          <Button
             variant="ghost"
             onClick={handleReset}
             className="h-9 px-3 text-xs font-semibold"
@@ -390,8 +455,8 @@ export default function EditImagePage() {
             <span>Revert Original</span>
           </Button>
           
-          <Button 
-            onClick={handleExport} 
+          <Button
+            onClick={handleExport}
             className="h-9 px-6 rounded-full font-bold shadow-sm transition-all active:scale-95"
           >
             <Download className="w-3.5 h-3.5 mr-1.5" />
@@ -578,6 +643,29 @@ export default function EditImagePage() {
 
         </section>
       </main>
+
+      {showConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-6">
+          <div className="w-full max-w-md rounded-3xl bg-card border border-white/10 p-6 shadow-2xl">
+            <h2 className="text-lg font-bold">Close editor without saving?</h2>
+            <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
+              You have unsaved changes. If you close without saving, all your edits will be lost.
+            </p>
+
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+              <Button variant="ghost" onClick={() => setShowConfirmModal(false)} className="w-full sm:w-auto order-first sm:order-none">
+                Cancel
+              </Button>
+              <Button variant="outline" onClick={handleDiscardAndLeave} className="w-full sm:w-auto">
+                Close without Saving
+              </Button>
+              <Button onClick={handleSaveAndLeave} className="w-full sm:w-auto">
+                Save and Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

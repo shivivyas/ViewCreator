@@ -1,11 +1,13 @@
 import { configureStore } from "@reduxjs/toolkit";
 
 import appReducer from "@/store/slices/app-slice";
+import imageEditorReducer from "@/store/slices/image-editor-slice";
 
 export const makeStore = () =>
   configureStore({
     reducer: {
       app: appReducer,
+      imageEditor: imageEditorReducer,
     },
   });
 

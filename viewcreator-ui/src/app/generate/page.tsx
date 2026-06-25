@@ -1,13 +1,15 @@
 "use client";
 
 import { useState, useRef } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAppDispatch } from '@/store/hooks';
+import { setImageEditorState } from '@/store/slices/image-editor-slice';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   ImageIcon, 
@@ -17,10 +19,7 @@ import {
   Sparkles, 
   Loader2, 
   Upload, 
-  X,
-  Square,
-  RectangleHorizontal,
-  RectangleVertical
+  X
 } from 'lucide-react';
 
 const STYLE_DESCRIPTIONS: Record<string, string> = {
@@ -61,6 +60,23 @@ export default function GenerateImagePage() {
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const dispatch = useAppDispatch();
+  const router = useRouter();
+
+  const handleSelectImage = (index: number) => {
+    dispatch(
+      setImageEditorState({
+        imageUrls,
+        selectedIndex: index,
+        basePrompt: prompt,
+        style,
+        aspectRatio,
+        previewUrl: imageUrls[index],
+      })
+    );
+    router.push('/generate/edit');
+  };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -116,8 +132,8 @@ export default function GenerateImagePage() {
       }
 
       setImageUrls(data.imageUrls || []);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Something went wrong');
     } finally {
       setIsLoading(false);
     }
@@ -406,12 +422,16 @@ export default function GenerateImagePage() {
                           <img 
                             src={url} 
                             alt={`${prompt} - variation ${i+1}`} 
-                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                            onClick={() => handleSelectImage(i)}
+                            className="w-full h-full object-cover cursor-pointer transition-transform duration-500 group-hover:scale-105"
                           />
                           {/* Hover Overlay */}
                           <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center gap-2">
                             <Button variant="secondary" size="sm" onClick={() => handleDownload(url, i)} className="text-xs h-8">
                               <Download className="w-3 h-3 mr-1" /> Download
+                            </Button>
+                            <Button variant="secondary" size="sm" onClick={() => handleSelectImage(i)} className="text-xs h-8">
+                              <Settings2 className="w-3 h-3 mr-1" /> Edit image
                             </Button>
                             <Button variant="outline" size="sm" className="text-xs h-8 bg-transparent text-white border-white/50 hover:bg-white/20 hover:text-white" onClick={handleGenerate}>
                               <Wand2 className="w-3 h-3 mr-1" /> Regenerate

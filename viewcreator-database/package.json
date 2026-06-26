@@ -1,0 +1,22 @@
+{
+  "name": "viewcreator-database",
+  "version": "1.0.0",
+  "description": "Database integration and model repositories for ViewCreator",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "db:migrate": "tsx src/migrate.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "pg": "^8.11.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.10",
+    "@types/pg": "^8.11.6",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from "@google/genai";
+import { TemplateRepository, UserRepository } from 'viewcreator-database';
 
 // Load environment variables
 dotenv.config();
@@ -14,9 +15,35 @@ const port = process.env.PORT || 3001;
 app.use(express.json({ limit: '10mb' }));
 app.use(cors());
 
+/**
+ * Downloads a public S3 template image and converts it to base64 format for Gemini
+ */
+async function fetchS3ImageAsBase64(url: string): Promise<{ mimeType: string; data: string }> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch template image from S3: ${response.statusText}`);
+  }
+  const arrayBuffer = await response.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+  const mimeType = response.headers.get('content-type') || 'image/webp';
+  const data = buffer.toString('base64');
+  return { mimeType, data };
+}
+
 // Health Check Endpoint
 app.get('/health', (req, res) => {
   res.json({ status: 'healthy', timestamp: new Date().toISOString() });
+});
+
+// Get All Templates Endpoint
+app.get('/api/templates', async (req, res) => {
+  try {
+    const templates = await TemplateRepository.findAll();
+    res.json({ templates });
+  } catch (error: any) {
+    console.error('Error fetching templates:', error);
+    res.status(500).json({ error: 'Failed to retrieve templates from database' });
+  }
 });
 
 // Image Generation Endpoint
@@ -31,7 +58,8 @@ app.post('/api/generate', async (req: express.Request, res: express.Response): P
       quality = 'Standard',
       thinkingLevel = 'minimal',
       referenceImages = [],
-      personGeneration = 'DONT_ALLOW'
+      personGeneration = 'DONT_ALLOW',
+      templateId
     } = req.body;
 
     if (!prompt) {
@@ -59,6 +87,30 @@ app.post('/api/generate', async (req: express.Request, res: express.Response): P
 
     // Build the contents array
     const contents: any[] = [finalPrompt];
+    
+    // If templateId is provided, retrieve the viral template from PostgreSQL and fetch its S3 image
+    if (templateId) {
+      try {
+        console.log(`[Generate API] Retrieving template ${templateId} from database...`);
+        const template = await TemplateRepository.findById(templateId);
+        if (template) {
+          console.log(`[Generate API] Fetching public S3 image from: ${template.s3_link}`);
+          const { mimeType, data } = await fetchS3ImageAsBase64(template.s3_link);
+          contents.push({
+            inlineData: {
+              mimeType,
+              data
+            }
+          });
+          console.log(`[Generate API] Successfully loaded template image as reference.`);
+        } else {
+          console.warn(`[Generate API] Template with ID ${templateId} not found.`);
+        }
+      } catch (err: any) {
+        console.error('[Generate API] Error processing template image:', err);
+        return res.status(400).json({ error: `Failed to load template image: ${err.message}` });
+      }
+    }
     
     // Process reference images (support up to 3 for composition control)
     if (Array.isArray(referenceImages) && referenceImages.length > 0) {

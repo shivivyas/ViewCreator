@@ -7,6 +7,7 @@ const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const genai_1 = require("@google/genai");
+const viewcreator_database_1 = require("viewcreator-database");
 // Load environment variables
 dotenv_1.default.config();
 const app = (0, express_1.default)();
@@ -15,14 +16,39 @@ const port = process.env.PORT || 3001;
 // Use a large payload limit (e.g., 10mb) to support base64 encoded reference images
 app.use(express_1.default.json({ limit: '10mb' }));
 app.use((0, cors_1.default)());
+/**
+ * Downloads a public S3 template image and converts it to base64 format for Gemini
+ */
+async function fetchS3ImageAsBase64(url) {
+    const response = await fetch(url);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch template image from S3: ${response.statusText}`);
+    }
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const mimeType = response.headers.get('content-type') || 'image/webp';
+    const data = buffer.toString('base64');
+    return { mimeType, data };
+}
 // Health Check Endpoint
 app.get('/health', (req, res) => {
     res.json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
+// Get All Templates Endpoint
+app.get('/api/templates', async (req, res) => {
+    try {
+        const templates = await viewcreator_database_1.TemplateRepository.findAll();
+        res.json({ templates });
+    }
+    catch (error) {
+        console.error('Error fetching templates:', error);
+        res.status(500).json({ error: 'Failed to retrieve templates from database' });
+    }
+});
 // Image Generation Endpoint
 app.post('/api/generate', async (req, res) => {
     try {
-        const { prompt, aspectRatio = '1:1', imageSize = '1K', numberOfImages = 1, style = 'None', quality = 'Standard', thinkingLevel = 'minimal', referenceImages = [], personGeneration = 'DONT_ALLOW' } = req.body;
+        const { prompt, aspectRatio = '1:1', imageSize = '1K', numberOfImages = 1, style = 'None', quality = 'Standard', thinkingLevel = 'minimal', referenceImages = [], personGeneration = 'DONT_ALLOW', templateId } = req.body;
         if (!prompt) {
             return res.status(400).json({ error: 'Prompt is required' });
         }
@@ -43,6 +69,31 @@ app.post('/api/generate', async (req, res) => {
         }
         // Build the contents array
         const contents = [finalPrompt];
+        // If templateId is provided, retrieve the viral template from PostgreSQL and fetch its S3 image
+        if (templateId) {
+            try {
+                console.log(`[Generate API] Retrieving template ${templateId} from database...`);
+                const template = await viewcreator_database_1.TemplateRepository.findById(templateId);
+                if (template) {
+                    console.log(`[Generate API] Fetching public S3 image from: ${template.s3_link}`);
+                    const { mimeType, data } = await fetchS3ImageAsBase64(template.s3_link);
+                    contents.push({
+                        inlineData: {
+                            mimeType,
+                            data
+                        }
+                    });
+                    console.log(`[Generate API] Successfully loaded template image as reference.`);
+                }
+                else {
+                    console.warn(`[Generate API] Template with ID ${templateId} not found.`);
+                }
+            }
+            catch (err) {
+                console.error('[Generate API] Error processing template image:', err);
+                return res.status(400).json({ error: `Failed to load template image: ${err.message}` });
+            }
+        }
         // Process reference images (support up to 3 for composition control)
         if (Array.isArray(referenceImages) && referenceImages.length > 0) {
             for (const refImage of referenceImages.slice(0, 3)) {

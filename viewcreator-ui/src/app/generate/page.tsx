@@ -65,6 +65,34 @@ export default function GenerateImagePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
+
+  // Fetch templates from PostgreSQL database backend
+  useEffect(() => {
+    const fetchTemplates = async () => {
+      setIsLoadingTemplates(true);
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+        const response = await fetch(`${apiUrl}/api/templates`);
+        if (response.ok) {
+          const data = await response.json();
+          const loadedTemplates = data.templates || [];
+          setTemplates(loadedTemplates);
+          if (loadedTemplates.length > 0) {
+            setSelectedTemplateId(loadedTemplates[0].id);
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching templates:', err);
+      } finally {
+        setIsLoadingTemplates(false);
+      }
+    };
+    fetchTemplates();
+  }, []);
+
   // Sync state to redux when fetching new images
   useEffect(() => {
     if (imageUrls.length > 0) {
@@ -129,7 +157,8 @@ export default function GenerateImagePage() {
           imageSize,
           thinkingLevel,
           quality: isPremium ? 'Premium' : 'Standard',
-          referenceImages
+          referenceImages,
+          templateId: selectedTemplateId
         }),
       });
 
@@ -190,7 +219,80 @@ export default function GenerateImagePage() {
           <ScrollArea className="flex-1">
             <form id="generate-form" onSubmit={handleGenerate} className="flex flex-col gap-5 p-4">
               
-              {/* 1. Prompt */}
+              {/* 1. Viral Templates */}
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold flex items-center justify-between">
+                  <span>Select Viral Template</span>
+                  {isLoadingTemplates && <Loader2 className="w-3 h-3 animate-spin text-primary" />}
+                </Label>
+                {templates.length > 0 ? (
+                  <div className="grid grid-cols-1 gap-2">
+                    {templates.map((tpl) => (
+                      <div
+                        key={tpl.id}
+                        onClick={() => {
+                          setSelectedTemplateId(tpl.id);
+                          // Also set style and aspect ratio if defined in config
+                          if (tpl.config?.stylePreset) {
+                            setStyle(tpl.config.stylePreset);
+                          }
+                          if (tpl.config?.aspectRatio) {
+                            setAspectRatio(tpl.config.aspectRatio);
+                          }
+                        }}
+                        className={`cursor-pointer rounded-lg border p-2 flex items-center gap-3 transition-all ${
+                          selectedTemplateId === tpl.id
+                            ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                            : 'border-muted hover:border-primary/50'
+                        }`}
+                      >
+                        <div className="w-12 h-12 rounded bg-muted overflow-hidden shrink-0 flex items-center justify-center border">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={tpl.s3_link}
+                            alt={tpl.title}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="text-xs font-semibold truncate">{tpl.title}</h4>
+                          <p className="text-[10px] text-muted-foreground line-clamp-2 leading-snug">
+                            {tpl.description}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                    
+                    {/* Recommended prompts selector for the active template */}
+                    {templates.find((t) => t.id === selectedTemplateId)?.config?.recommendedPrompts && (
+                      <div className="pt-1.5 space-y-1">
+                        <span className="text-[10px] font-medium text-muted-foreground">Suggested Prompts:</span>
+                        <div className="flex flex-col gap-1">
+                          {templates
+                            .find((t) => t.id === selectedTemplateId)
+                            .config.recommendedPrompts.map((p: string, idx: number) => (
+                              <button
+                                key={idx}
+                                type="button"
+                                onClick={() => setPrompt(p)}
+                                className="text-[10px] text-left text-primary hover:underline bg-muted/30 p-1.5 rounded border border-dashed hover:bg-muted/50 truncate"
+                                title={p}
+                              >
+                                "{p}"
+                              </button>
+                            ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-xs p-3 text-center border border-dashed rounded-lg bg-muted/10 text-muted-foreground">
+                    {!isLoadingTemplates ? "No templates found. Database or API offline." : "Loading viral templates..."}
+                  </div>
+                )}
+              </div>
+
+              {/* 2. Prompt */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="prompt" className="text-xs font-semibold">
@@ -210,7 +312,7 @@ export default function GenerateImagePage() {
                 />
               </div>
 
-              {/* 2. Reference Images */}
+              {/* 3. Reference Images */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label className="text-xs font-semibold">References ({referenceImages.length}/3)</Label>

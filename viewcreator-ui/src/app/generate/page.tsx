@@ -15,7 +15,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { 
@@ -34,27 +33,12 @@ import {
   RefreshCw
 } from 'lucide-react';
 
-const STYLE_DESCRIPTIONS: Record<string, string> = {
-  'Product Photo': 'Perfect for SaaS dashboards, software interfaces, and tech product marketing. Emphasizes clean, professional product shots with clear UI elements.',
-  'Corporate': 'Formal business imagery for corporate communications, annual reports, and professional services. Conveys trust, stability, and professionalism.',
-  'Minimal': 'Clean, simple compositions with lots of negative space. Ideal for modern startups, tech companies, and minimalist brands.',
-  'Modern': 'Contemporary, trendy visual style with bold colors and dynamic compositions. Great for Gen-Z brands and forward-thinking companies.',
-  'Luxury': 'High-end, elegant aesthetics with premium feel. Perfect for luxury brands, high-ticket services, and upscale marketing.',
-  'Dark': 'Sophisticated dark-themed visuals. Ideal for gaming, fintech, SaaS dark mode UIs, and modern tech brands.'
-};
-
 const ASPECT_RATIO_DESCRIPTIONS: Record<string, string> = {
-  '1:1': 'Square format - Perfect for social media feed posts (Instagram, LinkedIn, Facebook), product thumbnails, and profile images.',
-  '4:5': 'Vertical portrait - Ideal for mobile ads, Instagram Stories (slightly wider), and mobile app marketing.',
-  '9:16': 'Full mobile story - Optimized for vertical video platforms (TikTok, Instagram Reels, YouTube Shorts) and mobile-first content.',
-  '16:9': 'Wide landscape - Standard for desktop web, YouTube thumbnails, presentation slides, and web banner ads.',
-  '2:3': 'Pinterest-style - Optimized specifically for Pinterest pins and tall vertical designs. Pinterest favors this ratio.',
-  '3:2': 'Classic landscape - Horizontal orientation, slightly wider than 16:9. Good for presentations and print.',
-  '4:3': 'Standard screen - Traditional aspect ratio for older displays and some professional work.',
-  '3:4': 'Portrait variant - Taller vertical format, similar to 9:16 but slightly wider.',
-  '5:4': 'Classic monitor - Historical standard monitor ratio, useful for certain layouts.',
-  '1:4': 'Ultra-tall - Extreme vertical for tall banners and narrow columns.',
-  '4:1': 'Ultra-wide - Extreme horizontal for panoramic and wide banners.'
+  '1:1': 'Square format (1:1) - Best for feed posts on Instagram, LinkedIn, Threads, Twitter, and Reddit.',
+  '4:5': 'Vertical Portrait (4:5) - Perfect for Instagram, Threads, and LinkedIn feed posts.',
+  '9:16': 'Full Mobile Story (9:16) - Optimized for vertical video/story platforms like TikTok, Instagram Reels, and YouTube Shorts.',
+  '16:9': 'Wide Landscape (16:9) - Standard for Twitter, LinkedIn, YouTube, and Reddit posts.',
+  '2:3': 'Pinterest Pin (2:3) - Optimized specifically for Pinterest pins and tall vertical visual content.'
 };
 
 interface Template {
@@ -77,7 +61,6 @@ export default function GenerateImagePage() {
   const [mounted, setMounted] = useState(false);
 
   const [prompt, setPrompt] = useState(editorState.basePrompt || '');
-  const [style, setStyle] = useState(editorState.style || 'Product Photo');
   const [aspectRatio, setAspectRatio] = useState(editorState.aspectRatio || '1:1');
   const [numberOfImages, setNumberOfImages] = useState(4);
   const [isPremium, setIsPremium] = useState(false);
@@ -94,6 +77,12 @@ export default function GenerateImagePage() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
+
+  // Get active template's style preset or fallback to 'None'
+  const getSelectedTemplateStyle = () => {
+    const activeTemplate = templates.find((t) => t.id === selectedTemplateId);
+    return activeTemplate?.config?.stylePreset || 'None';
+  };
 
   // Set mounted state asynchronously to avoid SSR and React state update warnings
   useEffect(() => {
@@ -130,13 +119,14 @@ export default function GenerateImagePage() {
   // Sync state to redux when fetching new images
   useEffect(() => {
     if (imageUrls.length > 0) {
-      dispatch(setImageEditorState({ imageUrls, basePrompt: prompt, style, aspectRatio }));
+      const activeTemplate = templates.find((t) => t.id === selectedTemplateId);
+      const activeStyle = activeTemplate?.config?.stylePreset || 'None';
+      dispatch(setImageEditorState({ imageUrls, basePrompt: prompt, style: activeStyle, aspectRatio }));
     }
-  }, [imageUrls, prompt, style, aspectRatio, dispatch]);
+  }, [imageUrls, prompt, selectedTemplateId, aspectRatio, dispatch, templates]);
 
   const handleLoadSettings = (item: GenerationHistoryItem) => {
     setPrompt(item.prompt);
-    setStyle(item.style);
     setAspectRatio(item.aspectRatio);
     setNumberOfImages(item.numberOfImages);
     setImageSize(item.imageSize);
@@ -155,7 +145,7 @@ export default function GenerateImagePage() {
         imageUrls: item.imageUrls,
         selectedIndex: index,
         basePrompt: item.prompt,
-        style: item.style,
+        style: item.style || 'None',
         aspectRatio: item.aspectRatio,
         previewUrl: item.imageUrls[index],
       })
@@ -247,7 +237,7 @@ export default function GenerateImagePage() {
 
     await generateImages({
       prompt,
-      style,
+      style: getSelectedTemplateStyle(),
       aspectRatio,
       numberOfImages,
       imageSize,
@@ -262,7 +252,7 @@ export default function GenerateImagePage() {
     handleLoadSettings(item);
     await generateImages({
       prompt: item.prompt,
-      style: item.style,
+      style: item.style || 'None',
       aspectRatio: item.aspectRatio,
       numberOfImages: item.numberOfImages,
       imageSize: item.imageSize,
@@ -329,10 +319,7 @@ export default function GenerateImagePage() {
                         key={tpl.id}
                         onClick={() => {
                           setSelectedTemplateId(tpl.id);
-                          // Also set style and aspect ratio if defined in config
-                          if (tpl.config?.stylePreset) {
-                            setStyle(tpl.config.stylePreset);
-                          }
+                          // Also set aspect ratio if defined in config
                           if (tpl.config?.aspectRatio) {
                             setAspectRatio(tpl.config.aspectRatio);
                           }
@@ -460,31 +447,7 @@ export default function GenerateImagePage() {
                 />
               </div>
 
-              {/* 3. Style */}
-              <div className="space-y-2">
-                <Label className="text-xs font-semibold">Style</Label>
-                <RadioGroup value={style} onValueChange={setStyle} className="grid grid-cols-3 gap-2">
-                  {Object.keys(STYLE_DESCRIPTIONS).map((styleId) => (
-                    <div key={styleId} className="relative group">
-                      <Label
-                        className={`cursor-pointer rounded-md border-2 p-2 text-center transition-all block h-full ${
-                          style === styleId ? 'border-primary bg-primary/10' : 'border-muted hover:border-primary/50'
-                        }`}
-                        title={STYLE_DESCRIPTIONS[styleId]}
-                      >
-                        <RadioGroupItem value={styleId} className="sr-only" />
-                        <span className="text-[10px] font-medium leading-tight">{styleId}</span>
-                      </Label>
-                      {/* Tooltip on hover */}
-                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block bg-black/90 text-white text-xs rounded px-2 py-1 whitespace-nowrap z-50 max-w-xs">
-                        {STYLE_DESCRIPTIONS[styleId]}
-                      </div>
-                    </div>
-                  ))}
-                </RadioGroup>
-              </div>
-
-              {/* 4. Aspect Ratio */}
+              {/* 3. Aspect Ratio */}
               <div className="space-y-2">
                 <Label className="text-xs font-semibold">Aspect Ratio</Label>
                 <div className="flex flex-wrap gap-1.5">
@@ -647,7 +610,6 @@ export default function GenerateImagePage() {
                           &quot;{prompt}&quot;
                         </div>
                         <div className="flex flex-wrap gap-1.5">
-                          <Badge variant="secondary" className="text-[9px] px-1.5 py-0">Style: {style}</Badge>
                           <Badge variant="secondary" className="text-[9px] px-1.5 py-0">Ratio: {aspectRatio}</Badge>
                           <Badge variant="secondary" className="text-[9px] px-1.5 py-0">Size: {imageSize}</Badge>
                           <Badge variant="secondary" className="text-[9px] px-1.5 py-0">{isPremium ? 'Premium' : 'Standard'}</Badge>
@@ -682,9 +644,6 @@ export default function GenerateImagePage() {
                                 <Clock className="w-3 h-3 text-muted-foreground/60" />
                                 {item.timestamp}
                               </span>
-                              <Badge variant="outline" className="text-[9px] border-primary/20 bg-primary/5 text-primary font-medium px-1.5 py-0">
-                                {item.style}
-                              </Badge>
                               <Badge variant="outline" className="text-[9px] font-medium px-1.5 py-0">
                                 {item.aspectRatio}
                               </Badge>

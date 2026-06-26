@@ -39,7 +39,7 @@ const initialState: ImageEditorState = {
   imageUrls: [],
   selectedIndex: null,
   basePrompt: "",
-  style: "Product Photo",
+  style: "None",
   aspectRatio: "1:1",
   editInstruction: "",
   adjustments: {

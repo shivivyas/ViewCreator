@@ -3,7 +3,13 @@
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { setImageEditorState } from '@/store/slices/image-editor-slice';
+import { 
+  setImageEditorState, 
+  addGenerationToHistory, 
+  deleteGenerationFromHistory, 
+  clearHistory,
+  type GenerationHistoryItem
+} from '@/store/slices/image-editor-slice';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -11,6 +17,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
 import { 
   ImageIcon, 
   Wand2, 
@@ -19,7 +26,12 @@ import {
   Sparkles, 
   Loader2, 
   Upload, 
-  X
+  X,
+  History,
+  Trash2,
+  Copy,
+  Clock,
+  RefreshCw
 } from 'lucide-react';
 
 const STYLE_DESCRIPTIONS: Record<string, string> = {
@@ -45,10 +57,24 @@ const ASPECT_RATIO_DESCRIPTIONS: Record<string, string> = {
   '4:1': 'Ultra-wide - Extreme horizontal for panoramic and wide banners.'
 };
 
+interface Template {
+  id: string;
+  title: string;
+  description: string;
+  s3_link: string;
+  config?: {
+    stylePreset?: string;
+    aspectRatio?: string;
+    recommendedPrompts?: string[];
+  };
+}
+
 export default function GenerateImagePage() {
   const dispatch = useAppDispatch();
   const router = useRouter();
   const editorState = useAppSelector((state) => state.imageEditor);
+
+  const [mounted, setMounted] = useState(false);
 
   const [prompt, setPrompt] = useState(editorState.basePrompt || '');
   const [style, setStyle] = useState(editorState.style || 'Product Photo');
@@ -65,9 +91,17 @@ export default function GenerateImagePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [templates, setTemplates] = useState<any[]>([]);
+  const [templates, setTemplates] = useState<Template[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
+
+  // Set mounted state asynchronously to avoid SSR and React state update warnings
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setMounted(true);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Fetch templates from PostgreSQL database backend
   useEffect(() => {
@@ -100,15 +134,30 @@ export default function GenerateImagePage() {
     }
   }, [imageUrls, prompt, style, aspectRatio, dispatch]);
 
-  const handleSelectImage = (index: number) => {
+  const handleLoadSettings = (item: GenerationHistoryItem) => {
+    setPrompt(item.prompt);
+    setStyle(item.style);
+    setAspectRatio(item.aspectRatio);
+    setNumberOfImages(item.numberOfImages);
+    setImageSize(item.imageSize);
+    setThinkingLevel(item.thinkingLevel);
+    setIsPremium(item.quality === 'Premium');
+    if (item.templateId) {
+      setSelectedTemplateId(item.templateId);
+    } else {
+      setSelectedTemplateId(null);
+    }
+  };
+
+  const handleSelectImageFromHistory = (item: GenerationHistoryItem, index: number) => {
     dispatch(
       setImageEditorState({
-        imageUrls,
+        imageUrls: item.imageUrls,
         selectedIndex: index,
-        basePrompt: prompt,
-        style,
-        aspectRatio,
-        previewUrl: imageUrls[index],
+        basePrompt: item.prompt,
+        style: item.style,
+        aspectRatio: item.aspectRatio,
+        previewUrl: item.imageUrls[index],
       })
     );
     router.push('/generate/edit');
@@ -134,10 +183,17 @@ export default function GenerateImagePage() {
     setReferenceImages(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleGenerate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!prompt.trim()) return;
-
+  const generateImages = async (params: {
+    prompt: string;
+    style: string;
+    aspectRatio: string;
+    numberOfImages: number;
+    imageSize: string;
+    thinkingLevel: string;
+    quality: 'Standard' | 'Premium';
+    referenceImages: string[];
+    templateId: string | null;
+  }) => {
     setIsLoading(true);
     setError(null);
     setImageUrls([]);
@@ -149,17 +205,7 @@ export default function GenerateImagePage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
-          prompt,
-          style,
-          aspectRatio,
-          numberOfImages,
-          imageSize,
-          thinkingLevel,
-          quality: isPremium ? 'Premium' : 'Standard',
-          referenceImages,
-          templateId: selectedTemplateId
-        }),
+        body: JSON.stringify(params),
       });
 
       const data = await response.json();
@@ -168,7 +214,26 @@ export default function GenerateImagePage() {
         throw new Error(data.error || 'Something went wrong');
       }
 
-      setImageUrls(data.imageUrls || []);
+      const generatedUrls = data.imageUrls || [];
+      setImageUrls(generatedUrls);
+
+      if (generatedUrls.length > 0) {
+        const historyItem: GenerationHistoryItem = {
+          id: `gen-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          prompt: params.prompt,
+          style: params.style,
+          aspectRatio: params.aspectRatio,
+          numberOfImages: params.numberOfImages,
+          imageSize: params.imageSize,
+          thinkingLevel: params.thinkingLevel,
+          quality: params.quality,
+          imageUrls: generatedUrls,
+          referenceImages: params.referenceImages.length > 0 ? [...params.referenceImages] : undefined,
+          templateId: params.templateId
+        };
+        dispatch(addGenerationToHistory(historyItem));
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
     } finally {
@@ -176,10 +241,42 @@ export default function GenerateImagePage() {
     }
   };
 
-  const handleDownload = (url: string, index: number) => {
+  const handleGenerate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!prompt.trim()) return;
+
+    await generateImages({
+      prompt,
+      style,
+      aspectRatio,
+      numberOfImages,
+      imageSize,
+      thinkingLevel,
+      quality: isPremium ? 'Premium' : 'Standard',
+      referenceImages,
+      templateId: selectedTemplateId
+    });
+  };
+
+  const handleRegenerate = async (item: GenerationHistoryItem) => {
+    handleLoadSettings(item);
+    await generateImages({
+      prompt: item.prompt,
+      style: item.style,
+      aspectRatio: item.aspectRatio,
+      numberOfImages: item.numberOfImages,
+      imageSize: item.imageSize,
+      thinkingLevel: item.thinkingLevel,
+      quality: item.quality,
+      referenceImages: item.referenceImages || [],
+      templateId: item.templateId || null
+    });
+  };
+
+  const handleDownload = (url: string, index: number, prefix = 'generated') => {
     const a = document.createElement('a');
     a.href = url;
-    a.download = `generated-${Date.now()}-${index}.png`;
+    a.download = `${prefix}-${Date.now()}-${index}.png`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -264,13 +361,15 @@ export default function GenerateImagePage() {
                     ))}
                     
                     {/* Recommended prompts selector for the active template */}
-                    {templates.find((t) => t.id === selectedTemplateId)?.config?.recommendedPrompts && (
-                      <div className="pt-1.5 space-y-1">
-                        <span className="text-[10px] font-medium text-muted-foreground">Suggested Prompts:</span>
-                        <div className="flex flex-col gap-1">
-                          {templates
-                            .find((t) => t.id === selectedTemplateId)
-                            .config.recommendedPrompts.map((p: string, idx: number) => (
+                    {(() => {
+                      const activeTemplate = templates.find((t) => t.id === selectedTemplateId);
+                      const recommendedPrompts = activeTemplate?.config?.recommendedPrompts;
+                      if (!recommendedPrompts) return null;
+                      return (
+                        <div className="pt-1.5 space-y-1">
+                          <span className="text-[10px] font-medium text-muted-foreground">Suggested Prompts:</span>
+                          <div className="flex flex-col gap-1">
+                            {recommendedPrompts.map((p: string, idx: number) => (
                               <button
                                 key={idx}
                                 type="button"
@@ -278,12 +377,13 @@ export default function GenerateImagePage() {
                                 className="text-[10px] text-left text-primary hover:underline bg-muted/30 p-1.5 rounded border border-dashed hover:bg-muted/50 truncate"
                                 title={p}
                               >
-                                "{p}"
+                                &quot;{p}&quot;
                               </button>
                             ))}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      );
+                    })()}
                   </div>
                 ) : (
                   <div className="text-xs p-3 text-center border border-dashed rounded-lg bg-muted/10 text-muted-foreground">
@@ -483,7 +583,7 @@ export default function GenerateImagePage() {
               type="submit" 
               form="generate-form"
               className="w-full h-10 text-sm font-bold shadow-md hover:shadow-lg transition-all" 
-              disabled={isLoading || !prompt.trim()}
+              disabled={!mounted || isLoading || !prompt.trim()}
             >
               {isLoading ? (
                 <>
@@ -500,15 +600,26 @@ export default function GenerateImagePage() {
           </div>
         </Card>
 
-        {/* Right Area - Results */}
+        {/* Right Area - Results & History */}
         <div className="flex flex-col h-full gap-4 overflow-hidden">
           <Card className="flex-1 overflow-hidden flex flex-col shadow-md">
             <CardHeader className="border-b bg-muted/30 pb-2 pt-3 shrink-0">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-base font-medium flex items-center gap-2">
-                  <ImageIcon className="w-4 h-4" />
-                  Results
+                <CardTitle className="text-base font-semibold flex items-center gap-2">
+                  <History className="w-4 h-4 text-primary" />
+                  Generation History
                 </CardTitle>
+                {(editorState.history && editorState.history.length > 0) && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => dispatch(clearHistory())}
+                    className="h-8 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 mr-1" />
+                    Clear History
+                  </Button>
+                )}
               </div>
             </CardHeader>
             <ScrollArea className="flex-1">
@@ -516,48 +627,205 @@ export default function GenerateImagePage() {
                 {/* Background grid pattern */}
                 <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none"></div>
                 
-                <div className="relative z-10 w-full h-full flex flex-col items-center justify-center min-h-[350px]">
-                  {isLoading ? (
-                    <div className="flex flex-col items-center gap-3 text-muted-foreground">
-                      <Loader2 className="w-10 h-10 animate-spin text-primary" />
-                      <p className="text-xs font-medium animate-pulse">
-                        Painting your imagination...
-                      </p>
+                <div className="relative z-10 w-full flex flex-col gap-6">
+                  
+                  {/* Active Loading State */}
+                  {isLoading && (
+                    <div className="border border-primary/20 rounded-xl bg-primary/5 p-4 animate-pulse space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                          <span className="text-xs font-bold text-primary">Generating images...</span>
+                        </div>
+                        <span className="text-[10px] text-muted-foreground bg-background px-2 py-0.5 rounded border">
+                          Nano Banana 3.1
+                        </span>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <div className="bg-muted/50 border border-muted/80 p-2.5 rounded text-xs italic text-muted-foreground line-clamp-2">
+                          &quot;{prompt}&quot;
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          <Badge variant="secondary" className="text-[9px] px-1.5 py-0">Style: {style}</Badge>
+                          <Badge variant="secondary" className="text-[9px] px-1.5 py-0">Ratio: {aspectRatio}</Badge>
+                          <Badge variant="secondary" className="text-[9px] px-1.5 py-0">Size: {imageSize}</Badge>
+                          <Badge variant="secondary" className="text-[9px] px-1.5 py-0">{isPremium ? 'Premium' : 'Standard'}</Badge>
+                          {thinkingLevel === 'high' && <Badge variant="secondary" className="text-[9px] px-1.5 py-0 text-primary bg-primary/10 border-primary/20">Deep Thinking</Badge>}
+                        </div>
+                      </div>
+                      
+                      {/* Placeholder skeletons matching requested quantity */}
+                      <div className={`grid gap-3 ${numberOfImages === 1 ? 'grid-cols-1 max-w-sm mx-auto' : numberOfImages === 2 ? 'grid-cols-2' : 'grid-cols-2'}`}>
+                        {Array.from({ length: numberOfImages }).map((_, i) => (
+                          <div key={i} className="aspect-square bg-muted/40 rounded-lg border border-dashed flex flex-col items-center justify-center text-center">
+                            <ImageIcon className="w-6 h-6 text-muted-foreground/30 animate-bounce mb-1" />
+                            <span className="text-[10px] text-muted-foreground/40 font-medium">Variation {i + 1}...</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  ) : imageUrls.length > 0 ? (
-                    <div className={`w-full grid gap-3 ${imageUrls.length === 1 ? 'grid-cols-1 max-w-lg mx-auto' : imageUrls.length === 2 ? 'grid-cols-2' : 'grid-cols-2'}`}>
-                      {imageUrls.map((url, i) => (
-                        <div key={i} className="group relative rounded-lg overflow-hidden border shadow-sm bg-muted/20 flex items-center justify-center aspect-square">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img 
-                            src={url} 
-                            alt={`${prompt} - variation ${i+1}`} 
-                            onClick={() => handleSelectImage(i)}
-                            className="w-full h-full object-cover cursor-pointer transition-transform duration-500 group-hover:scale-105"
-                          />
-                          {/* Hover Overlay */}
-                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center gap-2">
-                            <Button variant="secondary" size="sm" onClick={() => handleDownload(url, i)} className="text-xs h-8">
-                              <Download className="w-3 h-3 mr-1" /> Download
-                            </Button>
-                            <Button variant="secondary" size="sm" onClick={() => handleSelectImage(i)} className="text-xs h-8">
-                              <Settings2 className="w-3 h-3 mr-1" /> Edit image
-                            </Button>
-                            <Button variant="outline" size="sm" className="text-xs h-8 bg-transparent text-white border-white/50 hover:bg-white/20 hover:text-white" onClick={handleGenerate}>
-                              <Wand2 className="w-3 h-3 mr-1" /> Regenerate
-                            </Button>
+                  )}
+
+                  {/* History List */}
+                  {editorState.history && editorState.history.length > 0 ? (
+                    <div className="space-y-6">
+                      {editorState.history.map((item) => (
+                        <div 
+                          key={item.id} 
+                          className="border border-muted rounded-xl bg-background shadow-sm hover:shadow transition-all overflow-hidden"
+                        >
+                          {/* Item Header */}
+                          <div className="bg-muted/10 border-b p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
+                            <div className="flex items-center flex-wrap gap-1.5">
+                              <span className="text-[10px] font-semibold text-muted-foreground flex items-center gap-1 shrink-0">
+                                <Clock className="w-3 h-3 text-muted-foreground/60" />
+                                {item.timestamp}
+                              </span>
+                              <Badge variant="outline" className="text-[9px] border-primary/20 bg-primary/5 text-primary font-medium px-1.5 py-0">
+                                {item.style}
+                              </Badge>
+                              <Badge variant="outline" className="text-[9px] font-medium px-1.5 py-0">
+                                {item.aspectRatio}
+                              </Badge>
+                              <Badge variant="outline" className="text-[9px] font-medium px-1.5 py-0">
+                                {item.imageSize}
+                              </Badge>
+                              <Badge 
+                                variant="outline" 
+                                className={`text-[9px] font-medium px-1.5 py-0 ${
+                                  item.quality === 'Premium' 
+                                    ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' 
+                                    : ''
+                                }`}
+                              >
+                                {item.quality}
+                              </Badge>
+                              {item.thinkingLevel === 'high' && (
+                                <Badge variant="outline" className="text-[9px] font-medium border-violet-500/20 bg-violet-500/5 text-violet-600 dark:text-violet-400 px-1.5 py-0">
+                                  Deep Think
+                                </Badge>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-1 sm:self-auto self-end shrink-0">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleLoadSettings(item)}
+                                className="h-7 text-[10px] px-2 text-muted-foreground hover:text-foreground hover:bg-muted"
+                                title="Load these parameters into form"
+                              >
+                                <Copy className="w-3 h-3 mr-1 text-muted-foreground/75" />
+                                Use settings
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleRegenerate(item)}
+                                disabled={isLoading}
+                                className="h-7 text-[10px] px-2 text-primary hover:text-primary hover:bg-primary/5"
+                                title="Regenerate these images"
+                              >
+                                <RefreshCw className="w-3 h-3 mr-1 text-primary/75" />
+                                Regenerate
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => dispatch(deleteGenerationFromHistory(item.id))}
+                                className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                title="Remove from history"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </Button>
+                            </div>
+                          </div>
+
+                          {/* Item Details */}
+                          <div className="p-3.5 space-y-3">
+                            {/* Prompt text box */}
+                            <div className="text-xs bg-muted/30 border border-muted/50 p-2.5 rounded-lg text-foreground font-normal leading-relaxed break-words whitespace-pre-wrap select-all">
+                              {item.prompt}
+                            </div>
+
+                            {/* Reference Images if available */}
+                            {item.referenceImages && item.referenceImages.length > 0 && (
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[10px] text-muted-foreground font-medium">Composition References:</span>
+                                <div className="flex gap-1">
+                                  {item.referenceImages.map((refImg, rIdx) => (
+                                    <div key={rIdx} className="w-6 h-6 rounded border bg-muted overflow-hidden flex items-center justify-center">
+                                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                                      <img src={refImg} alt={`Reference ${rIdx+1}`} className="max-h-full object-contain" />
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Image Grid */}
+                            <div className={`grid gap-3 ${
+                              item.imageUrls.length === 1 
+                                ? 'grid-cols-1 max-w-md' 
+                                : item.imageUrls.length === 2 
+                                ? 'grid-cols-2' 
+                                : 'grid-cols-2 lg:grid-cols-4'
+                            }`}>
+                              {item.imageUrls.map((url, i) => (
+                                <div 
+                                  key={i} 
+                                  className="group relative rounded-lg overflow-hidden border shadow-sm bg-muted/20 flex items-center justify-center aspect-square transition-all duration-300 hover:border-primary/30"
+                                >
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img 
+                                    src={url} 
+                                    alt={`Generated variation ${i+1}`} 
+                                    onClick={() => handleSelectImageFromHistory(item, i)}
+                                    className="w-full h-full object-cover cursor-pointer transition-transform duration-500 group-hover:scale-105"
+                                  />
+                                  
+                                  {/* Variation tag */}
+                                  <span className="absolute top-1.5 left-1.5 bg-black/75 text-[9px] text-white font-semibold rounded px-1.5 py-0.5 pointer-events-none select-none">
+                                    #{i + 1}
+                                  </span>
+
+                                  {/* Hover Overlay */}
+                                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center gap-1.5 p-2 text-center">
+                                    <Button 
+                                      variant="secondary" 
+                                      size="sm" 
+                                      onClick={() => handleDownload(url, i, `history-${item.id}`)} 
+                                      className="text-[10px] h-7 w-full max-w-[110px]"
+                                    >
+                                      <Download className="w-3 h-3 mr-1" /> Download
+                                    </Button>
+                                    <Button 
+                                      variant="secondary" 
+                                      size="sm" 
+                                      onClick={() => handleSelectImageFromHistory(item, i)} 
+                                      className="text-[10px] h-7 w-full max-w-[110px]"
+                                    >
+                                      <Settings2 className="w-3 h-3 mr-1" /> Edit Image
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
                           </div>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <div className="flex flex-col items-center gap-3 text-muted-foreground/60 p-6 text-center">
-                      <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mb-1">
-                        <ImageIcon className="w-8 h-8 opacity-50" />
+                    !isLoading && (
+                      <div className="flex flex-col items-center gap-3 text-muted-foreground/60 py-16 text-center">
+                        <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mb-1">
+                          <ImageIcon className="w-8 h-8 opacity-50" />
+                        </div>
+                        <h3 className="text-sm font-medium text-foreground">Awaiting Instructions</h3>
+                        <p className="text-xs max-w-xs">Configure parameters and click Generate to see your marketing assets come to life. Past generations will be preserved here during your session.</p>
                       </div>
-                      <h3 className="text-sm font-medium text-foreground">Awaiting Instructions</h3>
-                      <p className="text-xs max-w-xs">Configure parameters and click Generate to see your marketing assets come to life.</p>
-                    </div>
+                    )
                   )}
                 </div>
               </CardContent>

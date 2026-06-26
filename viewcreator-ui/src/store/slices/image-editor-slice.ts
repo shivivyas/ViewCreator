@@ -7,6 +7,21 @@ type ImageAdjustments = {
   warmth: number;
 };
 
+export type GenerationHistoryItem = {
+  id: string;
+  timestamp: string;
+  prompt: string;
+  style: string;
+  aspectRatio: string;
+  numberOfImages: number;
+  imageSize: string;
+  thinkingLevel: string;
+  quality: 'Standard' | 'Premium';
+  imageUrls: string[];
+  referenceImages?: string[];
+  templateId?: string | null;
+};
+
 export type ImageEditorState = {
   imageUrls: string[];
   selectedIndex: number | null;
@@ -17,6 +32,7 @@ export type ImageEditorState = {
   adjustments: ImageAdjustments;
   cropRatio: string;
   previewUrl: string | null;
+  history: GenerationHistoryItem[];
 };
 
 const initialState: ImageEditorState = {
@@ -34,6 +50,7 @@ const initialState: ImageEditorState = {
   },
   cropRatio: "1:1",
   previewUrl: null,
+  history: [],
 };
 
 const imageEditorSlice = createSlice({
@@ -47,10 +64,28 @@ const imageEditorSlice = createSlice({
       };
     },
     resetImageEditor(state) {
-      return initialState;
+      return {
+        ...initialState,
+        history: state.history, // Preserve history when resetting the editor
+      };
+    },
+    addGenerationToHistory(state, action: PayloadAction<GenerationHistoryItem>) {
+      state.history = [action.payload, ...state.history];
+    },
+    deleteGenerationFromHistory(state, action: PayloadAction<string>) {
+      state.history = state.history.filter(item => item.id !== action.payload);
+    },
+    clearHistory(state) {
+      state.history = [];
     },
   },
 });
 
-export const { setImageEditorState, resetImageEditor } = imageEditorSlice.actions;
+export const { 
+  setImageEditorState, 
+  resetImageEditor, 
+  addGenerationToHistory, 
+  deleteGenerationFromHistory,
+  clearHistory 
+} = imageEditorSlice.actions;
 export default imageEditorSlice.reducer;

@@ -1,12 +1,12 @@
+import dotenv from 'dotenv';
+// Load environment variables immediately before importing other modules
+dotenv.config();
+
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import { GoogleGenAI } from "@google/genai";
 import { TemplateRepository, UserRepository } from 'viewcreator-database';
 import { clerkMiddleware, requireAuth, clerkClient } from '@clerk/express';
-
-// Load environment variables
-dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3001;

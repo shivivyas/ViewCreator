@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from "@google/genai";
 import { TemplateRepository, UserRepository } from 'viewcreator-database';
+import { clerkMiddleware, requireAuth, clerkClient } from '@clerk/express';
 
 // Load environment variables
 dotenv.config();
@@ -14,6 +15,49 @@ const port = process.env.PORT || 3001;
 // Use a large payload limit (e.g., 10mb) to support base64 encoded reference images
 app.use(express.json({ limit: '10mb' }));
 app.use(cors());
+app.use(clerkMiddleware());
+
+/**
+ * Ensures the authenticated user exists in the database.
+ * If not, fetches details from Clerk and creates a new database record.
+ */
+async function ensureUserSynced(userId: string): Promise<void> {
+  try {
+    console.log(`[Auth Sync] Checking if user ${userId} exists in database...`);
+    const dbUser = await UserRepository.findById(userId);
+    if (!dbUser) {
+      console.log(`[Auth Sync] User ${userId} not found in database. Fetching from Clerk...`);
+      const clerkUser = await clerkClient.users.getUser(userId);
+      
+      const email = clerkUser.emailAddresses[0]?.emailAddress;
+      if (!email) {
+        throw new Error(`User ${userId} does not have a primary email address in Clerk.`);
+      }
+      
+      const name = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ') || undefined;
+      
+      console.log(`[Auth Sync] Registering user in database: ${email} | Name: ${name}`);
+      await UserRepository.create({
+        id: userId,
+        email,
+        name,
+      });
+      console.log(`[Auth Sync] Successfully created user row for ${userId}`);
+    } else {
+      console.log(`[Auth Sync] User ${userId} already exists in database.`);
+    }
+  } catch (error) {
+    console.error(`[Auth Sync] Failed to sync user ${userId}:`, error);
+  }
+}
+
+const syncUserMiddleware = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const userId = (req as any).auth?.userId;
+  if (userId) {
+    await ensureUserSynced(userId);
+  }
+  next();
+};
 
 /**
  * Downloads a public S3 template image and converts it to base64 format for Gemini
@@ -36,7 +80,7 @@ app.get('/health', (req, res) => {
 });
 
 // Get All Templates Endpoint
-app.get('/api/templates', async (req, res) => {
+app.get('/api/templates', requireAuth(), syncUserMiddleware, async (req, res) => {
   try {
     const templates = await TemplateRepository.findAll();
     res.json({ templates });
@@ -47,7 +91,7 @@ app.get('/api/templates', async (req, res) => {
 });
 
 // Image Generation Endpoint
-app.post('/api/generate', async (req: express.Request, res: express.Response): Promise<any> => {
+app.post('/api/generate', requireAuth(), syncUserMiddleware, async (req: express.Request, res: express.Response): Promise<any> => {
   try {
     const { 
       prompt, 

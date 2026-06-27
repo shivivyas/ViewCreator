@@ -15,6 +15,7 @@ async function seed() {
         const existingUser = await user_repository_js_1.UserRepository.findByEmail('demo@viewcreator.com');
         if (!existingUser) {
             const user = await user_repository_js_1.UserRepository.create({
+                id: 'user_demo123',
                 email: 'demo@viewcreator.com',
                 name: 'Demo Creator',
             });

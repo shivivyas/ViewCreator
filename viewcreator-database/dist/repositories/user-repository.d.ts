@@ -18,6 +18,7 @@ export declare class UserRepository {
      * Create a new user
      */
     static create(userData: {
+        id: string;
         email: string;
         name?: string;
     }): Promise<User>;

@@ -8,6 +8,7 @@ const cors_1 = __importDefault(require("cors"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const genai_1 = require("@google/genai");
 const viewcreator_database_1 = require("viewcreator-database");
+const express_2 = require("@clerk/express");
 // Load environment variables
 dotenv_1.default.config();
 const app = (0, express_1.default)();
@@ -16,6 +17,46 @@ const port = process.env.PORT || 3001;
 // Use a large payload limit (e.g., 10mb) to support base64 encoded reference images
 app.use(express_1.default.json({ limit: '10mb' }));
 app.use((0, cors_1.default)());
+app.use((0, express_2.clerkMiddleware)());
+/**
+ * Ensures the authenticated user exists in the database.
+ * If not, fetches details from Clerk and creates a new database record.
+ */
+async function ensureUserSynced(userId) {
+    try {
+        console.log(`[Auth Sync] Checking if user ${userId} exists in database...`);
+        const dbUser = await viewcreator_database_1.UserRepository.findById(userId);
+        if (!dbUser) {
+            console.log(`[Auth Sync] User ${userId} not found in database. Fetching from Clerk...`);
+            const clerkUser = await express_2.clerkClient.users.getUser(userId);
+            const email = clerkUser.emailAddresses[0]?.emailAddress;
+            if (!email) {
+                throw new Error(`User ${userId} does not have a primary email address in Clerk.`);
+            }
+            const name = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ') || undefined;
+            console.log(`[Auth Sync] Registering user in database: ${email} | Name: ${name}`);
+            await viewcreator_database_1.UserRepository.create({
+                id: userId,
+                email,
+                name,
+            });
+            console.log(`[Auth Sync] Successfully created user row for ${userId}`);
+        }
+        else {
+            console.log(`[Auth Sync] User ${userId} already exists in database.`);
+        }
+    }
+    catch (error) {
+        console.error(`[Auth Sync] Failed to sync user ${userId}:`, error);
+    }
+}
+const syncUserMiddleware = async (req, res, next) => {
+    const userId = req.auth?.userId;
+    if (userId) {
+        await ensureUserSynced(userId);
+    }
+    next();
+};
 /**
  * Downloads a public S3 template image and converts it to base64 format for Gemini
  */
@@ -35,7 +76,7 @@ app.get('/health', (req, res) => {
     res.json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
 // Get All Templates Endpoint
-app.get('/api/templates', async (req, res) => {
+app.get('/api/templates', (0, express_2.requireAuth)(), syncUserMiddleware, async (req, res) => {
     try {
         const templates = await viewcreator_database_1.TemplateRepository.findAll();
         res.json({ templates });
@@ -46,7 +87,7 @@ app.get('/api/templates', async (req, res) => {
     }
 });
 // Image Generation Endpoint
-app.post('/api/generate', async (req, res) => {
+app.post('/api/generate', (0, express_2.requireAuth)(), syncUserMiddleware, async (req, res) => {
     try {
         const { prompt, aspectRatio = '1:1', imageSize = '1K', numberOfImages = 1, style = 'None', quality = 'Standard', thinkingLevel = 'minimal', referenceImages = [], personGeneration = 'DONT_ALLOW', templateId } = req.body;
         if (!prompt) {

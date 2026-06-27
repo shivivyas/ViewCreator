@@ -34,10 +34,10 @@ export class UserRepository {
   /**
    * Create a new user
    */
-  static async create(userData: { email: string; name?: string }): Promise<User> {
+  static async create(userData: { id: string; email: string; name?: string }): Promise<User> {
     const result = await query<User>(
-      'INSERT INTO users (email, name) VALUES ($1, $2) RETURNING id, email, name, created_at, updated_at',
-      [userData.email, userData.name || null]
+      'INSERT INTO users (id, email, name) VALUES ($1, $2, $3) RETURNING id, email, name, created_at, updated_at',
+      [userData.id, userData.email, userData.name || null]
     );
     return result.rows[0];
   }

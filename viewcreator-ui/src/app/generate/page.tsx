@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@clerk/nextjs';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { 
   setImageEditorState, 
@@ -77,6 +78,7 @@ export default function GenerateImagePage() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
+  const { getToken } = useAuth();
 
   // Get active template's style preset or fallback to 'None'
   const getSelectedTemplateStyle = () => {
@@ -98,7 +100,8 @@ export default function GenerateImagePage() {
       setIsLoadingTemplates(true);
       try {
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-        const response = await fetch(`${apiUrl}/api/templates`);
+        const headers = await getAuthHeaders();
+        const response = await fetch(`${apiUrl}/api/templates`, { headers });
         if (response.ok) {
           const data = await response.json();
           const loadedTemplates = data.templates || [];
@@ -106,6 +109,9 @@ export default function GenerateImagePage() {
           if (loadedTemplates.length > 0) {
             setSelectedTemplateId(loadedTemplates[0].id);
           }
+        } else {
+          const errorData = await response.json().catch(() => null);
+          console.error('Error fetching templates:', errorData || response.statusText);
         }
       } catch (err) {
         console.error('Error fetching templates:', err);
@@ -124,6 +130,14 @@ export default function GenerateImagePage() {
       dispatch(setImageEditorState({ imageUrls, basePrompt: prompt, style: activeStyle, aspectRatio }));
     }
   }, [imageUrls, prompt, selectedTemplateId, aspectRatio, dispatch, templates]);
+
+  const getAuthHeaders = async () => {
+    const token = await getToken().catch(() => undefined);
+    return {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+  };
 
   const handleLoadSettings = (item: GenerationHistoryItem) => {
     setPrompt(item.prompt);
@@ -190,11 +204,10 @@ export default function GenerateImagePage() {
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+      const headers = await getAuthHeaders();
       const response = await fetch(`${apiUrl}/api/generate`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify(params),
       });
 

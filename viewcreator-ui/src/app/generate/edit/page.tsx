@@ -2,6 +2,7 @@
 
 import { useRef, useState, useEffect, type PointerEvent } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@clerk/nextjs";
 import { 
   ArrowLeft, 
   Crop, 
@@ -143,6 +144,16 @@ export default function EditImagePage() {
     cropH: number;
   } | null>(null);
 
+  const { getToken } = useAuth();
+
+  const getAuthHeaders = async () => {
+    const token = await getToken().catch(() => undefined);
+    return {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+  };
+
   const updateState = (payload: Partial<typeof editorState>) => {
     dispatch(setImageEditorState(payload));
   };
@@ -178,11 +189,10 @@ export default function EditImagePage() {
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+      const headers = await getAuthHeaders();
       const response = await fetch(`${apiUrl}/api/generate`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers,
         body: JSON.stringify({
           prompt: `${basePrompt}. ${instruction}`,
           style,

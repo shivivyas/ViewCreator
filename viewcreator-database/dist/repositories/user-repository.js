@@ -21,7 +21,7 @@ class UserRepository {
      * Create a new user
      */
     static async create(userData) {
-        const result = await (0, db_js_1.query)('INSERT INTO users (email, name) VALUES ($1, $2) RETURNING id, email, name, created_at, updated_at', [userData.email, userData.name || null]);
+        const result = await (0, db_js_1.query)('INSERT INTO users (id, email, name) VALUES ($1, $2, $3) RETURNING id, email, name, created_at, updated_at', [userData.id, userData.email, userData.name || null]);
         return result.rows[0];
     }
     /**

@@ -8,9 +8,10 @@ import {
   setImageEditorState, 
   addGenerationToHistory, 
   deleteGenerationFromHistory, 
-  clearHistory,
-  type GenerationHistoryItem
+  clearHistory
 } from '@/store/slices/image-editor-slice';
+import type { Template, GenerationHistoryItem, GenerateParams } from '@/types';
+import { getTemplates, generateImages as apiGenerateImages } from '@/services';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -41,18 +42,6 @@ const ASPECT_RATIO_DESCRIPTIONS: Record<string, string> = {
   '16:9': 'Wide Landscape (16:9) - Standard for Twitter, LinkedIn, YouTube, and Reddit posts.',
   '2:3': 'Pinterest Pin (2:3) - Optimized specifically for Pinterest pins and tall vertical visual content.'
 };
-
-interface Template {
-  id: string;
-  title: string;
-  description: string;
-  s3_link: string;
-  config?: {
-    stylePreset?: string;
-    aspectRatio?: string;
-    recommendedPrompts?: string[];
-  };
-}
 
 export default function GenerateImagePage() {
   const dispatch = useAppDispatch();
@@ -99,19 +88,11 @@ export default function GenerateImagePage() {
     const fetchTemplates = async () => {
       setIsLoadingTemplates(true);
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-        const headers = await getAuthHeaders();
-        const response = await fetch(`${apiUrl}/api/templates`, { headers });
-        if (response.ok) {
-          const data = await response.json();
-          const loadedTemplates = data.templates || [];
-          setTemplates(loadedTemplates);
-          if (loadedTemplates.length > 0) {
-            setSelectedTemplateId(loadedTemplates[0].id);
-          }
-        } else {
-          const errorData = await response.json().catch(() => null);
-          console.error('Error fetching templates:', errorData || response.statusText);
+        const token = await getToken().catch(() => undefined) || undefined;
+        const loadedTemplates = await getTemplates(token);
+        setTemplates(loadedTemplates);
+        if (loadedTemplates.length > 0) {
+          setSelectedTemplateId(loadedTemplates[0].id);
         }
       } catch (err) {
         console.error('Error fetching templates:', err);
@@ -120,7 +101,7 @@ export default function GenerateImagePage() {
       }
     };
     fetchTemplates();
-  }, []);
+  }, [getToken]);
 
   // Sync state to redux when fetching new images
   useEffect(() => {
@@ -130,14 +111,6 @@ export default function GenerateImagePage() {
       dispatch(setImageEditorState({ imageUrls, basePrompt: prompt, style: activeStyle, aspectRatio }));
     }
   }, [imageUrls, prompt, selectedTemplateId, aspectRatio, dispatch, templates]);
-
-  const getAuthHeaders = async () => {
-    const token = await getToken().catch(() => undefined);
-    return {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    };
-  };
 
   const handleLoadSettings = (item: GenerationHistoryItem) => {
     setPrompt(item.prompt);
@@ -187,37 +160,14 @@ export default function GenerateImagePage() {
     setReferenceImages(prev => prev.filter((_, i) => i !== index));
   };
 
-  const generateImages = async (params: {
-    prompt: string;
-    style: string;
-    aspectRatio: string;
-    numberOfImages: number;
-    imageSize: string;
-    thinkingLevel: string;
-    quality: 'Standard' | 'Premium';
-    referenceImages: string[];
-    templateId: string | null;
-  }) => {
+  const generateImages = async (params: GenerateParams) => {
     setIsLoading(true);
     setError(null);
     setImageUrls([]);
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      const headers = await getAuthHeaders();
-      const response = await fetch(`${apiUrl}/api/generate`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(params),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Something went wrong');
-      }
-
-      const generatedUrls = data.imageUrls || [];
+      const token = await getToken().catch(() => undefined) || undefined;
+      const generatedUrls = await apiGenerateImages(params, token);
       setImageUrls(generatedUrls);
 
       if (generatedUrls.length > 0) {

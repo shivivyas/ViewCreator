@@ -1,39 +1,5 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
-
-type ImageAdjustments = {
-  brightness: number;
-  contrast: number;
-  saturation: number;
-  warmth: number;
-};
-
-export type GenerationHistoryItem = {
-  id: string;
-  timestamp: string;
-  prompt: string;
-  style: string;
-  aspectRatio: string;
-  numberOfImages: number;
-  imageSize: string;
-  thinkingLevel: string;
-  quality: 'Standard' | 'Premium';
-  imageUrls: string[];
-  referenceImages?: string[];
-  templateId?: string | null;
-};
-
-export type ImageEditorState = {
-  imageUrls: string[];
-  selectedIndex: number | null;
-  basePrompt: string;
-  style: string;
-  aspectRatio: string;
-  editInstruction: string;
-  adjustments: ImageAdjustments;
-  cropRatio: string;
-  previewUrl: string | null;
-  history: GenerationHistoryItem[];
-};
+import type { GenerationHistoryItem, ImageEditorState } from "@/types";
 
 const initialState: ImageEditorState = {
   imageUrls: [],

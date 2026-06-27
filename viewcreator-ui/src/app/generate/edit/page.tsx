@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { setImageEditorState } from "@/store/slices/image-editor-slice";
+import { generateImages } from "@/services";
 
 export default function EditImagePage() {
   const router = useRouter();
@@ -50,21 +51,14 @@ export default function EditImagePage() {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   // Undo/Redo Edit Session History Stack
-  const [history, setHistory] = useState<string[]>([]);
-  const [historyIndex, setHistoryIndex] = useState(-1);
-
-  // Initialize history and saved state on mount
-  useEffect(() => {
+  const [history, setHistory] = useState<string[]>(() => {
     const initialImg = previewUrl || selectedImage;
-    if (initialImg) {
-      if (history.length === 0) {
-        setHistory([initialImg]);
-        setHistoryIndex(0);
-      }
-      setLastSavedUrl(initialImg);
-      setIsSaved(true);
-    }
-  }, [previewUrl, selectedImage, history.length]);
+    return initialImg ? [initialImg] : [];
+  });
+  const [historyIndex, setHistoryIndex] = useState(() => {
+    const initialImg = previewUrl || selectedImage;
+    return initialImg ? 0 : -1;
+  });
 
   useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -146,14 +140,6 @@ export default function EditImagePage() {
 
   const { getToken } = useAuth();
 
-  const getAuthHeaders = async () => {
-    const token = await getToken().catch(() => undefined);
-    return {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    };
-  };
-
   const updateState = (payload: Partial<typeof editorState>) => {
     dispatch(setImageEditorState(payload));
   };
@@ -188,29 +174,20 @@ export default function EditImagePage() {
     setError(null);
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-      const headers = await getAuthHeaders();
-      const response = await fetch(`${apiUrl}/api/generate`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          prompt: `${basePrompt}. ${instruction}`,
-          style,
-          aspectRatio,
-          numberOfImages: 1,
-          imageSize: "1K",
-          thinkingLevel: "high",
-          quality: "Premium",
-          referenceImages: [currentImage],
-        }),
-      });
+      const token = await getToken().catch(() => undefined) || undefined;
+      const imageUrlsResult = await generateImages({
+        prompt: `${basePrompt}. ${instruction}`,
+        style,
+        aspectRatio,
+        numberOfImages: 1,
+        imageSize: "1K",
+        thinkingLevel: "high",
+        quality: "Premium",
+        referenceImages: [currentImage],
+        templateId: null
+      }, token);
 
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to apply AI edit");
-      }
-
-      const updatedUrl = data.imageUrls?.[0] ?? currentImage;
+      const updatedUrl = imageUrlsResult?.[0] ?? currentImage;
       setPreviewImageUrl(updatedUrl);
       setInstruction("");
       pushToHistory(updatedUrl);

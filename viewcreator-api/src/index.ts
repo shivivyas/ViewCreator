@@ -7,9 +7,19 @@ import cors from 'cors';
 import { GoogleGenAI } from "@google/genai";
 import { TemplateRepository, UserRepository } from 'viewcreator-database';
 import { clerkMiddleware, requireAuth, clerkClient } from '@clerk/express';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 
 const app = express();
 const port = process.env.PORT || 3001;
+
+// Initialize S3 Client
+const s3Client = new S3Client({
+  region: process.env.AWS_REGION || 'us-east-1',
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
+  },
+});
 
 // Middlewares
 // Use a large payload limit (e.g., 10mb) to support base64 encoded reference images
@@ -82,11 +92,79 @@ app.get('/health', (req, res) => {
 // Get All Templates Endpoint
 app.get('/api/templates', requireAuth(), syncUserMiddleware, async (req, res) => {
   try {
-    const templates = await TemplateRepository.findAll();
+    const userId = (req as any).auth?.userId;
+    const templates = await TemplateRepository.findAll(userId);
     res.json({ templates });
   } catch (error: any) {
     console.error('Error fetching templates:', error);
     res.status(500).json({ error: 'Failed to retrieve templates from database' });
+  }
+});
+
+// Upload Template Image to S3 and Save Reference Endpoint
+app.post('/api/templates/upload', requireAuth(), syncUserMiddleware, async (req: express.Request, res: express.Response): Promise<any> => {
+  try {
+    const userId = (req as any).auth?.userId;
+    const { title, description, base64Image, category = 'My Uploads' } = req.body;
+
+    if (!title) {
+      return res.status(400).json({ error: 'Title is required' });
+    }
+    if (!base64Image) {
+      return res.status(400).json({ error: 'base64Image content is required' });
+    }
+
+    const bucketName = process.env.AWS_S3_BUCKET;
+    if (!bucketName) {
+      return res.status(500).json({ error: 'S3 bucket name is not configured on the server. Please check the AWS_S3_BUCKET setting.' });
+    }
+
+    // Match image mime type from base64 string
+    const match = base64Image.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
+    if (!match) {
+      return res.status(400).json({ error: 'Invalid base64 image data format' });
+    }
+
+    const mimeType = match[1];
+    const base64Data = match[2];
+    const buffer = Buffer.from(base64Data, 'base64');
+    
+    // Create clean S3 key
+    const fileExtension = mimeType.split('/')[1] || 'png';
+    const s3Key = `templates/${userId || 'public'}/${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExtension}`;
+
+    console.log(`[S3 Upload] Uploading ${s3Key} to bucket ${bucketName}...`);
+
+    // Put Object in S3 Bucket
+    await s3Client.send(
+      new PutObjectCommand({
+        Bucket: bucketName,
+        Key: s3Key,
+        Body: buffer,
+        ContentType: mimeType,
+      })
+    );
+
+    const s3Url = `https://${bucketName}.s3.${process.env.AWS_REGION || 'us-east-1'}.amazonaws.com/${s3Key}`;
+    console.log(`[S3 Upload] Successfully uploaded template image to S3: ${s3Url}`);
+
+    // Persist template metadata reference in Supabase
+    const template = await TemplateRepository.create({
+      title,
+      description,
+      s3_link: s3Url,
+      config: {
+        category,
+        uploadedAt: new Date().toISOString()
+      },
+      user_id: userId
+    });
+
+    console.log(`[S3 Upload] Successfully recorded template ${template.id} in Postgres.`);
+    res.json({ template });
+  } catch (error: any) {
+    console.error('Error uploading template to S3:', error);
+    res.status(500).json({ error: error.message || 'Failed to upload template' });
   }
 });
 

@@ -15,3 +15,26 @@ export async function getTemplates(token?: string): Promise<Template[]> {
   });
   return data.templates || [];
 }
+
+export interface UploadTemplateResponse {
+  template: Template;
+}
+
+export interface UploadTemplateParams {
+  base64Image: string;
+  title: string;
+  description?: string;
+  category?: string;
+}
+
+/**
+ * Uploads a template image to the backend for S3 storage and database insertion.
+ */
+export async function uploadTemplate(params: UploadTemplateParams, token?: string): Promise<Template> {
+  const data = await request<UploadTemplateResponse>('/api/templates/upload', {
+    method: 'POST',
+    body: params,
+    token,
+  });
+  return data.template;
+}

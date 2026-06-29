@@ -38,7 +38,9 @@ export interface Template {
   title: string;
   description: string;
   s3_link: string;
+  user_id?: string | null;
   config?: {
+    category?: string;
     stylePreset?: string;
     aspectRatio?: string;
     recommendedPrompts?: string[];

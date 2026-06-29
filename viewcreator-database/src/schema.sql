@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 
 -- Templates Table
+DROP TABLE IF EXISTS templates CASCADE;
 CREATE TABLE IF NOT EXISTS templates (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     title VARCHAR(255) NOT NULL,
@@ -23,6 +24,7 @@ CREATE TABLE IF NOT EXISTS templates (
     -- JSONB to store flexible configurations such as bounding boxes, text placement, 
     -- dimensions, overlay properties, or default prompts
     config JSONB DEFAULT '{}'::jsonb NOT NULL,
+    user_id VARCHAR(255) REFERENCES users(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
 );

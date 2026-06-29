@@ -4,6 +4,7 @@ export interface Template {
     description: string | null;
     s3_link: string;
     config: Record<string, any>;
+    user_id: string | null;
     created_at: Date;
     updated_at: Date;
 }
@@ -13,9 +14,11 @@ export declare class TemplateRepository {
      */
     static findById(id: string): Promise<Template | null>;
     /**
-     * Get all available templates
+     * Get all available templates.
+     * If a userId is passed, fetches public templates (user_id IS NULL) AND user's private templates.
+     * If no userId is passed, fetches public templates only.
      */
-    static findAll(): Promise<Template[]>;
+    static findAll(userId?: string): Promise<Template[]>;
     /**
      * Create a new template
      */
@@ -24,6 +27,7 @@ export declare class TemplateRepository {
         description?: string;
         s3_link: string;
         config?: Record<string, any>;
+        user_id?: string | null;
     }): Promise<Template>;
     /**
      * Update an existing template
@@ -33,6 +37,7 @@ export declare class TemplateRepository {
         description?: string;
         s3_link?: string;
         config?: Record<string, any>;
+        user_id?: string | null;
     }): Promise<Template | null>;
     /**
      * Delete a template by ID

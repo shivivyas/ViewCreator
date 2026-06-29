@@ -56,6 +56,11 @@ export function SiteHeader() {
             </>
           ) : (
             <>
+              <Link href="/templates" className="mr-1">
+                <Button size="sm" variant="ghost">
+                  Templates
+                </Button>
+              </Link>
               <Link href="/generate" className="mr-1">
                 <Button size="sm" variant="outline">
                   AI Studio

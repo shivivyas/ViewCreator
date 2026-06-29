@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAppDispatch } from "@/store";
 import { setImageEditorState } from "@/store/slices/image-editor-slice";
@@ -39,6 +40,9 @@ export default function TemplatesPage() {
   const [uploadDescription, setUploadDescription] = useState("");
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  
+  // View modal state
+  const [viewTemplate, setViewTemplate] = useState<Template | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -62,7 +66,9 @@ export default function TemplatesPage() {
   }, [fetchTemplates]);
 
   // Derive categories dynamically from database
-  const categories = ["All", ...Array.from(new Set(templates.map(t => t.config?.category || "Uncategorized")))];
+  const allCategories = Array.from(new Set(templates.map(t => t.config?.category || "Uncategorized")));
+  const globalCategories = allCategories.filter(c => c !== "My Uploads");
+  const hasMyUploads = allCategories.includes("My Uploads");
   
   const filteredTemplates = activeCategory === "All" 
     ? templates 
@@ -147,17 +153,40 @@ export default function TemplatesPage() {
         </div>
         <ScrollArea className="flex-1 p-4">
           <div className="space-y-1">
-            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Categories</h4>
-            {categories.map(category => (
+            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-2">Library</h4>
+            <Button
+              variant={activeCategory === "All" ? "secondary" : "ghost"}
+              className="w-full justify-start font-normal"
+              onClick={() => setActiveCategory("All")}
+            >
+              All Templates
+            </Button>
+            
+            {hasMyUploads && (
               <Button
-                key={category}
-                variant={activeCategory === category ? "secondary" : "ghost"}
+                variant={activeCategory === "My Uploads" ? "secondary" : "ghost"}
                 className="w-full justify-start font-normal"
-                onClick={() => setActiveCategory(category)}
+                onClick={() => setActiveCategory("My Uploads")}
               >
-                {category}
+                My Uploads
               </Button>
-            ))}
+            )}
+
+            {globalCategories.length > 0 && (
+              <>
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-6 mb-3 px-2">Global Categories</h4>
+                {globalCategories.map(category => (
+                  <Button
+                    key={category}
+                    variant={activeCategory === category ? "secondary" : "ghost"}
+                    className="w-full justify-start font-normal"
+                    onClick={() => setActiveCategory(category)}
+                  >
+                    {category}
+                  </Button>
+                ))}
+              </>
+            )}
           </div>
         </ScrollArea>
       </div>
@@ -182,7 +211,11 @@ export default function TemplatesPage() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {filteredTemplates.map((template) => (
-                <Card key={template.id} className="overflow-hidden flex flex-col group">
+                <Card 
+                  key={template.id} 
+                  className="overflow-hidden flex flex-col group cursor-pointer hover:border-primary/50 transition-colors"
+                  onClick={() => setViewTemplate(template)}
+                >
                   <div className="relative aspect-square bg-muted">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img 
@@ -201,7 +234,10 @@ export default function TemplatesPage() {
                     <Button 
                       className="w-full" 
                       variant="secondary"
-                      onClick={() => handleUseTemplate(template.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleUseTemplate(template.id);
+                      }}
                     >
                       Use Template
                     </Button>
@@ -305,6 +341,57 @@ export default function TemplatesPage() {
                 )}
               </Button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* View Template Modal */}
+      {viewTemplate && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" 
+          onClick={() => setViewTemplate(null)}
+        >
+          <div 
+            className="bg-card w-full max-w-4xl rounded-2xl shadow-2xl border overflow-hidden flex flex-col md:flex-row max-h-[90vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="md:w-3/5 bg-muted/30 flex items-center justify-center p-6 border-b md:border-b-0 md:border-r">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img 
+                src={viewTemplate.s3_link} 
+                alt={viewTemplate.title} 
+                className="max-w-full max-h-full object-contain rounded-lg shadow-sm" 
+              />
+            </div>
+            <div className="md:w-2/5 p-6 flex flex-col">
+              <div className="flex justify-between items-start mb-4">
+                <Badge variant="secondary">{viewTemplate.config?.category || "Uncategorized"}</Badge>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={() => setViewTemplate(null)} 
+                  className="h-8 w-8 rounded-full"
+                >
+                  <X className="size-4" />
+                </Button>
+              </div>
+              
+              <h2 className="text-2xl font-bold mb-2">{viewTemplate.title}</h2>
+              <p className="text-muted-foreground text-sm flex-1 mb-6 whitespace-pre-wrap">
+                {viewTemplate.description || "No description provided."}
+              </p>
+              
+              <div className="mt-auto pt-6 border-t space-y-4 shrink-0">
+                 <Button 
+                   size="lg" 
+                   className="w-full font-bold shadow-md" 
+                   onClick={() => handleUseTemplate(viewTemplate.id)}
+                 >
+                   <Wand2 className="size-4 mr-2" />
+                   Use This Template
+                 </Button>
+              </div>
+            </div>
           </div>
         </div>
       )}

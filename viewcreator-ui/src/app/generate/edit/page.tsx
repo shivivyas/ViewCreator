@@ -20,7 +20,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
-import { setImageEditorState } from "@/store/slices/image-editor-slice";
+import { setImageEditorState, updateHistoryItemImages } from "@/store/slices/image-editor-slice";
 import { generateImages } from "@/services";
 
 export default function EditImagePage() {
@@ -112,6 +112,14 @@ export default function EditImagePage() {
       editInstruction: instruction,
       imageUrls: updatedImageUrls
     });
+
+    if (editorState.activeHistoryItemId) {
+      dispatch(updateHistoryItemImages({ 
+        id: editorState.activeHistoryItemId, 
+        imageUrls: updatedImageUrls 
+      }));
+    }
+
     setLastSavedUrl(previewImageUrl);
     setIsSaved(true);
   };
@@ -347,13 +355,13 @@ export default function EditImagePage() {
   };
 
   const handleReset = () => {
-    if (selectedImage) {
-      setPreviewImageUrl(selectedImage);
+    const originalImage = history[0];
+    if (originalImage && previewImageUrl !== originalImage) {
+      setPreviewImageUrl(originalImage);
       setCrop({ x: 10, y: 10, width: 80, height: 80 });
       setIsCropMode(false);
       setError(null);
-      setIsSaved(selectedImage === lastSavedUrl);
-      pushToHistory(selectedImage);
+      pushToHistory(originalImage);
     }
   };
 

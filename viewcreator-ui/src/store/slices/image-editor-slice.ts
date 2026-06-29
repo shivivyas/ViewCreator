@@ -44,6 +44,12 @@ const imageEditorSlice = createSlice({
     clearHistory(state) {
       state.history = [];
     },
+    updateHistoryItemImages(state, action: PayloadAction<{ id: string; imageUrls: string[] }>) {
+      const item = state.history.find(i => i.id === action.payload.id);
+      if (item) {
+        item.imageUrls = action.payload.imageUrls;
+      }
+    },
   },
 });
 
@@ -52,6 +58,7 @@ export const {
   resetImageEditor, 
   addGenerationToHistory, 
   deleteGenerationFromHistory,
-  clearHistory 
+  clearHistory,
+  updateHistoryItemImages
 } = imageEditorSlice.actions;
 export default imageEditorSlice.reducer;

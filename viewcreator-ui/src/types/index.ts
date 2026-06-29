@@ -31,6 +31,7 @@ export interface ImageEditorState {
   cropRatio: string;
   previewUrl: string | null;
   history: GenerationHistoryItem[];
+  activeHistoryItemId?: string;
 }
 
 export interface Template {

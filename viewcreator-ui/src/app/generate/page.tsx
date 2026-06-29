@@ -136,6 +136,7 @@ export default function GenerateImagePage() {
         style: item.style || 'None',
         aspectRatio: item.aspectRatio,
         previewUrl: item.imageUrls[index],
+        activeHistoryItemId: item.id,
       })
     );
     router.push('/generate/edit');

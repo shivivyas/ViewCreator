@@ -38,6 +38,7 @@ export default function TemplatesPage() {
   const [uploadTitle, setUploadTitle] = useState("");
   const [uploadDescription, setUploadDescription] = useState("");
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -73,15 +74,34 @@ export default function TemplatesPage() {
     router.push(`/generate?templateId=${templateId}`);
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
+  const processFile = (file?: File) => {
+    if (file && file.type.startsWith('image/')) {
       const reader = new FileReader();
       reader.onloadend = () => {
         setPreviewImage(reader.result as string);
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    processFile(e.target.files?.[0]);
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+    processFile(e.dataTransfer.files?.[0]);
   };
 
   const handleUploadSubmit = async (e: React.FormEvent) => {
@@ -208,8 +228,11 @@ export default function TemplatesPage() {
               <div className="space-y-2">
                 <Label>Template Image</Label>
                 <div 
-                  className={`border-2 border-dashed rounded-lg flex flex-col items-center justify-center overflow-hidden bg-muted/30 cursor-pointer transition-colors hover:bg-muted/50 ${previewImage ? 'aspect-square' : 'h-32'}`}
+                  className={`border-2 border-dashed rounded-lg flex flex-col items-center justify-center overflow-hidden cursor-pointer transition-colors ${previewImage ? 'aspect-square' : 'h-32'} ${isDragging ? 'bg-primary/10 border-primary' : 'bg-muted/30 hover:bg-muted/50'}`}
                   onClick={() => fileInputRef.current?.click()}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
                 >
                   {previewImage ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -217,7 +240,7 @@ export default function TemplatesPage() {
                   ) : (
                     <>
                       <Plus className="size-8 text-muted-foreground mb-2" />
-                      <span className="text-sm text-muted-foreground">Click to select image</span>
+                      <span className="text-sm text-muted-foreground">Click or drag image to select</span>
                     </>
                   )}
                   <input 

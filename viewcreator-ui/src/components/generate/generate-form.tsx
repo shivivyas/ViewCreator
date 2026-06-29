@@ -68,20 +68,39 @@ export function GenerateForm({
   handleEnhancePrompt
 }: GenerateFormProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isDragging, setIsDragging] = React.useState(false);
+
+  const processFiles = (files: FileList | null) => {
+    if (!files) return;
+    Array.from(files).forEach((file, index) => {
+      if (referenceImages.length + index < 3 && file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setReferenceImages(prev => [...prev, reader.result as string]);
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+  };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files) {
-      Array.from(files).forEach((file, index) => {
-        if (referenceImages.length + index < 3) {
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            setReferenceImages(prev => [...prev, reader.result as string]);
-          };
-          reader.readAsDataURL(file);
-        }
-      });
-    }
+    processFiles(e.target.files);
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+    processFiles(e.dataTransfer.files);
   };
 
   const clearReferenceImage = (index: number) => {
@@ -203,8 +222,11 @@ export function GenerateForm({
             </div>
             {referenceImages.length < 3 ? (
               <div 
-                className="border-2 border-dashed rounded-lg p-3 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-muted/50 transition-colors"
+                className={`border-2 border-dashed rounded-lg p-3 flex flex-col items-center justify-center text-center cursor-pointer transition-colors ${isDragging ? 'bg-primary/10 border-primary' : 'hover:bg-muted/50'}`}
                 onClick={() => fileInputRef.current?.click()}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
               >
                 <Upload className="w-5 h-5 text-muted-foreground mb-1" />
                 <p className="text-xs font-medium">Add reference (up to 3)</p>

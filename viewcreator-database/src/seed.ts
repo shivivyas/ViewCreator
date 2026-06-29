@@ -36,6 +36,7 @@ async function seed() {
         description: 'High-engagement template for Twitter/LinkedIn visual hooks, featuring prominent typography, custom placeholders, and modern high-contrast styling.',
         s3_link: s3Link,
         config: {
+          tags: ['LinkedIn', 'Social Media', 'Modern'],
           category: 'LinkedIn',
           aspectRatio: '1:1',
           width: 1024,

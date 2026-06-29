@@ -24,7 +24,7 @@ export interface UploadTemplateParams {
   base64Image: string;
   title: string;
   description?: string;
-  category?: string;
+  tags?: string[];
   isPublic?: boolean;
 }
 

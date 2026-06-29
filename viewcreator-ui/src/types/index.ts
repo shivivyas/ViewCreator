@@ -42,6 +42,7 @@ export interface Template {
   user_id?: string | null;
   config?: {
     category?: string;
+    tags?: string[];
     stylePreset?: string;
     aspectRatio?: string;
     recommendedPrompts?: string[];

@@ -100,7 +100,7 @@ app.get('/api/templates', (0, express_2.requireAuth)(), syncUserMiddleware, asyn
 app.post('/api/templates/upload', (0, express_2.requireAuth)(), syncUserMiddleware, async (req, res) => {
     try {
         const userId = req.auth?.userId;
-        const { title, description, base64Image, category = 'My Uploads', isPublic = false } = req.body;
+        const { title, description, base64Image, tags = [], isPublic = false } = req.body;
         if (!title) {
             return res.status(400).json({ error: 'Title is required' });
         }
@@ -133,12 +133,13 @@ app.post('/api/templates/upload', (0, express_2.requireAuth)(), syncUserMiddlewa
         const s3Url = `https://${bucketName}.s3.${process.env.AWS_REGION || 'us-east-1'}.amazonaws.com/${s3Key}`;
         console.log(`[S3 Upload] Successfully uploaded template image to S3: ${s3Url}`);
         // Persist template metadata reference in Supabase
+        const configTags = isPublic ? tags : ['My Uploads'];
         const template = await viewcreator_database_1.TemplateRepository.create({
             title,
             description,
             s3_link: s3Url,
             config: {
-                category,
+                tags: configTags,
                 uploadedAt: new Date().toISOString()
             },
             user_id: isPublic ? null : userId

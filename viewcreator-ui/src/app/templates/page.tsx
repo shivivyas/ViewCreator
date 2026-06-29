@@ -39,7 +39,7 @@ export default function TemplatesPage() {
   const [uploading, setUploading] = useState(false);
   const [uploadTitle, setUploadTitle] = useState("");
   const [uploadDescription, setUploadDescription] = useState("");
-  const [uploadCategory, setUploadCategory] = useState("");
+  const [uploadTagsInput, setUploadTagsInput] = useState("");
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [isPublic, setIsPublic] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
@@ -68,14 +68,28 @@ export default function TemplatesPage() {
     fetchTemplates();
   }, [fetchTemplates]);
 
-  // Derive categories dynamically from database
-  const allCategories = Array.from(new Set(templates.map(t => t.config?.category || "Uncategorized")));
-  const globalCategories = allCategories.filter(c => c !== "My Uploads");
-  const hasMyUploads = allCategories.includes("My Uploads");
+  // Derive tags dynamically from database
+  // Support both new config.tags[] and legacy config.category string
+  const allTags = Array.from(new Set(
+    templates.flatMap(t => {
+      if (t.config?.tags && t.config.tags.length > 0) return t.config.tags;
+      if (t.config?.category) return [t.config.category];
+      return ['Uncategorized'];
+    })
+  ));
+  const globalTags = allTags.filter(t => t !== "My Uploads");
+  const hasMyUploads = allTags.includes("My Uploads");
   
   const filteredTemplates = activeCategory === "All" 
     ? templates 
-    : templates.filter(t => (t.config?.category || "Uncategorized") === activeCategory);
+    : templates.filter(t => {
+        // Check new tags array format
+        if (t.config?.tags && t.config.tags.length > 0) {
+          return t.config.tags.includes(activeCategory);
+        }
+        // Fall back to legacy category string
+        return (t.config?.category || "Uncategorized") === activeCategory;
+      });
 
   const handleUseTemplate = (templateId: string) => {
     // Jump straight to generator with this template active
@@ -120,17 +134,22 @@ export default function TemplatesPage() {
     setUploading(true);
     try {
       const token = await getToken().catch(() => undefined) || undefined;
+      const tags = uploadTagsInput
+        .split(',')
+        .map(t => t.trim())
+        .filter(Boolean);
       await uploadTemplate({
         base64Image: previewImage,
         title: uploadTitle,
         description: uploadDescription,
-        category: isPublic ? uploadCategory || "Uncategorized" : "My Uploads",
+        tags: isPublic ? tags : ['My Uploads'],
         isPublic,
       }, token);
 
       setShowUploadModal(false);
       setUploadTitle("");
       setUploadDescription("");
+      setUploadTagsInput("");
       setPreviewImage(null);
       setIsPublic(true);
       toast.success("Template uploaded successfully!");
@@ -177,17 +196,17 @@ export default function TemplatesPage() {
               </Button>
             )}
 
-            {globalCategories.length > 0 && (
+            {globalTags.length > 0 && (
               <>
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-6 mb-3 px-2">Global Categories</h4>
-                {globalCategories.map(category => (
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-6 mb-3 px-2">Tags</h4>
+                {globalTags.map(tag => (
                   <Button
-                    key={category}
-                    variant={activeCategory === category ? "secondary" : "ghost"}
+                    key={tag}
+                    variant={activeCategory === tag ? "secondary" : "ghost"}
                     className="w-full justify-start font-normal"
-                    onClick={() => setActiveCategory(category)}
+                    onClick={() => setActiveCategory(tag)}
                   >
-                    {category}
+                    {tag}
                   </Button>
                 ))}
               </>
@@ -267,7 +286,7 @@ export default function TemplatesPage() {
                   setShowUploadModal(false);
                   setUploadTitle("");
                   setUploadDescription("");
-                  setUploadCategory("");
+                  setUploadTagsInput("");
                   setPreviewImage(null);
                   setIsPublic(true);
                 }}
@@ -290,13 +309,14 @@ export default function TemplatesPage() {
 
               {isPublic && (
                 <div className="space-y-2">
-                  <Label htmlFor="category">Category</Label>
+                  <Label htmlFor="tags">Tags</Label>
                   <Input 
-                    id="category" 
-                    placeholder="e.g. Hero Banners, Social Media, Minimalist" 
-                    value={uploadCategory}
-                    onChange={(e) => setUploadCategory(e.target.value)}
+                    id="tags" 
+                    placeholder="e.g. Hero Banners, Social Media, Minimalist (comma-separated)" 
+                    value={uploadTagsInput}
+                    onChange={(e) => setUploadTagsInput(e.target.value)}
                   />
+                  <p className="text-[10px] text-muted-foreground">Separate tags with commas. These help other users discover your template.</p>
                 </div>
               )}
 
@@ -394,13 +414,20 @@ export default function TemplatesPage() {
               />
             </div>
             <div className="md:w-2/5 p-6 flex flex-col">
-              <div className="flex justify-between items-start mb-4">
-                <Badge variant="secondary">{viewTemplate.config?.category || "Uncategorized"}</Badge>
+              <div className="flex justify-between items-start mb-4 gap-2">
+                <div className="flex flex-wrap gap-1.5">
+                  {(viewTemplate.config?.tags && viewTemplate.config.tags.length > 0
+                    ? viewTemplate.config.tags
+                    : [viewTemplate.config?.category || "Uncategorized"]
+                  ).map(tag => (
+                    <Badge key={tag} variant="secondary">{tag}</Badge>
+                  ))}
+                </div>
                 <Button 
                   variant="ghost" 
                   size="icon" 
                   onClick={() => setViewTemplate(null)} 
-                  className="h-8 w-8 rounded-full"
+                  className="h-8 w-8 rounded-full shrink-0"
                 >
                   <X className="size-4" />
                 </Button>

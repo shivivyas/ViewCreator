@@ -175,9 +175,10 @@ export default function TemplatesPage() {
             Upload Template
           </Button>
         </div>
-        <ScrollArea className="flex-1 p-4">
-          <div className="space-y-1">
-            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-2">Library</h4>
+        <ScrollArea className="flex-1 min-h-0">
+          <div className="p-4">
+            <div className="space-y-1">
+              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-2">Library</h4>
             <Button
               variant={activeCategory === "All" ? "secondary" : "ghost"}
               className="w-full justify-start font-normal"
@@ -211,6 +212,7 @@ export default function TemplatesPage() {
                 ))}
               </>
             )}
+            </div>
           </div>
         </ScrollArea>
       </div>
@@ -222,54 +224,56 @@ export default function TemplatesPage() {
           <h1 className="text-lg font-semibold">Templates Library</h1>
         </header>
 
-        <ScrollArea className="flex-1 p-6">
-          {loading ? (
-            <div className="flex h-64 items-center justify-center">
-              <Loader2 className="size-8 animate-spin text-primary" />
-            </div>
-          ) : filteredTemplates.length === 0 ? (
-            <div className="flex flex-col h-64 items-center justify-center text-muted-foreground">
-              <Wand2 className="size-12 mb-4 opacity-20" />
-              <p>No templates found in this category.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {filteredTemplates.map((template) => (
-                <Card 
-                  key={template.id} 
-                  className="overflow-hidden flex flex-col group cursor-pointer hover:border-primary/50 transition-colors"
-                  onClick={() => setViewTemplate(template)}
-                >
-                  <div className="relative aspect-square bg-muted">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img 
-                      src={template.s3_link} 
-                      alt={template.title}
-                      className="object-cover w-full h-full transition-transform duration-300 group-hover:scale-105"
-                    />
-                  </div>
-                  <CardHeader className="p-4 flex-1">
-                    <CardTitle className="text-base line-clamp-1">{template.title}</CardTitle>
-                    <CardDescription className="line-clamp-2 text-xs">
-                      {template.description || "No description provided."}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardFooter className="p-4 pt-0">
-                    <Button 
-                      className="w-full" 
-                      variant="secondary"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleUseTemplate(template.id);
-                      }}
-                    >
-                      Use Template
-                    </Button>
-                  </CardFooter>
-                </Card>
-              ))}
-            </div>
-          )}
+        <ScrollArea className="flex-1 min-h-0">
+          <div className="p-6">
+            {loading ? (
+              <div className="flex h-64 items-center justify-center">
+                <Loader2 className="size-8 animate-spin text-primary" />
+              </div>
+            ) : filteredTemplates.length === 0 ? (
+              <div className="flex flex-col h-64 items-center justify-center text-muted-foreground">
+                <Wand2 className="size-12 mb-4 opacity-20" />
+                <p>No templates found in this category.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {filteredTemplates.map((template) => (
+                  <Card 
+                    key={template.id} 
+                    className="overflow-hidden flex flex-col group cursor-pointer hover:border-primary/50 transition-colors"
+                    onClick={() => setViewTemplate(template)}
+                  >
+                    <div className="relative aspect-square bg-muted">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img 
+                        src={template.s3_link} 
+                        alt={template.title}
+                        className="object-cover w-full h-full transition-transform duration-300 group-hover:scale-105"
+                      />
+                    </div>
+                    <CardHeader className="p-4 flex-1">
+                      <CardTitle className="text-base line-clamp-1">{template.title}</CardTitle>
+                      <CardDescription className="line-clamp-2 text-xs">
+                        {template.description || "No description provided."}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardFooter className="p-4 pt-0">
+                      <Button 
+                        className="w-full" 
+                        variant="secondary"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleUseTemplate(template.id);
+                        }}
+                      >
+                        Use Template
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
         </ScrollArea>
       </div>
 

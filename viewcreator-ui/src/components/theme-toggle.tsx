@@ -17,7 +17,7 @@ export function ThemeToggle() {
 
   if (!mounted) {
     return (
-      <Button variant="outline" size="icon" aria-label="Toggle theme" disabled>
+      <Button variant="outline" size="icon" aria-label="Toggle theme">
         <Sun className="size-4" />
       </Button>
     );

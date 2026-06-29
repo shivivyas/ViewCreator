@@ -723,22 +723,20 @@ export default function GenerateImagePage() {
                                   </span>
 
                                   {/* Hover Overlay */}
-                                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center gap-1.5 p-2 text-center">
+                                  <div 
+                                    className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center gap-1.5 p-2 text-center cursor-pointer"
+                                    onClick={() => handleSelectImageFromHistory(item, i)}
+                                  >
                                     <Button 
                                       variant="secondary" 
                                       size="sm" 
-                                      onClick={() => handleDownload(url, i, `history-${item.id}`)} 
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDownload(url, i, `history-${item.id}`);
+                                      }} 
                                       className="text-[10px] h-7 w-full max-w-[110px]"
                                     >
                                       <Download className="w-3 h-3 mr-1" /> Download
-                                    </Button>
-                                    <Button 
-                                      variant="secondary" 
-                                      size="sm" 
-                                      onClick={() => handleSelectImageFromHistory(item, i)} 
-                                      className="text-[10px] h-7 w-full max-w-[110px]"
-                                    >
-                                      <Settings2 className="w-3 h-3 mr-1" /> Edit Image
                                     </Button>
                                   </div>
                                 </div>

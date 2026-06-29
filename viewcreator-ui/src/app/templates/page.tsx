@@ -13,7 +13,7 @@ import {
   Wand2
 } from "lucide-react";
 
-import { getTemplates, uploadTemplate } from "@/services/api/template-service";
+import { getTemplates, uploadTemplate, deleteTemplate } from "@/services/api/template-service";
 import type { Template } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
@@ -24,10 +24,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
 import { useAppDispatch } from "@/store";
 import { setImageEditorState } from "@/store/slices/image-editor-slice";
+import { Trash2 } from "lucide-react";
 
 export default function TemplatesPage() {
   const router = useRouter();
-  const { getToken } = useAuth();
+  const { getToken, userId } = useAuth();
   const dispatch = useAppDispatch();
 
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -46,6 +47,11 @@ export default function TemplatesPage() {
   
   // View modal state
   const [viewTemplate, setViewTemplate] = useState<Template | null>(null);
+  
+  // Delete modal state
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [templateToDelete, setTemplateToDelete] = useState<Template | null>(null);
+  const [deleting, setDeleting] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -162,6 +168,34 @@ export default function TemplatesPage() {
     }
   };
 
+  const handleDeleteTemplate = async () => {
+    if (!templateToDelete) return;
+    setDeleting(true);
+    try {
+      const token = await getToken().catch(() => undefined) || undefined;
+      await deleteTemplate(templateToDelete.id, token);
+      
+      toast.success("Template deleted successfully!");
+      setShowDeleteModal(false);
+      setTemplateToDelete(null);
+      if (viewTemplate?.id === templateToDelete.id) {
+        setViewTemplate(null);
+      }
+      await fetchTemplates();
+    } catch (err) {
+      console.error("Delete failed", err);
+      toast.error(err instanceof Error ? err.message : "Failed to delete template.");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const promptDeleteTemplate = (e: React.MouseEvent, template: Template) => {
+    e.stopPropagation();
+    setTemplateToDelete(template);
+    setShowDeleteModal(true);
+  };
+
   return (
     <div className="flex h-[calc(100vh-4rem)] bg-background overflow-hidden">
       {/* Sidebar Categories */}
@@ -250,6 +284,18 @@ export default function TemplatesPage() {
                         alt={template.title}
                         className="object-cover w-full h-full transition-transform duration-300 group-hover:scale-105"
                       />
+                      {userId && template.user_id === userId && (
+                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button 
+                            variant="destructive" 
+                            size="icon" 
+                            className="h-8 w-8 rounded-full shadow-sm"
+                            onClick={(e) => promptDeleteTemplate(e, template)}
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </div>
+                      )}
                     </div>
                     <CardHeader className="p-4 flex-1">
                       <CardTitle className="text-base line-clamp-1">{template.title}</CardTitle>
@@ -451,7 +497,56 @@ export default function TemplatesPage() {
                    <Wand2 className="size-4 mr-2" />
                    Use This Template
                  </Button>
+                 
+                 {userId && viewTemplate.user_id === userId && (
+                   <Button 
+                     variant="outline"
+                     className="w-full text-destructive hover:bg-destructive/10" 
+                     onClick={(e) => promptDeleteTemplate(e, viewTemplate)}
+                   >
+                     <Trash2 className="size-4 mr-2" />
+                     Delete Template
+                   </Button>
+                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && templateToDelete && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-card w-full max-w-sm rounded-xl shadow-xl border overflow-hidden p-6 space-y-4">
+            <h3 className="text-lg font-semibold text-destructive flex items-center gap-2">
+              <Trash2 className="size-5" />
+              Delete Template?
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Are you sure you want to delete <strong>&quot;{templateToDelete.title}&quot;</strong>? This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3 pt-4">
+              <Button 
+                variant="ghost" 
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setTemplateToDelete(null);
+                }}
+                disabled={deleting}
+              >
+                Cancel
+              </Button>
+              <Button 
+                variant="destructive" 
+                onClick={handleDeleteTemplate}
+                disabled={deleting}
+              >
+                {deleting ? (
+                  <><Loader2 className="size-4 mr-2 animate-spin" /> Deleting...</>
+                ) : (
+                  "Delete"
+                )}
+              </Button>
             </div>
           </div>
         </div>

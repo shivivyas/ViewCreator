@@ -6,7 +6,7 @@ import express from 'express';
 import cors from 'cors';
 import { GoogleGenAI } from "@google/genai";
 import { TemplateRepository, UserRepository } from 'viewcreator-database';
-import { clerkMiddleware, requireAuth, clerkClient } from '@clerk/express';
+import { clerkMiddleware, requireAuth, clerkClient, getAuth } from '@clerk/express';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 
 const app = express();
@@ -62,7 +62,8 @@ async function ensureUserSynced(userId: string): Promise<void> {
 }
 
 const syncUserMiddleware = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-  const userId = (req as any).auth?.userId;
+  const { userId } = getAuth(req);
+  console.log('[Auth Sync] userId:', userId);
   if (userId) {
     await ensureUserSynced(userId);
   }
@@ -92,8 +93,8 @@ app.get('/health', (req, res) => {
 // Get All Templates Endpoint
 app.get('/api/templates', requireAuth(), syncUserMiddleware, async (req, res) => {
   try {
-    const userId = (req as any).auth?.userId;
-    const templates = await TemplateRepository.findAll(userId);
+    const { userId } = getAuth(req);
+    const templates = await TemplateRepository.findAll(userId || undefined);
     res.json({ templates });
   } catch (error: any) {
     console.error('Error fetching templates:', error);
@@ -101,10 +102,40 @@ app.get('/api/templates', requireAuth(), syncUserMiddleware, async (req, res) =>
   }
 });
 
+// Delete Template Endpoint
+app.delete('/api/templates/:id', requireAuth(), syncUserMiddleware, async (req: express.Request, res: express.Response): Promise<any> => {
+  try {
+    const { userId } = getAuth(req);
+    const templateId = req.params.id;
+
+    if (!templateId) {
+      return res.status(400).json({ error: 'Template ID is required' });
+    }
+
+    const template = await TemplateRepository.findById(templateId);
+    if (!template) {
+      return res.status(404).json({ error: 'Template not found' });
+    }
+
+    // Check authorization: User must be the creator
+    if (template.user_id !== userId) {
+      return res.status(403).json({ error: 'Not authorized to delete this template' });
+    }
+
+    // Optional: Delete from S3 (If required, we can extract the key from s3_link, but skipping for now or I can add it)
+    await TemplateRepository.delete(templateId);
+
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Error deleting template:', error);
+    res.status(500).json({ error: 'Failed to delete template from database' });
+  }
+});
+
 // Upload Template Image to S3 and Save Reference Endpoint
 app.post('/api/templates/upload', requireAuth(), syncUserMiddleware, async (req: express.Request, res: express.Response): Promise<any> => {
   try {
-    const userId = (req as any).auth?.userId;
+    const { userId } = getAuth(req);
     const { title, description, base64Image, tags = [], isPublic = false } = req.body;
 
     if (!title) {
@@ -148,7 +179,7 @@ app.post('/api/templates/upload', requireAuth(), syncUserMiddleware, async (req:
     const s3Url = `https://${bucketName}.s3.${process.env.AWS_REGION || 'us-east-1'}.amazonaws.com/${s3Key}`;
     console.log(`[S3 Upload] Successfully uploaded template image to S3: ${s3Url}`);
 
-    // Persist template metadata reference in Supabase
+    // Persist template metadata reference
     const configTags = isPublic ? tags : ['My Uploads'];
     const template = await TemplateRepository.create({
       title,

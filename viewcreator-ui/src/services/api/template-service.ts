@@ -39,3 +39,18 @@ export async function uploadTemplate(params: UploadTemplateParams, token?: strin
   });
   return data.template;
 }
+
+export interface DeleteTemplateResponse {
+  success: boolean;
+}
+
+/**
+ * Deletes a template by its ID
+ */
+export async function deleteTemplate(id: string, token?: string): Promise<boolean> {
+  const data = await request<DeleteTemplateResponse>(`/api/templates/${id}`, {
+    method: 'DELETE',
+    token,
+  });
+  return data.success;
+}

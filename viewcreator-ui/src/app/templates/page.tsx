@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
+import { toast } from "sonner";
 import { 
   UploadCloud, 
   Grid, 
@@ -48,6 +49,7 @@ export default function TemplatesPage() {
       setTemplates(loaded);
     } catch (err) {
       console.error("Failed to load templates:", err);
+      toast.error("Failed to fetch templates from the server.");
     } finally {
       setLoading(false);
     }
@@ -100,17 +102,18 @@ export default function TemplatesPage() {
       setUploadTitle("");
       setUploadDescription("");
       setPreviewImage(null);
+      toast.success("Template uploaded successfully!");
       await fetchTemplates(); // Refresh view
     } catch (err) {
       console.error("Upload failed", err);
-      alert("Failed to upload template.");
+      toast.error(err instanceof Error ? err.message : "Failed to upload template.");
     } finally {
       setUploading(false);
     }
   };
 
   return (
-    <div className="flex h-screen bg-background pt-16">
+    <div className="flex flex-1 bg-background overflow-hidden">
       {/* Sidebar Categories */}
       <div className="w-64 border-r bg-muted/20 flex flex-col">
         <div className="p-4 border-b">

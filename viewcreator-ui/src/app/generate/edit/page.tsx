@@ -3,6 +3,7 @@
 import { useRef, useState, useEffect, type PointerEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
+import { toast } from "sonner";
 import { 
   ArrowLeft, 
   Crop, 
@@ -191,8 +192,11 @@ export default function EditImagePage() {
       setPreviewImageUrl(updatedUrl);
       setInstruction("");
       pushToHistory(updatedUrl);
+      toast.success("AI edits applied successfully!");
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Something went wrong applying your edits.");
+      const msg = err instanceof Error ? err.message : "Something went wrong applying your edits.";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -382,7 +386,7 @@ export default function EditImagePage() {
   }
 
   return (
-    <div className="h-screen w-screen bg-background text-foreground flex flex-col overflow-hidden font-sans select-none relative">
+    <div className="flex flex-col flex-1 bg-background overflow-hidden relative select-none">
       
       {/* Header bar */}
       <header className="h-16 border-b bg-card/60 backdrop-blur-xl flex items-center justify-between px-6 shrink-0 z-30">

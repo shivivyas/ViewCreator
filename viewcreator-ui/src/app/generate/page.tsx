@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
+import { toast } from 'sonner';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { 
   setImageEditorState, 
@@ -186,9 +187,12 @@ export default function GenerateImagePage() {
           templateId: params.templateId
         };
         dispatch(addGenerationToHistory(historyItem));
+        toast.success(`Successfully generated ${generatedUrls.length} image(s)!`);
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Something went wrong');
+      const msg = err instanceof Error ? err.message : 'Something went wrong';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setIsLoading(false);
     }
@@ -227,12 +231,17 @@ export default function GenerateImagePage() {
   };
 
   const handleDownload = (url: string, index: number, prefix = 'generated') => {
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${prefix}-${Date.now()}-${index}.png`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    try {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${prefix}-${Date.now()}-${index}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      toast.success("Image download started!");
+    } catch {
+      toast.error("Failed to download image.");
+    }
   };
 
   const handleEnhancePrompt = () => {
@@ -243,8 +252,8 @@ export default function GenerateImagePage() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <div className="container mx-auto px-4 py-6 shrink-0">
+    <div className="flex flex-col flex-1 bg-background overflow-hidden">
+      <div className="container mx-auto px-4 py-4 shrink-0">
         <div className="flex flex-col items-start gap-1">
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
             <Wand2 className="h-6 w-6 text-primary" />

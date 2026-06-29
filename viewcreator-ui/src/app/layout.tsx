@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
+import { Toaster } from "sonner";
 
 import { ThemeProvider } from "@/components/theme-provider";
+import { SiteHeader } from "@/components/layout/site-header";
 import { StoreProvider } from "@/store";
 import "./globals.css";
 
@@ -45,7 +47,13 @@ export default function RootLayout({
               enableSystem={true}
               disableTransitionOnChange
             >
-              {children}
+              <div className="flex min-h-screen flex-col">
+                <SiteHeader />
+                <div className="flex-1 flex flex-col">
+                  {children}
+                </div>
+              </div>
+              <Toaster position="bottom-right" richColors closeButton />
             </ThemeProvider>
           </StoreProvider>
         </body>

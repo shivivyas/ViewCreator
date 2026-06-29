@@ -113,7 +113,7 @@ export default function TemplatesPage() {
   };
 
   return (
-    <div className="flex flex-1 bg-background overflow-hidden">
+    <div className="flex h-[calc(100vh-4rem)] bg-background overflow-hidden">
       {/* Sidebar Categories */}
       <div className="w-64 border-r bg-muted/20 flex flex-col">
         <div className="p-4 border-b">

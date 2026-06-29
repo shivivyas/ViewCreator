@@ -252,7 +252,7 @@ export default function GenerateImagePage() {
   };
 
   return (
-    <div className="flex flex-col flex-1 bg-background overflow-hidden">
+    <div className="flex flex-col h-[calc(100vh-4rem)] bg-background overflow-hidden">
       <div className="container mx-auto px-4 py-4 shrink-0">
         <div className="flex flex-col items-start gap-1">
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
@@ -268,14 +268,14 @@ export default function GenerateImagePage() {
       <div className="container mx-auto px-4 pb-6 flex-1 min-h-0 overflow-hidden">
         <div className="grid lg:grid-cols-[380px_1fr] gap-6 h-full">
         {/* Left Sidebar - Controls */}
-        <Card className="h-full flex flex-col shadow-sm border-primary/10 overflow-hidden">
+        <Card className="h-full min-h-0 flex flex-col shadow-sm border-primary/10 overflow-hidden">
           <CardHeader className="bg-primary/5 border-b py-3 shrink-0">
             <CardTitle className="flex items-center gap-2 text-base">
               <Settings2 className="w-4 h-4" />
               Parameters
             </CardTitle>
           </CardHeader>
-          <ScrollArea className="flex-1">
+          <ScrollArea className="flex-1 min-h-0">
             <form id="generate-form" onSubmit={handleGenerate} className="flex flex-col gap-5 p-4">
               
               {/* 1. Viral Templates */}
@@ -536,8 +536,8 @@ export default function GenerateImagePage() {
         </Card>
 
         {/* Right Area - Results & History */}
-        <div className="flex flex-col h-full gap-4 overflow-hidden">
-          <Card className="flex-1 overflow-hidden flex flex-col shadow-md">
+        <div className="flex flex-col h-full min-h-0 gap-4 overflow-hidden">
+          <Card className="flex-1 min-h-0 overflow-hidden flex flex-col shadow-md">
             <CardHeader className="border-b bg-muted/30 pb-2 pt-3 shrink-0">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base font-semibold flex items-center gap-2">
@@ -557,7 +557,7 @@ export default function GenerateImagePage() {
                 )}
               </div>
             </CardHeader>
-            <ScrollArea className="flex-1">
+            <ScrollArea className="flex-1 min-h-0">
               <CardContent className="p-4 relative min-h-[400px]">
                 {/* Background grid pattern */}
                 <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none"></div>

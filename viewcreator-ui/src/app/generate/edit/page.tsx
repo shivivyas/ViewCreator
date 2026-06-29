@@ -386,7 +386,7 @@ export default function EditImagePage() {
   }
 
   return (
-    <div className="flex flex-col flex-1 bg-background overflow-hidden relative select-none">
+    <div className="flex flex-col h-[calc(100vh-4rem)] bg-background overflow-hidden relative select-none">
       
       {/* Header bar */}
       <header className="h-16 border-b bg-card/60 backdrop-blur-xl flex items-center justify-between px-6 shrink-0 z-30">

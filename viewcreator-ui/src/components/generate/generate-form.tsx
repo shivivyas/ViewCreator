@@ -233,19 +233,18 @@ export function GenerateForm({
               </div>
             ) : null}
             {referenceImages.length > 0 && (
-              <div className="flex gap-1 flex-wrap">
+              <div className="flex gap-2 flex-wrap mt-2">
                 {referenceImages.map((img, idx) => (
-                  <div key={idx} className="relative group rounded-lg border bg-muted/20 p-0.5 overflow-hidden flex items-center justify-center h-16 w-16">
+                  <div key={idx} className="relative group rounded-lg border bg-muted/20 p-0.5 flex items-center justify-center h-16 w-16">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={img} alt={`Ref ${idx+1}`} className="max-h-full object-contain rounded" />
+                    <img src={img} alt={`Ref ${idx+1}`} className="max-h-full max-w-full object-contain rounded" />
                     <Button 
                       type="button"
                       variant="destructive" 
-                      size="icon" 
-                      className="absolute -top-1.5 -right-1.5 opacity-0 group-hover:opacity-100 transition-opacity h-5 w-5"
+                      className="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 transition-opacity h-5 w-5 rounded-full p-0 flex items-center justify-center shadow-sm"
                       onClick={() => clearReferenceImage(idx)}
                     >
-                      <X className="w-2 h-2" />
+                      <X className="w-3 h-3" />
                     </Button>
                   </div>
                 ))}

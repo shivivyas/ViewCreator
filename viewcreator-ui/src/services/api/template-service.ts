@@ -25,6 +25,7 @@ export interface UploadTemplateParams {
   title: string;
   description?: string;
   category?: string;
+  isPublic?: boolean;
 }
 
 /**

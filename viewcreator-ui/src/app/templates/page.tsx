@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Switch } from "@/components/ui/switch";
 import { useAppDispatch } from "@/store";
 import { setImageEditorState } from "@/store/slices/image-editor-slice";
 
@@ -38,7 +39,9 @@ export default function TemplatesPage() {
   const [uploading, setUploading] = useState(false);
   const [uploadTitle, setUploadTitle] = useState("");
   const [uploadDescription, setUploadDescription] = useState("");
+  const [uploadCategory, setUploadCategory] = useState("");
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [isPublic, setIsPublic] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
   
   // View modal state
@@ -121,13 +124,15 @@ export default function TemplatesPage() {
         base64Image: previewImage,
         title: uploadTitle,
         description: uploadDescription,
-        category: "My Uploads",
+        category: isPublic ? uploadCategory || "Uncategorized" : "My Uploads",
+        isPublic,
       }, token);
 
       setShowUploadModal(false);
       setUploadTitle("");
       setUploadDescription("");
       setPreviewImage(null);
+      setIsPublic(true);
       toast.success("Template uploaded successfully!");
       await fetchTemplates(); // Refresh view
     } catch (err) {
@@ -254,7 +259,7 @@ export default function TemplatesPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="bg-background w-full max-w-md rounded-xl shadow-lg border overflow-hidden">
             <div className="flex justify-between items-center p-4 border-b">
-              <h2 className="font-semibold">Upload Private Template</h2>
+              <h2 className="font-semibold">Upload Template</h2>
               <Button 
                 variant="ghost" 
                 size="icon" 
@@ -262,7 +267,9 @@ export default function TemplatesPage() {
                   setShowUploadModal(false);
                   setUploadTitle("");
                   setUploadDescription("");
+                  setUploadCategory("");
                   setPreviewImage(null);
+                  setIsPublic(true);
                 }}
               >
                 <X className="size-4" />
@@ -270,6 +277,29 @@ export default function TemplatesPage() {
             </div>
             <form onSubmit={handleUploadSubmit} className="p-6 space-y-4">
               
+              {/* Public / Private Toggle */}
+              <div className="flex items-center justify-between rounded-lg border p-3 bg-muted/20">
+                <div className="space-y-0.5">
+                  <Label className="text-sm font-medium cursor-pointer">Public Template</Label>
+                  <p className="text-[11px] text-muted-foreground">
+                    {isPublic ? "Visible to all users of the platform" : "Only visible to you"}
+                  </p>
+                </div>
+                <Switch checked={isPublic} onCheckedChange={setIsPublic} />
+              </div>
+
+              {isPublic && (
+                <div className="space-y-2">
+                  <Label htmlFor="category">Category</Label>
+                  <Input 
+                    id="category" 
+                    placeholder="e.g. Hero Banners, Social Media, Minimalist" 
+                    value={uploadCategory}
+                    onChange={(e) => setUploadCategory(e.target.value)}
+                  />
+                </div>
+              )}
+
               <div className="space-y-2">
                 <Label>Template Image</Label>
                 <div 

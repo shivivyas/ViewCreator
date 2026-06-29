@@ -105,7 +105,7 @@ app.get('/api/templates', requireAuth(), syncUserMiddleware, async (req, res) =>
 app.post('/api/templates/upload', requireAuth(), syncUserMiddleware, async (req: express.Request, res: express.Response): Promise<any> => {
   try {
     const userId = (req as any).auth?.userId;
-    const { title, description, base64Image, category = 'My Uploads' } = req.body;
+    const { title, description, base64Image, category = 'My Uploads', isPublic = false } = req.body;
 
     if (!title) {
       return res.status(400).json({ error: 'Title is required' });
@@ -157,7 +157,7 @@ app.post('/api/templates/upload', requireAuth(), syncUserMiddleware, async (req:
         category,
         uploadedAt: new Date().toISOString()
       },
-      user_id: userId
+      user_id: isPublic ? null : userId
     });
 
     console.log(`[S3 Upload] Successfully recorded template ${template.id} in Postgres.`);

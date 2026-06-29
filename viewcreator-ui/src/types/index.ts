@@ -40,6 +40,7 @@ export interface Template {
   description: string;
   s3_link: string;
   user_id?: string | null;
+  created_at?: string;
   config?: {
     category?: string;
     tags?: string[];

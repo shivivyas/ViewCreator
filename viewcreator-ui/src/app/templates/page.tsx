@@ -10,7 +10,15 @@ import {
   Plus, 
   X, 
   Loader2,
-  Wand2
+  Wand2,
+  Search,
+  ArrowUpDown,
+  Calendar,
+  ThumbsUp,
+  ArrowDownAZ,
+  ArrowUpZA,
+  Clock,
+  Trash2
 } from "lucide-react";
 
 import { getTemplates, uploadTemplate, deleteTemplate } from "@/services/api/template-service";
@@ -24,7 +32,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
 import { useAppDispatch } from "@/store";
 import { setImageEditorState } from "@/store/slices/image-editor-slice";
-import { Trash2 } from "lucide-react";
 
 export default function TemplatesPage() {
   const router = useRouter();
@@ -34,6 +41,8 @@ export default function TemplatesPage() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState<string>("All");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortOption, setSortOption] = useState<"recent" | "name-asc" | "name-desc" | "popular">("recent");
   
   // Upload modal states
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -86,16 +95,45 @@ export default function TemplatesPage() {
   const globalTags = allTags.filter(t => t !== "My Uploads");
   const hasMyUploads = allTags.includes("My Uploads");
   
-  const filteredTemplates = activeCategory === "All" 
-    ? templates 
-    : templates.filter(t => {
-        // Check new tags array format
-        if (t.config?.tags && t.config.tags.length > 0) {
-          return t.config.tags.includes(activeCategory);
-        }
-        // Fall back to legacy category string
-        return (t.config?.category || "Uncategorized") === activeCategory;
-      });
+  const filteredTemplates = (() => {
+    // First, filter by category
+    let result = activeCategory === "All" 
+      ? templates 
+      : templates.filter(t => {
+          if (t.config?.tags && t.config.tags.length > 0) {
+            return t.config.tags.includes(activeCategory);
+          }
+          return (t.config?.category || "Uncategorized") === activeCategory;
+        });
+
+    // Then, filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(t => 
+        t.title.toLowerCase().includes(query) ||
+        (t.description && t.description.toLowerCase().includes(query)) ||
+        (t.config?.tags && t.config.tags.some(tag => tag.toLowerCase().includes(query)))
+      );
+    }
+
+    // Finally, sort
+    result = [...result].sort((a, b) => {
+      switch (sortOption) {
+        case "recent":
+          return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+        case "name-asc":
+          return a.title.localeCompare(b.title);
+        case "name-desc":
+          return b.title.localeCompare(a.title);
+        case "popular":
+          return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+        default:
+          return 0;
+      }
+    });
+
+    return result;
+  })();
 
   const handleUseTemplate = (templateId: string) => {
     // Jump straight to generator with this template active
@@ -200,7 +238,7 @@ export default function TemplatesPage() {
     <div className="flex h-[calc(100vh-4rem)] bg-background overflow-hidden">
       {/* Sidebar Categories */}
       <div className="w-64 border-r bg-muted/20 flex flex-col">
-        <div className="p-4 border-b">
+        <div className="p-4 border-b space-y-3">
           <Button 
             className="w-full gap-2" 
             onClick={() => setShowUploadModal(true)}
@@ -208,6 +246,49 @@ export default function TemplatesPage() {
             <UploadCloud className="size-4" />
             Upload Template
           </Button>
+
+          {/* Sort Controls */}
+          <div className="space-y-1">
+            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 mb-2">Sort By</h4>
+            <div className="flex flex-col gap-0.5">
+              <Button
+                variant={sortOption === "popular" ? "secondary" : "ghost"}
+                size="sm"
+                className="w-full justify-start font-normal text-xs h-8"
+                onClick={() => setSortOption("popular")}
+              >
+                <ThumbsUp className="size-3.5 mr-2 shrink-0" />
+                Most Liked
+              </Button>
+              <Button
+                variant={sortOption === "recent" ? "secondary" : "ghost"}
+                size="sm"
+                className="w-full justify-start font-normal text-xs h-8"
+                onClick={() => setSortOption("recent")}
+              >
+                <Clock className="size-3.5 mr-2 shrink-0" />
+                Recently Uploaded
+              </Button>
+              <Button
+                variant={sortOption === "name-asc" ? "secondary" : "ghost"}
+                size="sm"
+                className="w-full justify-start font-normal text-xs h-8"
+                onClick={() => setSortOption("name-asc")}
+              >
+                <ArrowDownAZ className="size-3.5 mr-2 shrink-0" />
+                Name A–Z
+              </Button>
+              <Button
+                variant={sortOption === "name-desc" ? "secondary" : "ghost"}
+                size="sm"
+                className="w-full justify-start font-normal text-xs h-8"
+                onClick={() => setSortOption("name-desc")}
+              >
+                <ArrowUpZA className="size-3.5 mr-2 shrink-0" />
+                Name Z–A
+              </Button>
+            </div>
+          </div>
         </div>
         <ScrollArea className="flex-1 min-h-0">
           <div className="p-4">
@@ -254,8 +335,28 @@ export default function TemplatesPage() {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col overflow-hidden">
         <header className="flex h-14 items-center gap-4 border-b bg-background px-6">
-          <Grid className="size-5 text-muted-foreground" />
-          <h1 className="text-lg font-semibold">Templates Library</h1>
+          <Grid className="size-5 text-muted-foreground shrink-0" />
+          <h1 className="text-lg font-semibold shrink-0">Templates Library</h1>
+          <div className="flex-1" />
+          <div className="relative w-full max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
+            <Input
+              placeholder="Search templates by name, description, or tag..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 h-9 text-sm bg-muted/30 border-muted-foreground/20 focus-visible:bg-background"
+            />
+            {searchQuery && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
+                onClick={() => setSearchQuery("")}
+              >
+                <X className="size-3.5" />
+              </Button>
+            )}
+          </div>
         </header>
 
         <ScrollArea className="flex-1 min-h-0">
@@ -267,7 +368,12 @@ export default function TemplatesPage() {
             ) : filteredTemplates.length === 0 ? (
               <div className="flex flex-col h-64 items-center justify-center text-muted-foreground">
                 <Wand2 className="size-12 mb-4 opacity-20" />
-                <p>No templates found in this category.</p>
+                <p>{searchQuery ? "No templates match your search." : "No templates found in this category."}</p>
+                {searchQuery && (
+                  <Button variant="link" size="sm" onClick={() => setSearchQuery("")} className="mt-2">
+                    Clear search
+                  </Button>
+                )}
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">

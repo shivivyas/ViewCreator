@@ -219,7 +219,16 @@ export default function TemplatesPage() {
           <div className="bg-background w-full max-w-md rounded-xl shadow-lg border overflow-hidden">
             <div className="flex justify-between items-center p-4 border-b">
               <h2 className="font-semibold">Upload Private Template</h2>
-              <Button variant="ghost" size="icon" onClick={() => setShowUploadModal(false)}>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => {
+                  setShowUploadModal(false);
+                  setUploadTitle("");
+                  setUploadDescription("");
+                  setPreviewImage(null);
+                }}
+              >
                 <X className="size-4" />
               </Button>
             </div>
@@ -228,15 +237,29 @@ export default function TemplatesPage() {
               <div className="space-y-2">
                 <Label>Template Image</Label>
                 <div 
-                  className={`border-2 border-dashed rounded-lg flex flex-col items-center justify-center overflow-hidden cursor-pointer transition-colors ${previewImage ? 'aspect-square' : 'h-32'} ${isDragging ? 'bg-primary/10 border-primary' : 'bg-muted/30 hover:bg-muted/50'}`}
+                  className={`border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer transition-colors ${previewImage ? 'aspect-square p-1.5' : 'h-32'} ${isDragging ? 'bg-primary/10 border-primary' : 'bg-muted/30 hover:bg-muted/50'}`}
                   onClick={() => fileInputRef.current?.click()}
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
                   onDrop={handleDrop}
                 >
                   {previewImage ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={previewImage} alt="Preview" className="w-full h-full object-cover" />
+                    <div className="relative w-full h-full group">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={previewImage} alt="Preview" className="w-full h-full object-cover rounded-md" />
+                      <Button 
+                        type="button"
+                        variant="destructive" 
+                        className="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 transition-opacity h-5 w-5 rounded-full p-0 flex items-center justify-center shadow-sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPreviewImage(null);
+                          if (fileInputRef.current) fileInputRef.current.value = "";
+                        }}
+                      >
+                        <X className="w-3 h-3" />
+                      </Button>
+                    </div>
                   ) : (
                     <>
                       <Plus className="size-8 text-muted-foreground mb-2" />

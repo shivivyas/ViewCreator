@@ -1,0 +1,11 @@
+{
+  "name": "viewcreator",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ViewCreator - AI-powered image generation studio",
+  "workspaces": [
+    "viewcreator-api",
+    "viewcreator-database",
+    "viewcreator-ui"
+  ]
+}

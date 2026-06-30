@@ -54,3 +54,16 @@ CREATE TRIGGER update_templates_timestamp
     BEFORE UPDATE ON templates
     FOR EACH ROW
     EXECUTE FUNCTION update_timestamp();
+
+-- Template Upvotes Table
+DROP TABLE IF EXISTS template_upvotes CASCADE;
+CREATE TABLE IF NOT EXISTS template_upvotes (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    template_id UUID NOT NULL REFERENCES templates(id) ON DELETE CASCADE,
+    user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    UNIQUE (template_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_template_upvotes_template_id ON template_upvotes(template_id);
+CREATE INDEX IF NOT EXISTS idx_template_upvotes_user_id ON template_upvotes(user_id);

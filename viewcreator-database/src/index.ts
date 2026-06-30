@@ -18,3 +18,9 @@ export {
   Template,
   TemplateRepository,
 } from './repositories/template-repository.js';
+
+// Vote repository and types (upvote only)
+export {
+  TemplateWithVotes,
+  VoteRepository,
+} from './repositories/vote-repository.js';

@@ -85,11 +85,11 @@ async function fetchS3ImageAsBase64(url) {
 app.get('/health', (req, res) => {
     res.json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
-// Get All Templates Endpoint
+// Get All Templates Endpoint (with vote counts)
 app.get('/api/templates', (0, express_2.requireAuth)(), syncUserMiddleware, async (req, res) => {
     try {
         const { userId } = (0, express_2.getAuth)(req);
-        const templates = await viewcreator_database_1.TemplateRepository.findAll(userId || undefined);
+        const templates = await viewcreator_database_1.VoteRepository.findAllWithVotes(userId || undefined);
         res.json({ templates });
     }
     catch (error) {
@@ -120,6 +120,30 @@ app.delete('/api/templates/:id', (0, express_2.requireAuth)(), syncUserMiddlewar
     catch (error) {
         console.error('Error deleting template:', error);
         res.status(500).json({ error: 'Failed to delete template from database' });
+    }
+});
+// Vote on a Template Endpoint (toggles upvote)
+app.post('/api/templates/:id/vote', (0, express_2.requireAuth)(), syncUserMiddleware, async (req, res) => {
+    try {
+        const { userId } = (0, express_2.getAuth)(req);
+        const templateId = req.params.id;
+        if (!templateId) {
+            return res.status(400).json({ error: 'Template ID is required' });
+        }
+        if (!userId) {
+            return res.status(401).json({ error: 'Not authenticated' });
+        }
+        const template = await viewcreator_database_1.TemplateRepository.findById(templateId);
+        if (!template) {
+            return res.status(404).json({ error: 'Template not found' });
+        }
+        await viewcreator_database_1.VoteRepository.toggleUpvote(templateId, userId);
+        const updated = await viewcreator_database_1.VoteRepository.findByIdWithVotes(templateId, userId);
+        res.json({ template: updated });
+    }
+    catch (error) {
+        console.error('Error upvoting template:', error);
+        res.status(500).json({ error: error.message || 'Failed to record upvote' });
     }
 });
 // Upload Template Image to S3 and Save Reference Endpoint

@@ -5,7 +5,7 @@ dotenv.config();
 import express from 'express';
 import cors from 'cors';
 import { GoogleGenAI } from "@google/genai";
-import { TemplateRepository, UserRepository } from 'viewcreator-database';
+import { TemplateRepository, UserRepository, VoteRepository } from 'viewcreator-database';
 import { clerkMiddleware, requireAuth, clerkClient, getAuth } from '@clerk/express';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 
@@ -90,11 +90,11 @@ app.get('/health', (req, res) => {
   res.json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
 
-// Get All Templates Endpoint
+// Get All Templates Endpoint (with vote counts)
 app.get('/api/templates', requireAuth(), syncUserMiddleware, async (req, res) => {
   try {
     const { userId } = getAuth(req);
-    const templates = await TemplateRepository.findAll(userId || undefined);
+    const templates = await VoteRepository.findAllWithVotes(userId || undefined);
     res.json({ templates });
   } catch (error: any) {
     console.error('Error fetching templates:', error);
@@ -129,6 +129,35 @@ app.delete('/api/templates/:id', requireAuth(), syncUserMiddleware, async (req: 
   } catch (error: any) {
     console.error('Error deleting template:', error);
     res.status(500).json({ error: 'Failed to delete template from database' });
+  }
+});
+
+// Vote on a Template Endpoint (toggles upvote)
+app.post('/api/templates/:id/vote', requireAuth(), syncUserMiddleware, async (req: express.Request, res: express.Response): Promise<any> => {
+  try {
+    const { userId } = getAuth(req);
+    const templateId = req.params.id;
+
+    if (!templateId) {
+      return res.status(400).json({ error: 'Template ID is required' });
+    }
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const template = await TemplateRepository.findById(templateId);
+    if (!template) {
+      return res.status(404).json({ error: 'Template not found' });
+    }
+
+    await VoteRepository.toggleUpvote(templateId, userId);
+
+    const updated = await VoteRepository.findByIdWithVotes(templateId, userId);
+    res.json({ template: updated });
+  } catch (error: any) {
+    console.error('Error upvoting template:', error);
+    res.status(500).json({ error: error.message || 'Failed to record upvote' });
   }
 });
 

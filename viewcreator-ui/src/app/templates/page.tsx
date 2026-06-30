@@ -21,7 +21,7 @@ import {
   Trash2
 } from "lucide-react";
 
-import { getTemplates, uploadTemplate, deleteTemplate } from "@/services/api/template-service";
+import { getTemplates, uploadTemplate, deleteTemplate, voteTemplate } from "@/services/api/template-service";
 import type { Template } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
@@ -234,6 +234,21 @@ export default function TemplatesPage() {
     setShowDeleteModal(true);
   };
 
+  const handleVote = async (e: React.MouseEvent, templateId: string) => {
+    e.stopPropagation();
+    try {
+      const token = await getToken().catch(() => undefined) || undefined;
+      const updated = await voteTemplate(templateId, token);
+      setTemplates(prev => prev.map(t => t.id === templateId ? updated : t));
+      if (updated.user_upvoted) {
+        toast.success("Upvoted!");
+      }
+    } catch (err) {
+      console.error("Upvote failed", err);
+      toast.error(err instanceof Error ? err.message : "Failed to upvote.");
+    }
+  };
+
   return (
     <div className="flex h-[calc(100vh-4rem)] bg-background overflow-hidden">
       {/* Sidebar Categories */}
@@ -390,6 +405,23 @@ export default function TemplatesPage() {
                         alt={template.title}
                         className="object-cover w-full h-full transition-transform duration-300 group-hover:scale-105"
                       />
+                      {/* Upvote button overlay */}
+                      <div className="absolute bottom-2 left-2">
+                        <Button
+                          variant={template.user_upvoted ? "default" : "secondary"}
+                          size="sm"
+                          className={`h-7 text-xs gap-1 px-2.5 shadow-sm ${
+                            template.user_upvoted 
+                              ? 'bg-primary text-primary-foreground hover:bg-primary/90' 
+                              : 'bg-background/80 backdrop-blur-sm hover:bg-background'
+                          }`}
+                          onClick={(e) => handleVote(e, template.id)}
+                        >
+                          <ThumbsUp className={`size-3 ${template.user_upvoted ? 'fill-current' : ''}`} />
+                          <span className="tabular-nums">{template.upvotes || 0}</span>
+                        </Button>
+                      </div>
+                      {/* Delete button */}
                       {userId && template.user_id === userId && (
                         <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           <Button 
@@ -408,6 +440,21 @@ export default function TemplatesPage() {
                       <CardDescription className="line-clamp-2 text-xs">
                         {template.description || "No description provided."}
                       </CardDescription>
+                      {/* Tags */}
+                      {(template.config?.tags && template.config.tags.length > 0) && (
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {template.config.tags.slice(0, 3).map(tag => (
+                            <Badge key={tag} variant="outline" className="text-[9px] px-1.5 py-0 font-normal">
+                              {tag}
+                            </Badge>
+                          ))}
+                          {template.config.tags.length > 3 && (
+                            <Badge variant="outline" className="text-[9px] px-1.5 py-0 font-normal">
+                              +{template.config.tags.length - 3}
+                            </Badge>
+                          )}
+                        </div>
+                      )}
                     </CardHeader>
                     <CardFooter className="p-4 pt-0">
                       <Button 

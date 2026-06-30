@@ -54,3 +54,19 @@ export async function deleteTemplate(id: string, token?: string): Promise<boolea
   });
   return data.success;
 }
+
+export interface VoteResponse {
+  template: Template;
+}
+
+/**
+ * Toggle an upvote on a template
+ */
+export async function voteTemplate(templateId: string, token?: string): Promise<Template> {
+  const data = await request<VoteResponse>(`/api/templates/${templateId}/vote`, {
+    method: 'POST',
+    body: {},
+    token,
+  });
+  return data.template;
+}

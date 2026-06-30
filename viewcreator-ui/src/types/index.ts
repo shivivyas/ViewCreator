@@ -41,6 +41,8 @@ export interface Template {
   s3_link: string;
   user_id?: string | null;
   created_at?: string;
+  upvotes?: number;
+  user_upvoted?: boolean;
   config?: {
     category?: string;
     tags?: string[];

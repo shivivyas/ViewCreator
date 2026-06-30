@@ -1,0 +1,9 @@
+{
+  "servers": {
+    "codebase-memo": {
+      "type": "stdio",
+      "command": "/Users/sidkumar/.local/bin/codebase-memory-mcp",
+      "args": []
+    }
+  }
+}

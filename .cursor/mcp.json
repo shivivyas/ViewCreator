@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "codebase-memo": {
+      "command": "/Users/sidkumar/.local/bin/codebase-memory-mcp",
+      "args": []
+    }
+  }
+}

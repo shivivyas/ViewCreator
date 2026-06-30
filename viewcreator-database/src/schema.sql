@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS templates (
     title VARCHAR(255) NOT NULL,
     description TEXT,
     s3_link VARCHAR(512) NOT NULL,
+    media_type VARCHAR(10) DEFAULT 'image' NOT NULL CHECK (media_type IN ('image', 'video')),
     -- JSONB to store flexible configurations such as bounding boxes, text placement, 
     -- dimensions, overlay properties, or default prompts
     config JSONB DEFAULT '{}'::jsonb NOT NULL,
@@ -28,6 +29,9 @@ CREATE TABLE IF NOT EXISTS templates (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
+
+-- Index for fast sorting by creation date (primary listing order)
+CREATE INDEX IF NOT EXISTS idx_templates_created_at ON templates (created_at DESC);
 
 -- Index for searching metadata configuration keys quickly
 CREATE INDEX IF NOT EXISTS idx_templates_config ON templates USING gin (config);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import React, { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import { toast } from "sonner";
@@ -12,8 +12,6 @@ import {
   Loader2,
   Wand2,
   Search,
-  ArrowUpDown,
-  Calendar,
   ThumbsUp,
   ArrowDownAZ,
   ArrowUpZA,
@@ -22,7 +20,7 @@ import {
 } from "lucide-react";
 
 import { getTemplates, uploadTemplate, deleteTemplate, voteTemplate } from "@/services/api/template-service";
-import type { Template } from "@/types";
+import type { Template, MediaType } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -32,6 +30,163 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
 import { useAppDispatch } from "@/store";
 import { setImageEditorState } from "@/store/slices/image-editor-slice";
+
+// ─── Memoized Template Card ────────────────────────────────────────────────
+interface TemplateCardProps {
+  template: Template;
+  index: number;
+  userId: string | null | undefined;
+  onUse: (id: string) => void;
+  onView: (t: Template) => void;
+  onVote: (e: React.MouseEvent, id: string) => void;
+  onDelete: (e: React.MouseEvent, t: Template) => void;
+}
+
+const TemplateCard = React.memo(function TemplateCard({
+  template,
+  index,
+  userId,
+  onUse,
+  onView,
+  onVote,
+  onDelete,
+}: TemplateCardProps) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  // Only autoplay videos when they're visible in the viewport
+  useEffect(() => {
+    const el = cardRef.current;
+    const vid = videoRef.current;
+    if (!el || !vid || template.media_type !== 'video') return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          vid.play().catch(() => {}); // Browser may block autoplay
+        } else {
+          vid.pause();
+        }
+      },
+      { threshold: 0.3 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [template.media_type]);
+
+  const isFirstVisible = index < 4; // First row gets high fetchpriority
+
+  return (
+    <Card
+      ref={cardRef}
+      className="overflow-hidden flex flex-col group cursor-pointer hover:border-primary/50 transition-colors"
+      onClick={() => onView(template)}
+    >
+      <div className="relative aspect-square bg-muted overflow-hidden">
+        {template.media_type === 'video' ? (
+          <video
+            ref={videoRef}
+            src={template.s3_link}
+            className="object-cover w-full h-full"
+            muted
+            loop
+            playsInline
+            preload={isFirstVisible ? 'auto' : 'none'}
+          />
+        ) : (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={template.s3_link}
+            alt={template.title}
+            width={400}
+            height={400}
+            className="object-cover w-full h-full transition-transform duration-300 group-hover:scale-105"
+            loading={isFirstVisible ? 'eager' : 'lazy'}
+            decoding="async"
+            fetchPriority={isFirstVisible ? 'high' : undefined}
+          />
+        )}
+        {/* Media type badge */}
+        {template.media_type === 'video' && (
+          <div className="absolute top-2 left-2">
+            <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 uppercase tracking-wider bg-background/80 backdrop-blur-sm">
+              Video
+            </Badge>
+          </div>
+        )}
+        {/* Upvote button overlay */}
+        <div className="absolute bottom-2 left-2">
+          <Button
+            variant={template.user_upvoted ? 'default' : 'secondary'}
+            size="sm"
+            className={`h-7 text-xs gap-1 px-2.5 shadow-sm ${
+              template.user_upvoted
+                ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                : 'bg-background/80 backdrop-blur-sm hover:bg-background'
+            }`}
+            onClick={(e) => onVote(e, template.id)}
+          >
+            <ThumbsUp className={`size-3 ${template.user_upvoted ? 'fill-current' : ''}`} />
+            <span className="tabular-nums">{template.upvotes || 0}</span>
+          </Button>
+        </div>
+        {/* Delete button */}
+        {userId && template.user_id === userId && (
+          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Button
+              variant="destructive"
+              size="icon"
+              className="h-8 w-8 rounded-full shadow-sm"
+              onClick={(e) => onDelete(e, template)}
+            >
+              <Trash2 className="size-4" />
+            </Button>
+          </div>
+        )}
+      </div>
+      <CardHeader className="p-4 flex-1">
+        <CardTitle className="text-base line-clamp-1">{template.title}</CardTitle>
+        <CardDescription className="line-clamp-2 text-xs">
+          {template.description || 'No description provided.'}
+        </CardDescription>
+        {/* Tags + Media Type */}
+        <div className="flex flex-wrap gap-1 mt-2">
+          {template.media_type === 'video' && (
+            <Badge variant="default" className="text-[9px] px-1.5 py-0 font-normal uppercase tracking-wider">
+              Video
+            </Badge>
+          )}
+          {(template.config?.tags && template.config.tags.length > 0) && (
+            <>
+              {template.config.tags.slice(0, 3).map(tag => (
+                <Badge key={tag} variant="outline" className="text-[9px] px-1.5 py-0 font-normal">
+                  {tag}
+                </Badge>
+              ))}
+              {template.config.tags.length > 3 && (
+                <Badge variant="outline" className="text-[9px] px-1.5 py-0 font-normal">
+                  +{template.config.tags.length - 3}
+                </Badge>
+              )}
+            </>
+          )}
+        </div>
+      </CardHeader>
+      <CardFooter className="p-4 pt-0">
+        <Button
+          className="w-full"
+          variant="secondary"
+          onClick={(e) => {
+            e.stopPropagation();
+            onUse(template.id);
+          }}
+        >
+          Use Template
+        </Button>
+      </CardFooter>
+    </Card>
+  );
+});
 
 export default function TemplatesPage() {
   const router = useRouter();
@@ -51,6 +206,7 @@ export default function TemplatesPage() {
   const [uploadDescription, setUploadDescription] = useState("");
   const [uploadTagsInput, setUploadTagsInput] = useState("");
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [uploadFileType, setUploadFileType] = useState<MediaType>('image');
   const [isPublic, setIsPublic] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
   
@@ -64,11 +220,24 @@ export default function TemplatesPage() {
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const fetchTemplates = useCallback(async () => {
+  // Simple client-side cache keyed by token to avoid re-fetching on every mount
+  const cacheRef = useRef<{ key: string; data: Template[]; expiry: number } | null>(null);
+  const CACHE_TTL = 30_000; // 30 seconds
+
+  const fetchTemplates = useCallback(async (force = false) => {
+    const token = await getToken().catch(() => undefined) || undefined;
+    const cacheKey = token || 'anonymous';
+
+    // Serve from cache if fresh
+    if (!force && cacheRef.current && cacheRef.current.key === cacheKey && Date.now() < cacheRef.current.expiry) {
+      setTemplates(cacheRef.current.data);
+      return;
+    }
+
     setLoading(true);
     try {
-      const token = await getToken().catch(() => undefined) || undefined;
       const loaded = await getTemplates(token);
+      cacheRef.current = { key: cacheKey, data: loaded, expiry: Date.now() + CACHE_TTL };
       setTemplates(loaded);
     } catch (err) {
       console.error("Failed to load templates:", err);
@@ -79,23 +248,26 @@ export default function TemplatesPage() {
   }, [getToken]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchTemplates();
   }, [fetchTemplates]);
 
-  // Derive tags dynamically from database
+  // Derive tags dynamically from database — memoized to avoid re-computation on every render
   // Support both new config.tags[] and legacy config.category string
-  const allTags = Array.from(new Set(
-    templates.flatMap(t => {
-      if (t.config?.tags && t.config.tags.length > 0) return t.config.tags;
-      if (t.config?.category) return [t.config.category];
-      return ['Uncategorized'];
-    })
-  ));
-  const globalTags = allTags.filter(t => t !== "My Uploads");
-  const hasMyUploads = allTags.includes("My Uploads");
+  const { globalTags, hasMyUploads } = useMemo(() => {
+    const tags = Array.from(new Set(
+      templates.flatMap(t => {
+        if (t.config?.tags && t.config.tags.length > 0) return t.config.tags;
+        if (t.config?.category) return [t.config.category];
+        return ['Uncategorized'];
+      })
+    ));
+    return {
+      globalTags: tags.filter(t => t !== "My Uploads"),
+      hasMyUploads: tags.includes("My Uploads"),
+    };
+  }, [templates]);
   
-  const filteredTemplates = (() => {
+  const filteredTemplates = useMemo(() => {
     // First, filter by category
     let result = activeCategory === "All" 
       ? templates 
@@ -133,7 +305,7 @@ export default function TemplatesPage() {
     });
 
     return result;
-  })();
+  }, [templates, activeCategory, searchQuery, sortOption]);
 
   const handleUseTemplate = (templateId: string) => {
     // Jump straight to generator with this template active
@@ -141,8 +313,16 @@ export default function TemplatesPage() {
     router.push(`/generate?templateId=${templateId}`);
   };
 
+  const getFileType = (file: File): MediaType | null => {
+    if (file.type.startsWith('image/')) return 'image';
+    if (file.type.startsWith('video/')) return 'video';
+    return null;
+  };
+
   const processFile = (file?: File) => {
-    if (file && file.type.startsWith('image/')) {
+    const fileType = file ? getFileType(file) : null;
+    if (file && fileType) {
+      setUploadFileType(fileType);
       const reader = new FileReader();
       reader.onloadend = () => {
         setPreviewImage(reader.result as string);
@@ -183,7 +363,9 @@ export default function TemplatesPage() {
         .map(t => t.trim())
         .filter(Boolean);
       await uploadTemplate({
-        base64Image: previewImage,
+        base64Image: uploadFileType === 'image' ? previewImage : undefined,
+        base64Video: uploadFileType === 'video' ? previewImage : undefined,
+        mediaType: uploadFileType,
         title: uploadTitle,
         description: uploadDescription,
         tags: isPublic ? tags : ['My Uploads'],
@@ -195,9 +377,11 @@ export default function TemplatesPage() {
       setUploadDescription("");
       setUploadTagsInput("");
       setPreviewImage(null);
+      setUploadFileType('image');
       setIsPublic(true);
       toast.success("Template uploaded successfully!");
-      await fetchTemplates(); // Refresh view
+      cacheRef.current = null; // Bust cache so the new template appears immediately
+      await fetchTemplates(true);
     } catch (err) {
       console.error("Upload failed", err);
       toast.error(err instanceof Error ? err.message : "Failed to upload template.");
@@ -219,7 +403,8 @@ export default function TemplatesPage() {
       if (viewTemplate?.id === templateToDelete.id) {
         setViewTemplate(null);
       }
-      await fetchTemplates();
+      cacheRef.current = null; // Bust cache
+      await fetchTemplates(true);
     } catch (err) {
       console.error("Delete failed", err);
       toast.error(err instanceof Error ? err.message : "Failed to delete template.");
@@ -392,83 +577,17 @@ export default function TemplatesPage() {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {filteredTemplates.map((template) => (
-                  <Card 
-                    key={template.id} 
-                    className="overflow-hidden flex flex-col group cursor-pointer hover:border-primary/50 transition-colors"
-                    onClick={() => setViewTemplate(template)}
-                  >
-                    <div className="relative aspect-square bg-muted">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img 
-                        src={template.s3_link} 
-                        alt={template.title}
-                        className="object-cover w-full h-full transition-transform duration-300 group-hover:scale-105"
-                      />
-                      {/* Upvote button overlay */}
-                      <div className="absolute bottom-2 left-2">
-                        <Button
-                          variant={template.user_upvoted ? "default" : "secondary"}
-                          size="sm"
-                          className={`h-7 text-xs gap-1 px-2.5 shadow-sm ${
-                            template.user_upvoted 
-                              ? 'bg-primary text-primary-foreground hover:bg-primary/90' 
-                              : 'bg-background/80 backdrop-blur-sm hover:bg-background'
-                          }`}
-                          onClick={(e) => handleVote(e, template.id)}
-                        >
-                          <ThumbsUp className={`size-3 ${template.user_upvoted ? 'fill-current' : ''}`} />
-                          <span className="tabular-nums">{template.upvotes || 0}</span>
-                        </Button>
-                      </div>
-                      {/* Delete button */}
-                      {userId && template.user_id === userId && (
-                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button 
-                            variant="destructive" 
-                            size="icon" 
-                            className="h-8 w-8 rounded-full shadow-sm"
-                            onClick={(e) => promptDeleteTemplate(e, template)}
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                    <CardHeader className="p-4 flex-1">
-                      <CardTitle className="text-base line-clamp-1">{template.title}</CardTitle>
-                      <CardDescription className="line-clamp-2 text-xs">
-                        {template.description || "No description provided."}
-                      </CardDescription>
-                      {/* Tags */}
-                      {(template.config?.tags && template.config.tags.length > 0) && (
-                        <div className="flex flex-wrap gap-1 mt-2">
-                          {template.config.tags.slice(0, 3).map(tag => (
-                            <Badge key={tag} variant="outline" className="text-[9px] px-1.5 py-0 font-normal">
-                              {tag}
-                            </Badge>
-                          ))}
-                          {template.config.tags.length > 3 && (
-                            <Badge variant="outline" className="text-[9px] px-1.5 py-0 font-normal">
-                              +{template.config.tags.length - 3}
-                            </Badge>
-                          )}
-                        </div>
-                      )}
-                    </CardHeader>
-                    <CardFooter className="p-4 pt-0">
-                      <Button 
-                        className="w-full" 
-                        variant="secondary"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleUseTemplate(template.id);
-                        }}
-                      >
-                        Use Template
-                      </Button>
-                    </CardFooter>
-                  </Card>
+                {filteredTemplates.map((template, i) => (
+                  <TemplateCard
+                    key={template.id}
+                    template={template}
+                    index={i}
+                    userId={userId}
+                    onUse={handleUseTemplate}
+                    onView={setViewTemplate}
+                    onVote={handleVote}
+                    onDelete={promptDeleteTemplate}
+                  />
                 ))}
               </div>
             )}
@@ -491,6 +610,7 @@ export default function TemplatesPage() {
                   setUploadDescription("");
                   setUploadTagsInput("");
                   setPreviewImage(null);
+                  setUploadFileType('image');
                   setIsPublic(true);
                 }}
               >
@@ -534,8 +654,17 @@ export default function TemplatesPage() {
                 >
                   {previewImage ? (
                     <div className="relative w-full h-full group">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={previewImage} alt="Preview" className="w-full h-full object-cover rounded-md" />
+                      {uploadFileType === 'video' ? (
+                        <video
+                          src={previewImage}
+                          className="w-full h-full object-cover rounded-md"
+                          controls
+                          muted
+                        />
+                      ) : (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img src={previewImage} alt="Preview" className="w-full h-full object-cover rounded-md" />
+                      )}
                       <Button 
                         type="button"
                         variant="destructive" 
@@ -552,12 +681,12 @@ export default function TemplatesPage() {
                   ) : (
                     <>
                       <Plus className="size-8 text-muted-foreground mb-2" />
-                      <span className="text-sm text-muted-foreground">Click or drag image to select</span>
+                      <span className="text-sm text-muted-foreground">Click or drag image or video to select</span>
                     </>
                   )}
                   <input 
                     type="file" 
-                    accept="image/*" 
+                    accept="image/*,video/*" 
                     className="hidden" 
                     ref={fileInputRef}
                     onChange={handleFileSelect}
@@ -609,16 +738,31 @@ export default function TemplatesPage() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="md:w-3/5 bg-muted/30 flex items-center justify-center p-6 border-b md:border-b-0 md:border-r">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img 
-                src={viewTemplate.s3_link} 
-                alt={viewTemplate.title} 
-                className="max-w-full max-h-full object-contain rounded-lg shadow-sm" 
-              />
+              {viewTemplate.media_type === 'video' ? (
+                <video
+                  src={viewTemplate.s3_link}
+                  className="max-w-full max-h-full object-contain rounded-lg shadow-sm"
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
+                  controls
+                />
+              ) : (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img 
+                  src={viewTemplate.s3_link} 
+                  alt={viewTemplate.title} 
+                  className="max-w-full max-h-full object-contain rounded-lg shadow-sm" 
+                />
+              )}
             </div>
             <div className="md:w-2/5 p-6 flex flex-col">
               <div className="flex justify-between items-start mb-4 gap-2">
                 <div className="flex flex-wrap gap-1.5">
+                  {viewTemplate.media_type === 'video' && (
+                    <Badge variant="default" className="uppercase text-[10px] tracking-wider">Video</Badge>
+                  )}
                   {(viewTemplate.config?.tags && viewTemplate.config.tags.length > 0
                     ? viewTemplate.config.tags
                     : [viewTemplate.config?.category || "Uncategorized"]

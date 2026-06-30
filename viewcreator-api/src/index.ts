@@ -90,11 +90,17 @@ app.get('/health', (req, res) => {
   res.json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
 
-// Get All Templates Endpoint (with vote counts)
+// Get All Templates Endpoint (with vote counts, pagination, and caching)
 app.get('/api/templates', requireAuth(), syncUserMiddleware, async (req, res) => {
   try {
     const { userId } = getAuth(req);
-    const templates = await VoteRepository.findAllWithVotes(userId || undefined);
+    const limit = Math.min(parseInt(req.query.limit as string) || 100, 200);
+    const offset = parseInt(req.query.offset as string) || 0;
+
+    const templates = await VoteRepository.findAllWithVotes(userId || undefined, limit, offset);
+    
+    // Cache for 30s on the browser/CDN; stale data can be served while revalidating for up to 60s
+    res.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
     res.json({ templates });
   } catch (error: any) {
     console.error('Error fetching templates:', error);
@@ -191,7 +197,7 @@ app.post('/api/templates/upload', requireAuth(), syncUserMiddleware, async (req:
 
     if (isVideo) {
       // Handle video upload
-      const videoMatch = base64Video.match(/^data:(video\/[a-zA-Z+]+);base64,(.+)$/);
+      const videoMatch = base64Video.match(/^data:(video\/[\w.+-]+);base64,(.+)$/);
       if (!videoMatch) {
         return res.status(400).json({ error: 'Invalid base64 video data format' });
       }
@@ -202,7 +208,7 @@ app.post('/api/templates/upload', requireAuth(), syncUserMiddleware, async (req:
       s3Key = `templates/${userId || 'public'}/${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExtension}`;
     } else {
       // Handle image upload (existing logic)
-      const match = base64Image.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
+      const match = base64Image.match(/^data:(image\/[\w.+-]+);base64,(.+)$/);
       if (!match) {
         return res.status(400).json({ error: 'Invalid base64 image data format' });
       }

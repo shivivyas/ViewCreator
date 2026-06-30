@@ -4,34 +4,49 @@ import React, { useEffect, useState, useRef, useCallback, useMemo } from "react"
 import { useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import { toast } from "sonner";
-import { 
-  UploadCloud, 
-  Grid, 
-  Plus, 
-  X, 
+import {
+  UploadCloud,
+  Plus,
+  X,
   Loader2,
   Wand2,
   Search,
   ThumbsUp,
-  ArrowDownAZ,
-  ArrowUpZA,
-  Clock,
-  Trash2
+  Trash2,
+  ChevronDown,
+  Grid3X3,
 } from "lucide-react";
 
 import { getTemplates, uploadTemplate, deleteTemplate, voteTemplate } from "@/services/api/template-service";
 import type { Template, MediaType } from "@/types";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useAppDispatch } from "@/store";
 import { setImageEditorState } from "@/store/slices/image-editor-slice";
 
-// ─── Memoized Template Card ────────────────────────────────────────────────
+// ─── Constants ─────────────────────────────────────────────────────────────
+
+const SORT_OPTIONS = [
+  { value: "recent", label: "Newest" },
+  { value: "popular", label: "Most Upvoted" },
+  { value: "name-asc", label: "Name A–Z" },
+  { value: "name-desc", label: "Name Z–A" },
+] as const;
+
+type SortValue = (typeof SORT_OPTIONS)[number]["value"];
+
+// ─── Template Card ─────────────────────────────────────────────────────────
+
 interface TemplateCardProps {
   template: Template;
   index: number;
@@ -54,19 +69,14 @@ const TemplateCard = React.memo(function TemplateCard({
   const videoRef = useRef<HTMLVideoElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
 
-  // Only autoplay videos when they're visible in the viewport
   useEffect(() => {
     const el = cardRef.current;
     const vid = videoRef.current;
-    if (!el || !vid || template.media_type !== 'video') return;
-
+    if (!el || !vid || template.media_type !== "video") return;
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting) {
-          vid.play().catch(() => {}); // Browser may block autoplay
-        } else {
-          vid.pause();
-        }
+        if (entry.isIntersecting) vid.play().catch(() => {});
+        else vid.pause();
       },
       { threshold: 0.3 }
     );
@@ -74,119 +84,167 @@ const TemplateCard = React.memo(function TemplateCard({
     return () => observer.disconnect();
   }, [template.media_type]);
 
-  const isFirstVisible = index < 4; // First row gets high fetchpriority
+  const isFirstVisible = index < 4;
 
   return (
-    <Card
+    <div
       ref={cardRef}
-      className="overflow-hidden flex flex-col group cursor-pointer hover:border-primary/50 transition-colors"
+      className="group relative cursor-pointer rounded-2xl overflow-hidden bg-card border border-border/50 hover:border-border hover:shadow-lg hover:shadow-primary/5 transition-all duration-300"
       onClick={() => onView(template)}
     >
-      <div className="relative aspect-square bg-muted overflow-hidden">
-        {template.media_type === 'video' ? (
+      {/* Image */}
+      <div className="relative aspect-[4/5] bg-muted overflow-hidden">
+        {template.media_type === "video" ? (
           <video
             ref={videoRef}
             src={template.s3_link}
-            className="object-cover w-full h-full"
+            className="absolute inset-0 w-full h-full object-cover"
             muted
             loop
             playsInline
-            preload={isFirstVisible ? 'auto' : 'none'}
+            preload={isFirstVisible ? "auto" : "none"}
           />
         ) : (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img
             src={template.s3_link}
             alt={template.title}
-            width={400}
-            height={400}
-            className="object-cover w-full h-full transition-transform duration-300 group-hover:scale-105"
-            loading={isFirstVisible ? 'eager' : 'lazy'}
+            className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+            loading={isFirstVisible ? "eager" : "lazy"}
             decoding="async"
-            fetchPriority={isFirstVisible ? 'high' : undefined}
+            fetchPriority={isFirstVisible ? "high" : undefined}
           />
         )}
-        {/* Media type badge */}
-        {template.media_type === 'video' && (
+
+        {/* Top-right actions (visible on hover) */}
+        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-all duration-200 translate-y-1 group-hover:translate-y-0 flex gap-1.5">
+          {userId && template.user_id === userId && (
+            <Button
+              variant="secondary"
+              size="icon"
+              className="h-8 w-8 rounded-full bg-background/80 backdrop-blur-md hover:bg-background shadow-xs"
+              onClick={(e) => onDelete(e, template)}
+            >
+              <Trash2 className="size-3.5" />
+            </Button>
+          )}
+        </div>
+
+        {/* Video badge */}
+        {template.media_type === "video" && (
           <div className="absolute top-2 left-2">
-            <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 uppercase tracking-wider bg-background/80 backdrop-blur-sm">
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-wider bg-background/80 backdrop-blur-md text-foreground">
               Video
-            </Badge>
+            </span>
           </div>
         )}
-        {/* Upvote button overlay */}
-        <div className="absolute bottom-2 left-2">
+
+        {/* Bottom overlay — always visible */}
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent p-4 pt-12">
+          <h3 className="text-sm font-semibold text-white line-clamp-1 drop-shadow-sm">
+            {template.title}
+          </h3>
+          {template.description && (
+            <p className="text-xs text-white/70 line-clamp-1 mt-0.5 drop-shadow-sm">
+              {template.description}
+            </p>
+          )}
+        </div>
+
+        {/* Use button — appears on hover */}
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 bg-black/30">
           <Button
-            variant={template.user_upvoted ? 'default' : 'secondary'}
+            variant="secondary"
             size="sm"
-            className={`h-7 text-xs gap-1 px-2.5 shadow-sm ${
+            className="shadow-lg backdrop-blur-md bg-white/90 text-black hover:bg-white"
+            onClick={(e) => {
+              e.stopPropagation();
+              onUse(template.id);
+            }}
+          >
+            <Wand2 className="size-3.5 mr-1.5" />
+            Use Template
+          </Button>
+        </div>
+      </div>
+
+      {/* Footer: upvote + tags */}
+      <div className="flex items-center justify-between gap-2 px-3 py-2.5">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <Button
+            variant="ghost"
+            size="sm"
+            className={`h-7 gap-1 px-2 text-xs rounded-full ${
               template.user_upvoted
-                ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                : 'bg-background/80 backdrop-blur-sm hover:bg-background'
+                ? "bg-primary/10 text-primary hover:bg-primary/15"
+                : "text-muted-foreground hover:text-foreground"
             }`}
             onClick={(e) => onVote(e, template.id)}
           >
-            <ThumbsUp className={`size-3 ${template.user_upvoted ? 'fill-current' : ''}`} />
-            <span className="tabular-nums">{template.upvotes || 0}</span>
+            <ThumbsUp
+              className={`size-3 ${template.user_upvoted ? "fill-current" : ""}`}
+            />
+            <span className="tabular-nums font-medium">
+              {template.upvotes || 0}
+            </span>
           </Button>
         </div>
-        {/* Delete button */}
-        {userId && template.user_id === userId && (
-          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-            <Button
-              variant="destructive"
-              size="icon"
-              className="h-8 w-8 rounded-full shadow-sm"
-              onClick={(e) => onDelete(e, template)}
-            >
-              <Trash2 className="size-4" />
-            </Button>
+        {template.config?.tags && template.config.tags.length > 0 && (
+          <div className="flex gap-1 min-w-0 shrink-0">
+            {template.config.tags.slice(0, 2).map((tag) => (
+              <span
+                key={tag}
+                className="text-[10px] font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full truncate max-w-16"
+              >
+                {tag}
+              </span>
+            ))}
+            {template.config.tags.length > 2 && (
+              <span className="text-[10px] text-muted-foreground">
+                +{template.config.tags.length - 2}
+              </span>
+            )}
           </div>
         )}
       </div>
-      <CardHeader className="p-4 flex-1">
-        <CardTitle className="text-base line-clamp-1">{template.title}</CardTitle>
-        <CardDescription className="line-clamp-2 text-xs">
-          {template.description || 'No description provided.'}
-        </CardDescription>
-        {/* Tags + Media Type */}
-        <div className="flex flex-wrap gap-1 mt-2">
-          {template.media_type === 'video' && (
-            <Badge variant="default" className="text-[9px] px-1.5 py-0 font-normal uppercase tracking-wider">
-              Video
-            </Badge>
-          )}
-          {(template.config?.tags && template.config.tags.length > 0) && (
-            <>
-              {template.config.tags.slice(0, 3).map(tag => (
-                <Badge key={tag} variant="outline" className="text-[9px] px-1.5 py-0 font-normal">
-                  {tag}
-                </Badge>
-              ))}
-              {template.config.tags.length > 3 && (
-                <Badge variant="outline" className="text-[9px] px-1.5 py-0 font-normal">
-                  +{template.config.tags.length - 3}
-                </Badge>
-              )}
-            </>
-          )}
-        </div>
-      </CardHeader>
-      <CardFooter className="p-4 pt-0">
-        <Button
-          className="w-full"
-          variant="secondary"
-          onClick={(e) => {
-            e.stopPropagation();
-            onUse(template.id);
-          }}
-        >
-          Use Template
-        </Button>
-      </CardFooter>
-    </Card>
+    </div>
   );
 });
+
+// ─── Empty State ───────────────────────────────────────────────────────────
+
+function EmptyState({
+  searchQuery,
+  onClear,
+}: {
+  searchQuery: string;
+  onClear: () => void;
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center py-24 text-center">
+      <div className="size-16 rounded-2xl bg-muted flex items-center justify-center mb-5">
+        <Grid3X3 className="size-7 text-muted-foreground" />
+      </div>
+      <p className="text-base font-medium text-foreground">
+        {searchQuery
+          ? "No templates match your search"
+          : "No templates yet"}
+      </p>
+      <p className="text-sm text-muted-foreground mt-1 max-w-sm">
+        {searchQuery
+          ? "Try a different search term or browse all templates."
+          : "Upload your first template to get started."}
+      </p>
+      {searchQuery && (
+        <Button variant="link" size="sm" onClick={onClear} className="mt-2">
+          Clear search
+        </Button>
+      )}
+    </div>
+  );
+}
+
+// ─── Page ───────────────────────────────────────────────────────────────────
 
 export default function TemplatesPage() {
   const router = useRouter();
@@ -197,8 +255,8 @@ export default function TemplatesPage() {
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortOption, setSortOption] = useState<"recent" | "name-asc" | "name-desc" | "popular">("recent");
-  
+  const [sortOption, setSortOption] = useState<SortValue>("recent");
+
   // Upload modal states
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -206,99 +264,99 @@ export default function TemplatesPage() {
   const [uploadDescription, setUploadDescription] = useState("");
   const [uploadTagsInput, setUploadTagsInput] = useState("");
   const [previewImage, setPreviewImage] = useState<string | null>(null);
-  const [uploadFileType, setUploadFileType] = useState<MediaType>('image');
+  const [uploadFileType, setUploadFileType] = useState<MediaType>("image");
   const [isPublic, setIsPublic] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
-  
-  // View modal state
+
+  // Detail modal state
   const [viewTemplate, setViewTemplate] = useState<Template | null>(null);
-  
+
   // Delete modal state
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [templateToDelete, setTemplateToDelete] = useState<Template | null>(null);
   const [deleting, setDeleting] = useState(false);
-  
+
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Simple client-side cache keyed by token to avoid re-fetching on every mount
   const cacheRef = useRef<{ key: string; data: Template[]; expiry: number } | null>(null);
-  const CACHE_TTL = 30_000; // 30 seconds
+  const CACHE_TTL = 30_000;
 
-  const fetchTemplates = useCallback(async (force = false) => {
-    const token = await getToken().catch(() => undefined) || undefined;
-    const cacheKey = token || 'anonymous';
+  const fetchTemplates = useCallback(
+    async (force = false) => {
+      const token = (await getToken().catch(() => undefined)) || undefined;
+      const cacheKey = token || "anonymous";
 
-    // Serve from cache if fresh
-    if (!force && cacheRef.current && cacheRef.current.key === cacheKey && Date.now() < cacheRef.current.expiry) {
-      setTemplates(cacheRef.current.data);
-      return;
-    }
+      if (
+        !force &&
+        cacheRef.current &&
+        cacheRef.current.key === cacheKey &&
+        Date.now() < cacheRef.current.expiry
+      ) {
+        setTemplates(cacheRef.current.data);
+        return;
+      }
 
-    setLoading(true);
-    try {
-      const loaded = await getTemplates(token);
-      cacheRef.current = { key: cacheKey, data: loaded, expiry: Date.now() + CACHE_TTL };
-      setTemplates(loaded);
-    } catch (err) {
-      console.error("Failed to load templates:", err);
-      toast.error("Failed to fetch templates from the server.");
-    } finally {
-      setLoading(false);
-    }
-  }, [getToken]);
+      setLoading(true);
+      try {
+        const loaded = await getTemplates(token);
+        cacheRef.current = { key: cacheKey, data: loaded, expiry: Date.now() + CACHE_TTL };
+        setTemplates(loaded);
+      } catch (err) {
+        console.error("Failed to load templates:", err);
+        toast.error("Failed to fetch templates from the server.");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [getToken]
+  );
 
   useEffect(() => {
     fetchTemplates();
   }, [fetchTemplates]);
 
-  // Derive tags dynamically from database — memoized to avoid re-computation on every render
-  // Support both new config.tags[] and legacy config.category string
-  const { globalTags, hasMyUploads } = useMemo(() => {
-    const tags = Array.from(new Set(
-      templates.flatMap(t => {
-        if (t.config?.tags && t.config.tags.length > 0) return t.config.tags;
-        if (t.config?.category) return [t.config.category];
-        return ['Uncategorized'];
-      })
-    ));
-    return {
-      globalTags: tags.filter(t => t !== "My Uploads"),
-      hasMyUploads: tags.includes("My Uploads"),
-    };
+  const { categories } = useMemo(() => {
+    const tags = Array.from(
+      new Set(
+        templates.flatMap((t) => {
+          if (t.config?.tags && t.config.tags.length > 0) return t.config.tags;
+          if (t.config?.category) return [t.config.category];
+          return ["Uncategorized"];
+        })
+      )
+    );
+    return { categories: tags };
   }, [templates]);
-  
-  const filteredTemplates = useMemo(() => {
-    // First, filter by category
-    let result = activeCategory === "All" 
-      ? templates 
-      : templates.filter(t => {
-          if (t.config?.tags && t.config.tags.length > 0) {
-            return t.config.tags.includes(activeCategory);
-          }
-          return (t.config?.category || "Uncategorized") === activeCategory;
-        });
 
-    // Then, filter by search query
+  const filteredTemplates = useMemo(() => {
+    let result =
+      activeCategory === "All"
+        ? templates
+        : templates.filter((t) => {
+            if (t.config?.tags && t.config.tags.length > 0)
+              return t.config.tags.includes(activeCategory);
+            return (t.config?.category || "Uncategorized") === activeCategory;
+          });
+
     if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      result = result.filter(t => 
-        t.title.toLowerCase().includes(query) ||
-        (t.description && t.description.toLowerCase().includes(query)) ||
-        (t.config?.tags && t.config.tags.some(tag => tag.toLowerCase().includes(query)))
+      const q = searchQuery.toLowerCase();
+      result = result.filter(
+        (t) =>
+          t.title.toLowerCase().includes(q) ||
+          (t.description && t.description.toLowerCase().includes(q)) ||
+          (t.config?.tags && t.config.tags.some((tag) => tag.toLowerCase().includes(q)))
       );
     }
 
-    // Finally, sort
     result = [...result].sort((a, b) => {
       switch (sortOption) {
         case "recent":
           return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+        case "popular":
+          return (b.upvotes || 0) - (a.upvotes || 0);
         case "name-asc":
           return a.title.localeCompare(b.title);
         case "name-desc":
           return b.title.localeCompare(a.title);
-        case "popular":
-          return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
         default:
           return 0;
       }
@@ -308,14 +366,13 @@ export default function TemplatesPage() {
   }, [templates, activeCategory, searchQuery, sortOption]);
 
   const handleUseTemplate = (templateId: string) => {
-    // Jump straight to generator with this template active
-    dispatch(setImageEditorState({ previewUrl: null })); // Reset active preview
+    dispatch(setImageEditorState({ previewUrl: null }));
     router.push(`/generate?templateId=${templateId}`);
   };
 
   const getFileType = (file: File): MediaType | null => {
-    if (file.type.startsWith('image/')) return 'image';
-    if (file.type.startsWith('video/')) return 'video';
+    if (file.type.startsWith("image/")) return "image";
+    if (file.type.startsWith("video/")) return "video";
     return null;
   };
 
@@ -324,28 +381,25 @@ export default function TemplatesPage() {
     if (file && fileType) {
       setUploadFileType(fileType);
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreviewImage(reader.result as string);
-      };
+      reader.onloadend = () => setPreviewImage(reader.result as string);
       reader.readAsDataURL(file);
     }
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) =>
     processFile(e.target.files?.[0]);
-  };
 
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+  const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(true);
   };
 
-  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+  const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
   };
 
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+  const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
     processFile(e.dataTransfer.files?.[0]);
@@ -357,30 +411,25 @@ export default function TemplatesPage() {
 
     setUploading(true);
     try {
-      const token = await getToken().catch(() => undefined) || undefined;
-      const tags = uploadTagsInput
-        .split(',')
-        .map(t => t.trim())
-        .filter(Boolean);
-      await uploadTemplate({
-        base64Image: uploadFileType === 'image' ? previewImage : undefined,
-        base64Video: uploadFileType === 'video' ? previewImage : undefined,
-        mediaType: uploadFileType,
-        title: uploadTitle,
-        description: uploadDescription,
-        tags: isPublic ? tags : ['My Uploads'],
-        isPublic,
-      }, token);
+      const token = (await getToken().catch(() => undefined)) || undefined;
+      const tags = uploadTagsInput.split(",").map((t) => t.trim()).filter(Boolean);
+      await uploadTemplate(
+        {
+          base64Image: uploadFileType === "image" ? previewImage : undefined,
+          base64Video: uploadFileType === "video" ? previewImage : undefined,
+          mediaType: uploadFileType,
+          title: uploadTitle,
+          description: uploadDescription,
+          tags: isPublic ? tags : ["My Uploads"],
+          isPublic,
+        },
+        token
+      );
 
       setShowUploadModal(false);
-      setUploadTitle("");
-      setUploadDescription("");
-      setUploadTagsInput("");
-      setPreviewImage(null);
-      setUploadFileType('image');
-      setIsPublic(true);
+      resetUploadForm();
       toast.success("Template uploaded successfully!");
-      cacheRef.current = null; // Bust cache so the new template appears immediately
+      cacheRef.current = null;
       await fetchTemplates(true);
     } catch (err) {
       console.error("Upload failed", err);
@@ -390,20 +439,26 @@ export default function TemplatesPage() {
     }
   };
 
+  const resetUploadForm = () => {
+    setUploadTitle("");
+    setUploadDescription("");
+    setUploadTagsInput("");
+    setPreviewImage(null);
+    setUploadFileType("image");
+    setIsPublic(true);
+  };
+
   const handleDeleteTemplate = async () => {
     if (!templateToDelete) return;
     setDeleting(true);
     try {
-      const token = await getToken().catch(() => undefined) || undefined;
+      const token = (await getToken().catch(() => undefined)) || undefined;
       await deleteTemplate(templateToDelete.id, token);
-      
       toast.success("Template deleted successfully!");
       setShowDeleteModal(false);
       setTemplateToDelete(null);
-      if (viewTemplate?.id === templateToDelete.id) {
-        setViewTemplate(null);
-      }
-      cacheRef.current = null; // Bust cache
+      if (viewTemplate?.id === templateToDelete.id) setViewTemplate(null);
+      cacheRef.current = null;
       await fetchTemplates(true);
     } catch (err) {
       console.error("Delete failed", err);
@@ -422,12 +477,9 @@ export default function TemplatesPage() {
   const handleVote = async (e: React.MouseEvent, templateId: string) => {
     e.stopPropagation();
     try {
-      const token = await getToken().catch(() => undefined) || undefined;
+      const token = (await getToken().catch(() => undefined)) || undefined;
       const updated = await voteTemplate(templateId, token);
-      setTemplates(prev => prev.map(t => t.id === templateId ? updated : t));
-      if (updated.user_upvoted) {
-        toast.success("Upvoted!");
-      }
+      setTemplates((prev) => prev.map((t) => (t.id === templateId ? updated : t)));
     } catch (err) {
       console.error("Upvote failed", err);
       toast.error(err instanceof Error ? err.message : "Failed to upvote.");
@@ -435,196 +487,158 @@ export default function TemplatesPage() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] bg-background overflow-hidden">
-      {/* Sidebar Categories */}
-      <div className="w-64 border-r bg-muted/20 flex flex-col">
-        <div className="p-4 border-b space-y-3">
-          <Button 
-            className="w-full gap-2" 
-            onClick={() => setShowUploadModal(true)}
-          >
-            <UploadCloud className="size-4" />
-            Upload Template
-          </Button>
-
-          {/* Sort Controls */}
-          <div className="space-y-1">
-            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 mb-2">Sort By</h4>
-            <div className="flex flex-col gap-0.5">
-              <Button
-                variant={sortOption === "popular" ? "secondary" : "ghost"}
-                size="sm"
-                className="w-full justify-start font-normal text-xs h-8"
-                onClick={() => setSortOption("popular")}
-              >
-                <ThumbsUp className="size-3.5 mr-2 shrink-0" />
-                Most Liked
-              </Button>
-              <Button
-                variant={sortOption === "recent" ? "secondary" : "ghost"}
-                size="sm"
-                className="w-full justify-start font-normal text-xs h-8"
-                onClick={() => setSortOption("recent")}
-              >
-                <Clock className="size-3.5 mr-2 shrink-0" />
-                Recently Uploaded
-              </Button>
-              <Button
-                variant={sortOption === "name-asc" ? "secondary" : "ghost"}
-                size="sm"
-                className="w-full justify-start font-normal text-xs h-8"
-                onClick={() => setSortOption("name-asc")}
-              >
-                <ArrowDownAZ className="size-3.5 mr-2 shrink-0" />
-                Name A–Z
-              </Button>
-              <Button
-                variant={sortOption === "name-desc" ? "secondary" : "ghost"}
-                size="sm"
-                className="w-full justify-start font-normal text-xs h-8"
-                onClick={() => setSortOption("name-desc")}
-              >
-                <ArrowUpZA className="size-3.5 mr-2 shrink-0" />
-                Name Z–A
-              </Button>
+    <div className="min-h-[calc(100vh-4rem)] bg-background">
+      {/* ── Header ─────────────────────────────────────────── */}
+      <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-lg border-b border-border/50">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-4 h-16">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="size-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                <Grid3X3 className="size-4 text-primary" />
+              </div>
+              <h1 className="text-lg font-semibold truncate">Templates</h1>
             </div>
+
+            <div className="flex-1" />
+
+            {/* Search */}
+            <div className="relative hidden sm:block w-full max-w-xs">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
+              <Input
+                placeholder="Search templates..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 h-9 text-sm bg-muted/40 border-border/50 focus-visible:bg-background rounded-xl"
+              />
+              {searchQuery && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
+                  onClick={() => setSearchQuery("")}
+                >
+                  <X className="size-3.5" />
+                </Button>
+              )}
+            </div>
+
+            {/* Sort */}
+            <Select value={sortOption} onValueChange={(v) => setSortOption(v as SortValue)}>
+              <SelectTrigger className="w-36 h-9 text-sm rounded-xl bg-muted/40 border-border/50">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SORT_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Upload */}
+            <Button
+              size="sm"
+              className="h-9 gap-1.5 rounded-xl"
+              onClick={() => setShowUploadModal(true)}
+            >
+              <UploadCloud className="size-4" />
+              <span className="hidden sm:inline">Upload</span>
+            </Button>
           </div>
         </div>
-        <ScrollArea className="flex-1 min-h-0">
-          <div className="p-4">
-            <div className="space-y-1">
-              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-2">Library</h4>
-            <Button
-              variant={activeCategory === "All" ? "secondary" : "ghost"}
-              className="w-full justify-start font-normal"
-              onClick={() => setActiveCategory("All")}
-            >
-              All Templates
-            </Button>
-            
-            {hasMyUploads && (
-              <Button
-                variant={activeCategory === "My Uploads" ? "secondary" : "ghost"}
-                className="w-full justify-start font-normal"
-                onClick={() => setActiveCategory("My Uploads")}
-              >
-                My Uploads
-              </Button>
-            )}
-
-            {globalTags.length > 0 && (
-              <>
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-6 mb-3 px-2">Tags</h4>
-                {globalTags.map(tag => (
-                  <Button
-                    key={tag}
-                    variant={activeCategory === tag ? "secondary" : "ghost"}
-                    className="w-full justify-start font-normal"
-                    onClick={() => setActiveCategory(tag)}
-                  >
-                    {tag}
-                  </Button>
-                ))}
-              </>
-            )}
-            </div>
-          </div>
-        </ScrollArea>
       </div>
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="flex h-14 items-center gap-4 border-b bg-background px-6">
-          <Grid className="size-5 text-muted-foreground shrink-0" />
-          <h1 className="text-lg font-semibold shrink-0">Templates Library</h1>
-          <div className="flex-1" />
-          <div className="relative w-full max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
-            <Input
-              placeholder="Search templates by name, description, or tag..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 h-9 text-sm bg-muted/30 border-muted-foreground/20 focus-visible:bg-background"
-            />
-            {searchQuery && (
+      {/* ── Category Pills ──────────────────────────────────── */}
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-4 pb-2">
+        <div className="flex gap-1.5 overflow-x-auto pb-2 scrollbar-none">
+          <button
+            onClick={() => setActiveCategory("All")}
+            className={`shrink-0 px-3.5 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
+              activeCategory === "All"
+                ? "bg-foreground text-background shadow-sm"
+                : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+            }`}
+          >
+            All
+          </button>
+          {categories.map((tag) => (
+            <button
+              key={tag}
+              onClick={() => setActiveCategory(tag)}
+              className={`shrink-0 px-3.5 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
+                activeCategory === tag
+                  ? "bg-foreground text-background shadow-sm"
+                  : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+              }`}
+            >
+              {tag}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Grid ────────────────────────────────────────────── */}
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pb-8">
+        {loading ? (
+          <div className="flex h-64 items-center justify-center">
+            <Loader2 className="size-7 animate-spin text-muted-foreground" />
+          </div>
+        ) : filteredTemplates.length === 0 ? (
+          <EmptyState searchQuery={searchQuery} onClear={() => setSearchQuery("")} />
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 pt-2">
+            {filteredTemplates.map((template, i) => (
+              <TemplateCard
+                key={template.id}
+                template={template}
+                index={i}
+                userId={userId}
+                onUse={handleUseTemplate}
+                onView={setViewTemplate}
+                onVote={handleVote}
+                onDelete={promptDeleteTemplate}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Upload Modal ────────────────────────────────────── */}
+      {showUploadModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div
+            className="bg-card w-full max-w-lg rounded-2xl shadow-xl border border-border/50 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-5 border-b border-border/50">
+              <div>
+                <h2 className="font-semibold text-base">Upload Template</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Share a template with the community
+                </p>
+              </div>
               <Button
                 variant="ghost"
                 size="icon"
-                className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
-                onClick={() => setSearchQuery("")}
-              >
-                <X className="size-3.5" />
-              </Button>
-            )}
-          </div>
-        </header>
-
-        <ScrollArea className="flex-1 min-h-0">
-          <div className="p-6">
-            {loading ? (
-              <div className="flex h-64 items-center justify-center">
-                <Loader2 className="size-8 animate-spin text-primary" />
-              </div>
-            ) : filteredTemplates.length === 0 ? (
-              <div className="flex flex-col h-64 items-center justify-center text-muted-foreground">
-                <Wand2 className="size-12 mb-4 opacity-20" />
-                <p>{searchQuery ? "No templates match your search." : "No templates found in this category."}</p>
-                {searchQuery && (
-                  <Button variant="link" size="sm" onClick={() => setSearchQuery("")} className="mt-2">
-                    Clear search
-                  </Button>
-                )}
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {filteredTemplates.map((template, i) => (
-                  <TemplateCard
-                    key={template.id}
-                    template={template}
-                    index={i}
-                    userId={userId}
-                    onUse={handleUseTemplate}
-                    onView={setViewTemplate}
-                    onVote={handleVote}
-                    onDelete={promptDeleteTemplate}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        </ScrollArea>
-      </div>
-
-      {/* Upload Modal */}
-      {showUploadModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-background w-full max-w-md rounded-xl shadow-lg border overflow-hidden">
-            <div className="flex justify-between items-center p-4 border-b">
-              <h2 className="font-semibold">Upload Template</h2>
-              <Button 
-                variant="ghost" 
-                size="icon" 
                 onClick={() => {
                   setShowUploadModal(false);
-                  setUploadTitle("");
-                  setUploadDescription("");
-                  setUploadTagsInput("");
-                  setPreviewImage(null);
-                  setUploadFileType('image');
-                  setIsPublic(true);
+                  resetUploadForm();
                 }}
+                className="h-8 w-8 rounded-full"
               >
                 <X className="size-4" />
               </Button>
             </div>
-            <form onSubmit={handleUploadSubmit} className="p-6 space-y-4">
-              
-              {/* Public / Private Toggle */}
-              <div className="flex items-center justify-between rounded-lg border p-3 bg-muted/20">
+            <form onSubmit={handleUploadSubmit} className="p-5 space-y-5">
+              {/* Public toggle */}
+              <div className="flex items-center justify-between rounded-xl border border-border/50 p-3.5">
                 <div className="space-y-0.5">
-                  <Label className="text-sm font-medium cursor-pointer">Public Template</Label>
-                  <p className="text-[11px] text-muted-foreground">
-                    {isPublic ? "Visible to all users of the platform" : "Only visible to you"}
+                  <Label className="text-sm font-medium cursor-pointer">Public template</Label>
+                  <p className="text-xs text-muted-foreground">
+                    {isPublic
+                      ? "Visible to everyone on the platform"
+                      : "Only visible to you"}
                   </p>
                 </div>
                 <Switch checked={isPublic} onCheckedChange={setIsPublic} />
@@ -632,62 +646,86 @@ export default function TemplatesPage() {
 
               {isPublic && (
                 <div className="space-y-2">
-                  <Label htmlFor="tags">Tags</Label>
-                  <Input 
-                    id="tags" 
-                    placeholder="e.g. Hero Banners, Social Media, Minimalist (comma-separated)" 
+                  <Label htmlFor="tags" className="text-sm">
+                    Tags
+                  </Label>
+                  <Input
+                    id="tags"
+                    placeholder="e.g. Social Media, Minimalist, Hero Banners"
                     value={uploadTagsInput}
                     onChange={(e) => setUploadTagsInput(e.target.value)}
+                    className="rounded-xl"
                   />
-                  <p className="text-[10px] text-muted-foreground">Separate tags with commas. These help other users discover your template.</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Comma-separated tags help others discover your template.
+                  </p>
                 </div>
               )}
 
+              {/* File dropzone */}
               <div className="space-y-2">
-                <Label>Template Image</Label>
-                <div 
-                  className={`border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer transition-colors ${previewImage ? 'aspect-square p-1.5' : 'h-32'} ${isDragging ? 'bg-primary/10 border-primary' : 'bg-muted/30 hover:bg-muted/50'}`}
+                <Label className="text-sm">File</Label>
+                <div
+                  className={`relative rounded-xl border-2 border-dashed transition-colors cursor-pointer overflow-hidden ${
+                    previewImage ? "p-1" : "p-6"
+                  } ${
+                    isDragging
+                      ? "border-primary bg-primary/5"
+                      : "border-border/60 hover:border-border bg-muted/20"
+                  }`}
                   onClick={() => fileInputRef.current?.click()}
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
                   onDrop={handleDrop}
                 >
                   {previewImage ? (
-                    <div className="relative w-full h-full group">
-                      {uploadFileType === 'video' ? (
+                    <div className="relative group">
+                      {uploadFileType === "video" ? (
                         <video
                           src={previewImage}
-                          className="w-full h-full object-cover rounded-md"
+                          className="w-full aspect-video object-cover rounded-lg"
                           controls
                           muted
                         />
                       ) : (
                         /* eslint-disable-next-line @next/next/no-img-element */
-                        <img src={previewImage} alt="Preview" className="w-full h-full object-cover rounded-md" />
+                        <img
+                          src={previewImage}
+                          alt="Preview"
+                          className="w-full aspect-video object-cover rounded-lg"
+                        />
                       )}
-                      <Button 
+                      <Button
                         type="button"
-                        variant="destructive" 
-                        className="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 transition-opacity h-5 w-5 rounded-full p-0 flex items-center justify-center shadow-sm"
+                        variant="secondary"
+                        size="icon"
+                        className="absolute top-2 right-2 h-7 w-7 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
                         onClick={(e) => {
                           e.stopPropagation();
                           setPreviewImage(null);
                           if (fileInputRef.current) fileInputRef.current.value = "";
                         }}
                       >
-                        <X className="w-3 h-3" />
+                        <X className="size-3.5" />
                       </Button>
                     </div>
                   ) : (
-                    <>
-                      <Plus className="size-8 text-muted-foreground mb-2" />
-                      <span className="text-sm text-muted-foreground">Click or drag image or video to select</span>
-                    </>
+                    <div className="flex flex-col items-center justify-center py-4 text-center">
+                      <div className="size-10 rounded-xl bg-muted flex items-center justify-center mb-3">
+                        <Plus className="size-5 text-muted-foreground" />
+                      </div>
+                      <span className="text-sm font-medium text-foreground">
+                        Choose an image or video
+                      </span>
+                      <span className="text-xs text-muted-foreground mt-1">
+                        Drag & drop or click to browse
+                      </span>
+                    </div>
                   )}
-                  <input 
-                    type="file" 
-                    accept="image/*,video/*" 
-                    className="hidden" 
+                  <input
+                    type="file"
+                    accept="image/*,video/*"
+                    className="hidden"
                     ref={fileInputRef}
                     onChange={handleFileSelect}
                   />
@@ -695,29 +733,42 @@ export default function TemplatesPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="title">Title</Label>
-                <Input 
-                  id="title" 
-                  placeholder="e.g. Minimalist UI Mockup" 
+                <Label htmlFor="title" className="text-sm">
+                  Title
+                </Label>
+                <Input
+                  id="title"
+                  placeholder="e.g. Minimalist UI Mockup"
                   value={uploadTitle}
                   onChange={(e) => setUploadTitle(e.target.value)}
                   required
+                  className="rounded-xl"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="desc">Description (Optional)</Label>
-                <Input 
-                  id="desc" 
-                  placeholder="Brief context..." 
+                <Label htmlFor="desc" className="text-sm">
+                  Description <span className="text-muted-foreground font-normal">(optional)</span>
+                </Label>
+                <Input
+                  id="desc"
+                  placeholder="Brief context about this template..."
                   value={uploadDescription}
                   onChange={(e) => setUploadDescription(e.target.value)}
+                  className="rounded-xl"
                 />
               </div>
 
-              <Button type="submit" className="w-full" disabled={!previewImage || !uploadTitle || uploading}>
+              <Button
+                type="submit"
+                className="w-full h-10 rounded-xl"
+                disabled={!previewImage || !uploadTitle || uploading}
+              >
                 {uploading ? (
-                  <><Loader2 className="size-4 mr-2 animate-spin" /> Uploading to S3...</>
+                  <>
+                    <Loader2 className="size-4 mr-2 animate-spin" />
+                    Uploading...
+                  </>
                 ) : (
                   "Save Template"
                 )}
@@ -727,21 +778,21 @@ export default function TemplatesPage() {
         </div>
       )}
 
-      {/* View Template Modal */}
+      {/* ── Detail Modal ────────────────────────────────────── */}
       {viewTemplate && (
-        <div 
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" 
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
           onClick={() => setViewTemplate(null)}
         >
-          <div 
-            className="bg-card w-full max-w-4xl rounded-2xl shadow-2xl border overflow-hidden flex flex-col md:flex-row max-h-[90vh]"
+          <div
+            className="bg-card w-full max-w-3xl rounded-2xl shadow-2xl border border-border/50 overflow-hidden flex flex-col md:flex-row max-h-[85vh] animate-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="md:w-3/5 bg-muted/30 flex items-center justify-center p-6 border-b md:border-b-0 md:border-r">
-              {viewTemplate.media_type === 'video' ? (
+            <div className="md:w-[55%] bg-muted/30 flex items-center justify-center p-5 border-b md:border-b-0 md:border-r border-border/50">
+              {viewTemplate.media_type === "video" ? (
                 <video
                   src={viewTemplate.s3_link}
-                  className="max-w-full max-h-full object-contain rounded-lg shadow-sm"
+                  className="max-w-full max-h-[50vh] md:max-h-[70vh] object-contain rounded-xl"
                   autoPlay
                   muted
                   loop
@@ -750,96 +801,110 @@ export default function TemplatesPage() {
                 />
               ) : (
                 /* eslint-disable-next-line @next/next/no-img-element */
-                <img 
-                  src={viewTemplate.s3_link} 
-                  alt={viewTemplate.title} 
-                  className="max-w-full max-h-full object-contain rounded-lg shadow-sm" 
+                <img
+                  src={viewTemplate.s3_link}
+                  alt={viewTemplate.title}
+                  className="max-w-full max-h-[50vh] md:max-h-[70vh] object-contain rounded-xl"
                 />
               )}
             </div>
-            <div className="md:w-2/5 p-6 flex flex-col">
-              <div className="flex justify-between items-start mb-4 gap-2">
+            <div className="md:w-[45%] p-6 flex flex-col">
+              <div className="flex items-start justify-between gap-3 mb-4">
                 <div className="flex flex-wrap gap-1.5">
-                  {viewTemplate.media_type === 'video' && (
-                    <Badge variant="default" className="uppercase text-[10px] tracking-wider">Video</Badge>
+                  {viewTemplate.media_type === "video" && (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-wider bg-muted text-muted-foreground">
+                      Video
+                    </span>
                   )}
-                  {(viewTemplate.config?.tags && viewTemplate.config.tags.length > 0
+                  {(viewTemplate.config?.tags?.length
                     ? viewTemplate.config.tags
                     : [viewTemplate.config?.category || "Uncategorized"]
-                  ).map(tag => (
-                    <Badge key={tag} variant="secondary">{tag}</Badge>
+                  ).map((tag) => (
+                    <span
+                      key={tag}
+                      className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-primary/10 text-primary"
+                    >
+                      {tag}
+                    </span>
                   ))}
                 </div>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  onClick={() => setViewTemplate(null)} 
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setViewTemplate(null)}
                   className="h-8 w-8 rounded-full shrink-0"
                 >
                   <X className="size-4" />
                 </Button>
               </div>
-              
-              <h2 className="text-2xl font-bold mb-2">{viewTemplate.title}</h2>
-              <p className="text-muted-foreground text-sm flex-1 mb-6 whitespace-pre-wrap">
+
+              <h2 className="text-xl font-bold mb-2">{viewTemplate.title}</h2>
+              <p className="text-sm text-muted-foreground flex-1 leading-relaxed whitespace-pre-wrap">
                 {viewTemplate.description || "No description provided."}
               </p>
-              
-              <div className="mt-auto pt-6 border-t space-y-4 shrink-0">
-                 <Button 
-                   size="lg" 
-                   className="w-full font-bold shadow-md" 
-                   onClick={() => handleUseTemplate(viewTemplate.id)}
-                 >
-                   <Wand2 className="size-4 mr-2" />
-                   Use This Template
-                 </Button>
-                 
-                 {userId && viewTemplate.user_id === userId && (
-                   <Button 
-                     variant="outline"
-                     className="w-full text-destructive hover:bg-destructive/10" 
-                     onClick={(e) => promptDeleteTemplate(e, viewTemplate)}
-                   >
-                     <Trash2 className="size-4 mr-2" />
-                     Delete Template
-                   </Button>
-                 )}
+
+              <div className="mt-auto pt-5 border-t border-border/50 space-y-3">
+                <Button
+                  size="lg"
+                  className="w-full font-semibold rounded-xl shadow-sm"
+                  onClick={() => handleUseTemplate(viewTemplate.id)}
+                >
+                  <Wand2 className="size-4 mr-2" />
+                  Use This Template
+                </Button>
+
+                {userId && viewTemplate.user_id === userId && (
+                  <Button
+                    variant="outline"
+                    className="w-full text-destructive hover:bg-destructive/10 rounded-xl border-border/50"
+                    onClick={(e) => promptDeleteTemplate(e, viewTemplate)}
+                  >
+                    <Trash2 className="size-4 mr-2" />
+                    Delete Template
+                  </Button>
+                )}
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
+      {/* ── Delete Confirmation ─────────────────────────────── */}
       {showDeleteModal && templateToDelete && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-card w-full max-w-sm rounded-xl shadow-xl border overflow-hidden p-6 space-y-4">
-            <h3 className="text-lg font-semibold text-destructive flex items-center gap-2">
-              <Trash2 className="size-5" />
-              Delete Template?
-            </h3>
-            <p className="text-sm text-muted-foreground">
-              Are you sure you want to delete <strong>&quot;{templateToDelete.title}&quot;</strong>? This action cannot be undone.
+          <div className="bg-card w-full max-w-sm rounded-2xl shadow-xl border border-border/50 p-6">
+            <div className="size-10 rounded-xl bg-destructive/10 flex items-center justify-center mb-4">
+              <Trash2 className="size-5 text-destructive" />
+            </div>
+            <h3 className="text-lg font-semibold mb-1">Delete template?</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Are you sure you want to delete{" "}
+              <strong className="text-foreground">&ldquo;{templateToDelete.title}&rdquo;</strong>?
+              This action cannot be undone.
             </p>
-            <div className="flex justify-end gap-3 pt-4">
-              <Button 
-                variant="ghost" 
+            <div className="flex justify-end gap-3 mt-6">
+              <Button
+                variant="ghost"
                 onClick={() => {
                   setShowDeleteModal(false);
                   setTemplateToDelete(null);
                 }}
                 disabled={deleting}
+                className="rounded-xl"
               >
                 Cancel
               </Button>
-              <Button 
-                variant="destructive" 
+              <Button
+                variant="destructive"
                 onClick={handleDeleteTemplate}
                 disabled={deleting}
+                className="rounded-xl"
               >
                 {deleting ? (
-                  <><Loader2 className="size-4 mr-2 animate-spin" /> Deleting...</>
+                  <>
+                    <Loader2 className="size-4 mr-2 animate-spin" />
+                    Deleting...
+                  </>
                 ) : (
                   "Delete"
                 )}

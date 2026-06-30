@@ -3,6 +3,7 @@ export interface TemplateWithVotes {
     title: string;
     description: string | null;
     s3_link: string;
+    media_type: 'image' | 'video';
     config: Record<string, any>;
     user_id: string | null;
     created_at: Date;

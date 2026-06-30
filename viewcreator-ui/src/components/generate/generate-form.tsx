@@ -5,8 +5,8 @@ import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Settings2, Sparkles, Upload, X } from 'lucide-react';
-import type { Template } from '@/types';
+import { Loader2, Settings2, Sparkles, Upload, X, Video, Image } from 'lucide-react';
+import type { Template, MediaType } from '@/types';
 
 const ASPECT_RATIO_DESCRIPTIONS: Record<string, string> = {
   '1:1': 'Square format (1:1) - Best for feed posts on Instagram, LinkedIn, Threads, Twitter, and Reddit.',
@@ -40,6 +40,9 @@ export interface GenerateFormProps {
   error: string | null;
   handleGenerate: (e: React.FormEvent) => void;
   handleEnhancePrompt: () => void;
+  mediaType: MediaType;
+  duration: number;
+  setDuration: (val: number) => void;
 }
 
 export function GenerateForm({
@@ -65,7 +68,10 @@ export function GenerateForm({
   mounted,
   error,
   handleGenerate,
-  handleEnhancePrompt
+  handleEnhancePrompt,
+  mediaType,
+  duration,
+  setDuration
 }: GenerateFormProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = React.useState(false);
@@ -113,6 +119,11 @@ export function GenerateForm({
         <CardTitle className="flex items-center gap-2 text-base">
           <Settings2 className="w-4 h-4" />
           Parameters
+          {mediaType === 'video' && (
+            <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium ml-auto flex items-center gap-1">
+              <Video className="w-3 h-3" /> Video Mode
+            </span>
+          )}
         </CardTitle>
       </CardHeader>
       <ScrollArea className="flex-1 min-h-0">
@@ -124,9 +135,11 @@ export function GenerateForm({
               <span>Select Viral Template</span>
               {isLoadingTemplates && <Loader2 className="w-3 h-3 animate-spin text-primary" />}
             </Label>
-            {templates.length > 0 ? (
+            {templates.filter(tpl => mediaType === 'video' ? tpl.media_type === 'video' || !tpl.media_type : true).length > 0 ? (
               <div className="grid grid-cols-1 gap-2">
-                {templates.map((tpl) => (
+                {templates
+                  .filter(tpl => mediaType === 'video' ? tpl.media_type === 'video' || !tpl.media_type : true)
+                  .map((tpl) => (
                   <div
                     key={tpl.id}
                     onClick={() => {
@@ -141,13 +154,24 @@ export function GenerateForm({
                         : 'border-muted hover:border-primary/50'
                     }`}
                   >
-                    <div className="w-12 h-12 rounded bg-muted overflow-hidden shrink-0 flex items-center justify-center border">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={tpl.s3_link}
-                        alt={tpl.title}
-                        className="w-full h-full object-cover"
-                      />
+                    <div className="w-12 h-12 rounded bg-muted overflow-hidden shrink-0 flex items-center justify-center border relative">
+                      {tpl.media_type === 'video' ? (
+                        <div className="w-full h-full flex items-center justify-center bg-muted">
+                          <Video className="w-5 h-5 text-muted-foreground" />
+                        </div>
+                      ) : (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img
+                          src={tpl.s3_link}
+                          alt={tpl.title}
+                          className="w-full h-full object-cover"
+                        />
+                      )}
+                      {tpl.media_type === 'video' && (
+                        <span className="absolute bottom-0.5 right-0.5 bg-black/70 text-white text-[7px] px-1 rounded font-semibold">
+                          VID
+                        </span>
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <h4 className="text-xs font-semibold truncate">{tpl.title}</h4>
@@ -210,7 +234,8 @@ export function GenerateForm({
             />
           </div>
 
-          {/* 3. Reference Images */}
+          {/* 3. Reference Images (Image Mode Only) */}
+          {mediaType === 'image' && (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label className="text-xs font-semibold">References ({referenceImages.length}/3)</Label>
@@ -259,6 +284,28 @@ export function GenerateForm({
               onChange={handleImageUpload} 
             />
           </div>
+          )}
+
+          {/* 3b. Video Duration (Video Mode Only) */}
+          {mediaType === 'video' && (
+          <div className="space-y-2">
+            <Label className="text-xs font-semibold">Duration (seconds)</Label>
+            <div className="flex gap-1">
+              {[3, 6, 10, 15].map(sec => (
+                <Button 
+                  key={sec}
+                  type="button" 
+                  variant={duration === sec ? "default" : "outline"} 
+                  onClick={() => setDuration(sec)}
+                  className="flex-1 h-8 text-xs"
+                  size="sm"
+                >
+                  {sec}s
+                </Button>
+              ))}
+            </div>
+          </div>
+          )}
 
           {/* 4. Aspect Ratio */}
           <div className="space-y-2">
@@ -287,6 +334,7 @@ export function GenerateForm({
 
           {/* 5. Number of Images & 6. Quality */}
           <div className="grid grid-cols-2 gap-3">
+            {mediaType === 'image' && (
             <div className="space-y-2">
               <Label className="text-xs font-semibold">Images</Label>
               <div className="flex gap-1">
@@ -297,6 +345,7 @@ export function GenerateForm({
                 ))}
               </div>
             </div>
+            )}
             
             <div className="space-y-2">
               <Label className="text-xs font-semibold">Quality</Label>
@@ -312,7 +361,8 @@ export function GenerateForm({
             </div>
           </div>
 
-          {/* 7. Image Size */}
+          {/* 7. Image Size (Image Mode Only) */}
+          {mediaType === 'image' && (
           <div className="space-y-2">
             <Label className="text-xs font-semibold">Resolution</Label>
             <div className="flex gap-1">
@@ -331,8 +381,10 @@ export function GenerateForm({
               ))}
             </div>
           </div>
+          )}
 
-          {/* 8. Thinking Level */}
+          {/* 8. Thinking Level (Image Mode Only) */}
+          {mediaType === 'image' && (
           <div className="space-y-2">
             <Label className="text-xs font-semibold">Thinking</Label>
             <div className="flex items-center justify-between rounded-lg border p-1.5 bg-muted/20 h-8">
@@ -345,6 +397,7 @@ export function GenerateForm({
               <span className={`text-[10px] font-medium ${thinkingLevel === 'high' ? 'text-primary' : 'text-muted-foreground'}`}>Deep</span>
             </div>
           </div>
+          )}
 
           {error && (
             <div className="p-2 bg-destructive/10 border border-destructive/20 text-destructive text-xs rounded-md font-medium flex items-start gap-2">

@@ -21,7 +21,9 @@ export interface UploadTemplateResponse {
 }
 
 export interface UploadTemplateParams {
-  base64Image: string;
+  base64Image?: string;
+  base64Video?: string;
+  mediaType?: 'image' | 'video';
   title: string;
   description?: string;
   tags?: string[];
@@ -29,7 +31,7 @@ export interface UploadTemplateParams {
 }
 
 /**
- * Uploads a template image to the backend for S3 storage and database insertion.
+ * Uploads a template image or video to the backend for S3 storage and database insertion.
  */
 export async function uploadTemplate(params: UploadTemplateParams, token?: string): Promise<Template> {
   const data = await request<UploadTemplateResponse>('/api/templates/upload', {

@@ -5,6 +5,7 @@ export interface TemplateWithVotes {
   title: string;
   description: string | null;
   s3_link: string;
+  media_type: 'image' | 'video';
   config: Record<string, any>;
   user_id: string | null;
   created_at: Date;
@@ -44,7 +45,7 @@ export class VoteRepository {
   static async findAllWithVotes(currentUserId?: string): Promise<TemplateWithVotes[]> {
     const result = await query<TemplateWithVotes>(
       `SELECT 
-        t.id, t.title, t.description, t.s3_link, t.config, t.user_id, t.created_at, t.updated_at,
+        t.id, t.title, t.description, t.s3_link, t.media_type, t.config, t.user_id, t.created_at, t.updated_at,
         COALESCE(v.upvotes, 0)::integer AS upvotes,
         CASE WHEN uv.id IS NOT NULL THEN true ELSE false END AS user_upvoted
       FROM templates t
@@ -67,7 +68,7 @@ export class VoteRepository {
   static async findByIdWithVotes(templateId: string, currentUserId?: string): Promise<TemplateWithVotes | null> {
     const result = await query<TemplateWithVotes>(
       `SELECT 
-        t.id, t.title, t.description, t.s3_link, t.config, t.user_id, t.created_at, t.updated_at,
+        t.id, t.title, t.description, t.s3_link, t.media_type, t.config, t.user_id, t.created_at, t.updated_at,
         COALESCE(v.upvotes, 0)::integer AS upvotes,
         CASE WHEN uv.id IS NOT NULL THEN true ELSE false END AS user_upvoted
       FROM templates t

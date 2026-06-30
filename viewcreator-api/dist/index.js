@@ -150,28 +150,48 @@ app.post('/api/templates/:id/vote', (0, express_2.requireAuth)(), syncUserMiddle
 app.post('/api/templates/upload', (0, express_2.requireAuth)(), syncUserMiddleware, async (req, res) => {
     try {
         const { userId } = (0, express_2.getAuth)(req);
-        const { title, description, base64Image, tags = [], isPublic = false } = req.body;
+        const { title, description, base64Image, base64Video, mediaType, tags = [], isPublic = false } = req.body;
         if (!title) {
             return res.status(400).json({ error: 'Title is required' });
         }
-        if (!base64Image) {
-            return res.status(400).json({ error: 'base64Image content is required' });
+        const isVideo = mediaType === 'video';
+        if (!isVideo && !base64Image) {
+            return res.status(400).json({ error: 'base64Image content is required for image templates' });
+        }
+        if (isVideo && !base64Video) {
+            return res.status(400).json({ error: 'base64Video content is required for video templates' });
         }
         const bucketName = process.env.AWS_S3_BUCKET;
         if (!bucketName) {
             return res.status(500).json({ error: 'S3 bucket name is not configured on the server. Please check the AWS_S3_BUCKET setting.' });
         }
-        // Match image mime type from base64 string
-        const match = base64Image.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
-        if (!match) {
-            return res.status(400).json({ error: 'Invalid base64 image data format' });
+        let buffer;
+        let mimeType;
+        let s3Key;
+        if (isVideo) {
+            // Handle video upload
+            const videoMatch = base64Video.match(/^data:(video\/[a-zA-Z+]+);base64,(.+)$/);
+            if (!videoMatch) {
+                return res.status(400).json({ error: 'Invalid base64 video data format' });
+            }
+            mimeType = videoMatch[1];
+            const base64Data = videoMatch[2];
+            buffer = Buffer.from(base64Data, 'base64');
+            const fileExtension = mimeType.split('/')[1] || 'mp4';
+            s3Key = `templates/${userId || 'public'}/${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExtension}`;
         }
-        const mimeType = match[1];
-        const base64Data = match[2];
-        const buffer = Buffer.from(base64Data, 'base64');
-        // Create clean S3 key
-        const fileExtension = mimeType.split('/')[1] || 'png';
-        const s3Key = `templates/${userId || 'public'}/${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExtension}`;
+        else {
+            // Handle image upload (existing logic)
+            const match = base64Image.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
+            if (!match) {
+                return res.status(400).json({ error: 'Invalid base64 image data format' });
+            }
+            mimeType = match[1];
+            const base64Data = match[2];
+            buffer = Buffer.from(base64Data, 'base64');
+            const fileExtension = mimeType.split('/')[1] || 'png';
+            s3Key = `templates/${userId || 'public'}/${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExtension}`;
+        }
         console.log(`[S3 Upload] Uploading ${s3Key} to bucket ${bucketName}...`);
         // Put Object in S3 Bucket
         await s3Client.send(new client_s3_1.PutObjectCommand({
@@ -181,13 +201,14 @@ app.post('/api/templates/upload', (0, express_2.requireAuth)(), syncUserMiddlewa
             ContentType: mimeType,
         }));
         const s3Url = `https://${bucketName}.s3.${process.env.AWS_REGION || 'us-east-1'}.amazonaws.com/${s3Key}`;
-        console.log(`[S3 Upload] Successfully uploaded template image to S3: ${s3Url}`);
+        console.log(`[S3 Upload] Successfully uploaded template ${isVideo ? 'video' : 'image'} to S3: ${s3Url}`);
         // Persist template metadata reference
         const configTags = isPublic ? tags : ['My Uploads'];
         const template = await viewcreator_database_1.TemplateRepository.create({
             title,
             description,
             s3_link: s3Url,
+            media_type: isVideo ? 'video' : 'image',
             config: {
                 tags: configTags,
                 uploadedAt: new Date().toISOString()
@@ -332,6 +353,103 @@ app.post('/api/generate', (0, express_2.requireAuth)(), syncUserMiddleware, asyn
     }
     catch (error) {
         console.error('Error generating image:', error);
+        return res.status(500).json({ error: error.message || 'Internal Server Error' });
+    }
+});
+// Video Generation Endpoint
+app.post('/api/generate/video', (0, express_2.requireAuth)(), syncUserMiddleware, async (req, res) => {
+    try {
+        const { prompt, aspectRatio = '16:9', style = 'None', quality = 'Standard', duration = 6, templateId } = req.body;
+        if (!prompt) {
+            return res.status(400).json({ error: 'Prompt is required' });
+        }
+        const apiKey = process.env.GEMINI_NANO_BANANA_API_KEY;
+        if (!apiKey || apiKey === 'your_api_key_here') {
+            return res.status(500).json({
+                error: 'API key is not configured on the server. Please check the GEMINI_NANO_BANANA_API_KEY setting.'
+            });
+        }
+        const ai = new genai_1.GoogleGenAI({ apiKey });
+        // Construct the final prompt
+        let finalPrompt = prompt;
+        if (style !== 'None') {
+            finalPrompt += `\n\nStyle: ${style}.`;
+        }
+        if (quality === 'Premium') {
+            finalPrompt += `\n\nQuality: Ultra high quality, 4k resolution, cinematic, highly detailed, professional production.`;
+        }
+        const contents = [finalPrompt];
+        // If templateId is provided, retrieve the template and attach its S3 asset as reference
+        if (templateId) {
+            try {
+                console.log(`[Generate Video API] Retrieving template ${templateId} from database...`);
+                const template = await viewcreator_database_1.TemplateRepository.findById(templateId);
+                if (template) {
+                    console.log(`[Generate Video API] Fetching public S3 asset from: ${template.s3_link}`);
+                    const response = await fetch(template.s3_link);
+                    if (response.ok) {
+                        const arrayBuffer = await response.arrayBuffer();
+                        const buffer = Buffer.from(arrayBuffer);
+                        const mimeType = response.headers.get('content-type') || (template.media_type === 'video' ? 'video/mp4' : 'image/jpeg');
+                        contents.push({
+                            inlineData: {
+                                mimeType,
+                                data: buffer.toString('base64')
+                            }
+                        });
+                        console.log(`[Generate Video API] Successfully loaded template ${template.media_type} as reference.`);
+                    }
+                }
+                else {
+                    console.warn(`[Generate Video API] Template with ID ${templateId} not found.`);
+                }
+            }
+            catch (err) {
+                console.error('[Generate Video API] Error processing template:', err);
+                return res.status(400).json({ error: `Failed to load template: ${err.message}` });
+            }
+        }
+        console.log("[Generate Video API] Request parameters:");
+        console.log("- Prompt length:", finalPrompt.length);
+        console.log("- Aspect Ratio:", aspectRatio);
+        console.log("- Duration:", duration);
+        try {
+            const response = await ai.models.generateContent({
+                model: "gemini-3.1-flash-image",
+                contents,
+                config: {
+                    responseModalities: ["IMAGE"],
+                    imageConfig: {
+                        aspectRatio: aspectRatio
+                    },
+                    thinkingConfig: {
+                        thinkingLevel: 'minimal',
+                        includeThoughts: false
+                    }
+                }
+            });
+            const videoUrls = [];
+            if (response.candidates && response.candidates[0]?.content?.parts) {
+                for (const part of response.candidates[0].content.parts) {
+                    if (part.inlineData) {
+                        const mimeType = part.inlineData.mimeType || 'image/jpeg';
+                        videoUrls.push(`data:${mimeType};base64,${part.inlineData.data}`);
+                        break;
+                    }
+                }
+            }
+            if (videoUrls.length === 0) {
+                throw new Error('API did not return any content.');
+            }
+            return res.json({ videoUrls, duration });
+        }
+        catch (genError) {
+            console.error('[Generate Video API] Generation failed:', genError);
+            return res.status(500).json({ error: `Video generation failed: ${genError.message}` });
+        }
+    }
+    catch (error) {
+        console.error('Error in video generation endpoint:', error);
         return res.status(500).json({ error: error.message || 'Internal Server Error' });
     }
 });

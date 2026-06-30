@@ -3,6 +3,7 @@ export interface Template {
     title: string;
     description: string | null;
     s3_link: string;
+    media_type: 'image' | 'video';
     config: Record<string, any>;
     user_id: string | null;
     created_at: Date;
@@ -17,8 +18,9 @@ export declare class TemplateRepository {
      * Get all available templates.
      * If a userId is passed, fetches public templates (user_id IS NULL) AND user's private templates.
      * If no userId is passed, fetches public templates only.
+     * Optionally filter by media_type ('image' | 'video').
      */
-    static findAll(userId?: string): Promise<Template[]>;
+    static findAll(userId?: string, mediaType?: 'image' | 'video'): Promise<Template[]>;
     /**
      * Create a new template
      */
@@ -26,6 +28,7 @@ export declare class TemplateRepository {
         title: string;
         description?: string;
         s3_link: string;
+        media_type?: 'image' | 'video';
         config?: Record<string, any>;
         user_id?: string | null;
     }): Promise<Template>;
@@ -36,6 +39,7 @@ export declare class TemplateRepository {
         title?: string;
         description?: string;
         s3_link?: string;
+        media_type?: 'image' | 'video';
         config?: Record<string, any>;
         user_id?: string | null;
     }): Promise<Template | null>;

@@ -22,7 +22,7 @@ class VoteRepository {
      */
     static async findAllWithVotes(currentUserId) {
         const result = await (0, db_js_1.query)(`SELECT 
-        t.id, t.title, t.description, t.s3_link, t.config, t.user_id, t.created_at, t.updated_at,
+        t.id, t.title, t.description, t.s3_link, t.media_type, t.config, t.user_id, t.created_at, t.updated_at,
         COALESCE(v.upvotes, 0)::integer AS upvotes,
         CASE WHEN uv.id IS NOT NULL THEN true ELSE false END AS user_upvoted
       FROM templates t
@@ -41,7 +41,7 @@ class VoteRepository {
      */
     static async findByIdWithVotes(templateId, currentUserId) {
         const result = await (0, db_js_1.query)(`SELECT 
-        t.id, t.title, t.description, t.s3_link, t.config, t.user_id, t.created_at, t.updated_at,
+        t.id, t.title, t.description, t.s3_link, t.media_type, t.config, t.user_id, t.created_at, t.updated_at,
         COALESCE(v.upvotes, 0)::integer AS upvotes,
         CASE WHEN uv.id IS NOT NULL THEN true ELSE false END AS user_upvoted
       FROM templates t

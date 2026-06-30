@@ -17,6 +17,9 @@ const initialState: ImageEditorState = {
   cropRatio: "1:1",
   previewUrl: null,
   history: [],
+  mediaType: "image",
+  videoUrls: [],
+  duration: 6,
 };
 
 const imageEditorSlice = createSlice({
@@ -37,6 +40,12 @@ const imageEditorSlice = createSlice({
     },
     addGenerationToHistory(state, action: PayloadAction<GenerationHistoryItem>) {
       state.history = [action.payload, ...state.history];
+      if (action.payload.mediaType === 'video' && action.payload.videoUrls) {
+        state.videoUrls = action.payload.videoUrls;
+        state.mediaType = 'video';
+      } else {
+        state.mediaType = 'image';
+      }
     },
     deleteGenerationFromHistory(state, action: PayloadAction<string>) {
       state.history = state.history.filter(item => item.id !== action.payload);

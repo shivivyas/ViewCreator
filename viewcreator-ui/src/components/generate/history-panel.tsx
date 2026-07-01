@@ -381,7 +381,11 @@ export function HistoryPanel({
               Download all
             </button>
             <button
-              onClick={() => dispatch(clearHistory())}
+              onClick={() => {
+                if (window.confirm("Clear all generation history? This cannot be undone.")) {
+                  dispatch(clearHistory());
+                }
+              }}
               className="h-6 px-2 rounded-md text-[10px] text-muted-foreground/60 hover:text-destructive hover:bg-destructive/10 transition-colors flex items-center gap-1"
             >
               <Trash2 className="size-3" />

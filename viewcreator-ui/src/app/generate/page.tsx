@@ -318,6 +318,7 @@ export default function GenerateImagePage() {
       <div className="flex-1 min-h-0 overflow-hidden">
         <div className="h-full mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-5">
           <div className="grid lg:grid-cols-[400px_1fr] gap-6 h-full">
+            <div className="self-start">
             <GenerateForm
               prompt={prompt}
               setPrompt={setPrompt}
@@ -342,6 +343,7 @@ export default function GenerateImagePage() {
               duration={duration}
               setDuration={setDuration}
             />
+            </div>
 
             <HistoryPanel
               isLoading={isLoading}

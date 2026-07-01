@@ -84,9 +84,11 @@ function LoadingSkeleton({
         className={`grid gap-3 ${
           params.mediaType === "video"
             ? "grid-cols-1"
-            : params.numberOfImages <= 2
+            : params.numberOfImages === 1
+            ? "grid-cols-1 max-w-sm"
+            : params.numberOfImages === 2
             ? "grid-cols-2"
-            : "grid-cols-2"
+            : "grid-cols-2 lg:grid-cols-4"
         }`}
       >
         {Array.from({ length: params.numberOfImages }).map((_, i) => (
@@ -306,21 +308,21 @@ export function HistoryPanel({
 
   return (
     <div className="h-full min-h-0 flex flex-col overflow-hidden">
-      {/* Sticky header bar */}
-      <div className="flex items-center justify-between shrink-0 h-12 px-1">
-        <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
-          <span className="size-2 rounded-full bg-primary/50" />
+      {/* Compact header bar */}
+      <div className="flex items-center justify-between shrink-0 h-9">
+        <h2 className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+          <span className="size-1.5 rounded-full bg-muted-foreground/40" />
           Output
           {hasHistory && (
-            <span className="text-xs font-normal text-muted-foreground">
-              ({editorState.history.length})
+            <span className="font-normal">
+              {editorState.history.length}
             </span>
           )}
         </h2>
         {hasHistory && (
           <button
             onClick={() => dispatch(clearHistory())}
-            className="h-7 px-2.5 rounded-lg text-[11px] text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors flex items-center gap-1"
+            className="h-6 px-2 rounded-md text-[10px] text-muted-foreground/60 hover:text-destructive hover:bg-destructive/10 transition-colors flex items-center gap-1"
           >
             <Trash2 className="size-3" />
             Clear

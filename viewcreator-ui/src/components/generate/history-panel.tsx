@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import JSZip from "jszip";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
@@ -6,6 +6,7 @@ import {
   deleteGenerationFromHistory,
 } from "@/store/slices/image-editor-slice";
 import type { GenerationHistoryItem, MediaType } from "@/types";
+import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import {
@@ -307,6 +308,7 @@ export function HistoryPanel({
   const editorState = useAppSelector((state) => state.imageEditor);
   const hasHistory =
     editorState.history && editorState.history.length > 0;
+  const [showClearModal, setShowClearModal] = useState(false);
 
   return (
     <div className="h-full min-h-0 flex flex-col overflow-hidden">
@@ -381,11 +383,7 @@ export function HistoryPanel({
               Download all
             </button>
             <button
-              onClick={() => {
-                if (window.confirm("Clear all generation history? This cannot be undone.")) {
-                  dispatch(clearHistory());
-                }
-              }}
+              onClick={() => setShowClearModal(true)}
               className="h-6 px-2 rounded-md text-[10px] text-muted-foreground/60 hover:text-destructive hover:bg-destructive/10 transition-colors flex items-center gap-1"
             >
               <Trash2 className="size-3" />
@@ -394,6 +392,41 @@ export function HistoryPanel({
           </div>
         )}
       </div>
+
+      {/* ── Clear Confirmation Modal ──────────────────────── */}
+      {showClearModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-card w-full max-w-sm rounded-2xl shadow-xl border border-border/50 p-6">
+            <div className="size-10 rounded-xl bg-destructive/10 flex items-center justify-center mb-4">
+              <Trash2 className="size-5 text-destructive" />
+            </div>
+            <h3 className="text-lg font-semibold mb-1">Clear all history?</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              This will permanently remove all {editorState.history.length} generation(s)
+              from this session. This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3 mt-6">
+              <Button
+                variant="ghost"
+                onClick={() => setShowClearModal(false)}
+                className="rounded-xl"
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  dispatch(clearHistory());
+                  setShowClearModal(false);
+                }}
+                className="rounded-xl"
+              >
+                Clear all
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <ScrollArea className="flex-1 min-h-0">
         <div className="space-y-4 pr-2">

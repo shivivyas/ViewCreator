@@ -1,4 +1,5 @@
 import React from "react";
+import JSZip from "jszip";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
   clearHistory,
@@ -17,6 +18,7 @@ import {
   Trash2,
   Sparkles,
   Copy,
+  Download,
 } from "lucide-react";
 
 export interface HistoryPanelProps {
@@ -320,13 +322,72 @@ export function HistoryPanel({
           )}
         </h2>
         {hasHistory && (
-          <button
-            onClick={() => dispatch(clearHistory())}
-            className="h-6 px-2 rounded-md text-[10px] text-muted-foreground/60 hover:text-destructive hover:bg-destructive/10 transition-colors flex items-center gap-1"
-          >
-            <Trash2 className="size-3" />
-            Clear
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={async () => {
+                const zip = new JSZip();
+                let count = 0;
+
+                for (const [hi, item] of editorState.history.entries()) {
+                  const urls =
+                    item.mediaType === "video"
+                      ? item.videoUrls ?? []
+                      : item.imageUrls;
+
+                  for (const [ai, url] of urls.entries()) {
+                    const prefix =
+                      item.mediaType === "video" ? "video" : "image";
+                    const ext =
+                      item.mediaType === "video" ? ".mp4" : ".png";
+                    const name = `viewcreator-${prefix}-${hi + 1}-${ai + 1}${ext}`;
+
+                    if (url.startsWith("data:")) {
+                      const comma = url.indexOf(",");
+                      const meta = url.slice(0, comma);
+                      const raw = atob(url.slice(comma + 1));
+                      const buf = new Uint8Array(raw.length);
+                      for (let i = 0; i < raw.length; i++)
+                        buf[i] = raw.charCodeAt(i);
+                      zip.file(name, buf);
+                    } else {
+                      try {
+                        const resp = await fetch(url);
+                        const blob = await resp.blob();
+                        zip.file(name, blob);
+                      } catch {
+                        console.warn("Failed to fetch", url);
+                      }
+                    }
+                    count++;
+                  }
+                }
+
+                if (count === 0) return;
+
+                const blob = await zip.generateAsync({ type: "blob" });
+                const a = document.createElement("a");
+                a.href = URL.createObjectURL(blob);
+                a.download = `viewcreator-assets-${Date.now()}.zip`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(a.href);
+                toast.success(`Downloaded ${count} asset(s) as zip`);
+              }}
+              className="h-6 px-2 rounded-md text-[10px] text-muted-foreground/60 hover:text-foreground hover:bg-muted transition-colors flex items-center gap-1"
+              title="Download all assets as zip"
+            >
+              <Download className="size-3" />
+              Download all
+            </button>
+            <button
+              onClick={() => dispatch(clearHistory())}
+              className="h-6 px-2 rounded-md text-[10px] text-muted-foreground/60 hover:text-destructive hover:bg-destructive/10 transition-colors flex items-center gap-1"
+            >
+              <Trash2 className="size-3" />
+              Clear
+            </button>
+          </div>
         )}
       </div>
 

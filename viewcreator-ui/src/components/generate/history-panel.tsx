@@ -1,24 +1,23 @@
-import React from 'react';
-import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { clearHistory, deleteGenerationFromHistory } from '@/store/slices/image-editor-slice';
-import type { GenerationHistoryItem, MediaType } from '@/types';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
-import { toast } from 'sonner';
-import { 
-  ImageIcon, 
-  Download, 
-  Loader2, 
-  X, 
-  History, 
-  Copy, 
-  Clock, 
+import React from "react";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import {
+  clearHistory,
+  deleteGenerationFromHistory,
+} from "@/store/slices/image-editor-slice";
+import type { GenerationHistoryItem, MediaType } from "@/types";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { toast } from "sonner";
+import {
+  ImageIcon,
+  Loader2,
+  X,
+  Clock,
   RefreshCw,
   Video,
-  Trash2 as Trash2Icon
-} from 'lucide-react';
+  Trash2,
+  Sparkles,
+  Copy,
+} from "lucide-react";
 
 export interface HistoryPanelProps {
   isLoading: boolean;
@@ -26,8 +25,6 @@ export interface HistoryPanelProps {
     prompt: string;
     aspectRatio: string;
     imageSize: string;
-    isPremium: boolean;
-    thinkingLevel: string;
     numberOfImages: number;
     mediaType?: MediaType;
   };
@@ -36,282 +33,323 @@ export interface HistoryPanelProps {
   handleSelectImageFromHistory: (item: GenerationHistoryItem, index: number) => void;
 }
 
+// ─── Loading skeleton ──────────────────────────────────────────────────────
+
+function LoadingSkeleton({
+  params,
+}: {
+  params: HistoryPanelProps["loadingParams"];
+}) {
+  return (
+    <div className="rounded-2xl border border-primary/20 bg-primary/[0.03] p-5 space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <div className="size-8 rounded-xl bg-primary/10 flex items-center justify-center">
+            <Loader2 className="size-4 animate-spin text-primary" />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-foreground">
+              {params.mediaType === "video"
+                ? "Generating video..."
+                : "Generating images..."}
+            </p>
+            <p className="text-[11px] text-muted-foreground">
+              {params.mediaType === "video"
+                ? "Gemini 3.1 Flash"
+                : "Gemini 3.1 Flash"}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-xl bg-muted/30 border border-border/50 p-3 text-xs text-muted-foreground italic leading-relaxed line-clamp-2">
+        &ldquo;{params.prompt}&rdquo;
+      </div>
+
+      <div className="flex gap-1.5 flex-wrap">
+        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-muted text-muted-foreground">
+          {params.aspectRatio}
+        </span>
+        {params.mediaType !== "video" && (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-muted text-muted-foreground">
+            {params.imageSize}
+          </span>
+        )}
+        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-muted text-muted-foreground">
+          Standard
+        </span>
+      </div>
+
+      <div
+        className={`grid gap-3 ${
+          params.mediaType === "video"
+            ? "grid-cols-1"
+            : params.numberOfImages <= 2
+            ? "grid-cols-2"
+            : "grid-cols-2"
+        }`}
+      >
+        {Array.from({ length: params.numberOfImages }).map((_, i) => (
+          <div
+            key={i}
+            className="aspect-square rounded-xl bg-muted/40 border border-dashed border-border/50 flex flex-col items-center justify-center gap-1.5 animate-pulse"
+          >
+            <ImageIcon className="size-6 text-muted-foreground/30" />
+            <span className="text-[10px] text-muted-foreground/40 font-medium">
+              {params.mediaType === "video"
+                ? "Rendering..."
+                : `Variation ${i + 1}`}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Empty state ───────────────────────────────────────────────────────────
+
+function EmptyState() {
+  return (
+    <div className="flex flex-col items-center justify-center py-24 text-center">
+      <div className="size-16 rounded-2xl bg-muted flex items-center justify-center mb-5">
+        <Sparkles className="size-7 text-muted-foreground" />
+      </div>
+      <p className="text-base font-medium text-foreground">No generations yet</p>
+      <p className="text-sm text-muted-foreground mt-1 max-w-sm">
+        Configure your parameters and hit Generate. Your creations will appear
+        here.
+      </p>
+    </div>
+  );
+}
+
+// ─── History item ──────────────────────────────────────────────────────────
+
+function HistoryItem({
+  item,
+  isLoading,
+  onLoadSettings,
+  onRegenerate,
+  onSelectImage,
+}: {
+  item: GenerationHistoryItem;
+  isLoading: boolean;
+  onLoadSettings: (item: GenerationHistoryItem) => void;
+  onRegenerate: (item: GenerationHistoryItem) => void;
+  onSelectImage: (item: GenerationHistoryItem, index: number) => void;
+}) {
+  const dispatch = useAppDispatch();
+
+  return (
+    <div className="rounded-2xl border border-border/50 bg-card overflow-hidden">
+      {/* Header bar */}
+      <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-border/50 bg-muted/20">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-[11px] text-muted-foreground flex items-center gap-1 shrink-0">
+            <Clock className="size-3 text-muted-foreground/60" />
+            {item.timestamp}
+          </span>
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-medium bg-muted text-muted-foreground shrink-0">
+            {item.aspectRatio}
+          </span>
+          {item.mediaType === "video" ? (
+            <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[9px] font-medium bg-muted text-muted-foreground shrink-0">
+              <Video className="size-2.5" />
+              {item.duration}s
+            </span>
+          ) : (
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-medium bg-muted text-muted-foreground shrink-0">
+              {item.imageSize}
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-0.5 shrink-0">
+          <button
+            onClick={() => onLoadSettings(item)}
+            className="h-7 px-2 rounded-lg text-[10px] text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex items-center gap-1"
+            title="Load these settings"
+          >
+            <Copy className="size-3" />
+            <span className="hidden sm:inline">Load</span>
+          </button>
+          <button
+            onClick={() => onRegenerate(item)}
+            disabled={isLoading}
+            className="h-7 px-2 rounded-lg text-[10px] text-primary hover:text-primary hover:bg-primary/5 transition-colors flex items-center gap-1"
+            title="Regenerate"
+          >
+            <RefreshCw className="size-3" />
+            <span className="hidden sm:inline">Retry</span>
+          </button>
+          <button
+            onClick={() => dispatch(deleteGenerationFromHistory(item.id))}
+            className="h-7 w-7 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors flex items-center justify-center"
+            title="Remove"
+          >
+            <X className="size-3.5" />
+          </button>
+        </div>
+      </div>
+
+      {/* Body */}
+      <div className="p-4 space-y-3">
+        {/* Prompt */}
+        <div className="text-xs text-muted-foreground bg-muted/30 border border-border/30 rounded-xl px-3 py-2.5 leading-relaxed select-all break-words">
+          {item.prompt}
+        </div>
+
+        {/* References */}
+        {item.referenceImages && item.referenceImages.length > 0 && (
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-muted-foreground font-medium">
+              References:
+            </span>
+            <div className="flex gap-1">
+              {item.referenceImages.map((ref, i) => (
+                <div
+                  key={i}
+                  className="size-6 rounded-md border border-border/50 bg-muted overflow-hidden"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={ref}
+                    alt={`Ref ${i + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Video or Image grid */}
+        {item.mediaType === "video" && item.videoUrls?.length ? (
+          <div className="grid gap-3 max-w-lg">
+            {item.videoUrls.map((url, i) => (
+              <div
+                key={i}
+                className="relative rounded-xl overflow-hidden border border-border/50 bg-black"
+              >
+                <video
+                  src={url}
+                  controls
+                  className="w-full max-h-[300px] object-contain"
+                  playsInline
+                />
+                <span className="absolute top-2 left-2 inline-flex items-center gap-1 bg-black/75 text-white text-[9px] font-semibold rounded-lg px-2 py-1 pointer-events-none">
+                  <Video className="size-3" />
+                  Video
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div
+            className={`grid gap-3 ${
+              item.imageUrls.length === 1
+                ? "grid-cols-1 max-w-sm"
+                : item.imageUrls.length === 2
+                ? "grid-cols-2"
+                : "grid-cols-2 lg:grid-cols-4"
+            }`}
+          >
+            {item.imageUrls.map((url, i) => (
+              <div
+                key={i}
+                className="group relative rounded-xl overflow-hidden border border-border/50 bg-muted/20 aspect-square cursor-pointer transition-all duration-300 hover:border-border hover:shadow-sm"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={url}
+                  alt={`Variation ${i + 1}`}
+                  onClick={() => onSelectImage(item, i)}
+                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                />
+
+                <span className="absolute top-1.5 left-1.5 bg-black/75 text-white text-[9px] font-semibold rounded-lg px-2 py-0.5 pointer-events-none select-none">
+                  #{i + 1}
+                </span>
+
+                <div
+                  className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center"
+                  onClick={() => onSelectImage(item, i)}
+                >
+                  <span className="text-xs text-white font-medium flex items-center gap-1.5">
+                    <ImageIcon className="size-4" />
+                    Edit
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── History panel ─────────────────────────────────────────────────────────
+
 export function HistoryPanel({
   isLoading,
   loadingParams,
   handleLoadSettings,
   handleRegenerate,
-  handleSelectImageFromHistory
+  handleSelectImageFromHistory,
 }: HistoryPanelProps) {
   const dispatch = useAppDispatch();
   const editorState = useAppSelector((state) => state.imageEditor);
-
-  const handleDownload = (url: string, index: number, prefix = 'generated') => {
-    try {
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${prefix}-${Date.now()}-${index}.png`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      toast.success("Image download started!");
-    } catch {
-      toast.error("Failed to download image.");
-    }
-  };
+  const hasHistory =
+    editorState.history && editorState.history.length > 0;
 
   return (
-    <div className="flex flex-col h-full min-h-0 gap-4 overflow-hidden">
-      <Card className="flex-1 min-h-0 overflow-hidden flex flex-col shadow-md">
-        <CardHeader className="border-b bg-muted/30 pb-2 pt-3 shrink-0">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <History className="w-4 h-4 text-primary" />
-              Generation History
-            </CardTitle>
-            {(editorState.history && editorState.history.length > 0) && (
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => dispatch(clearHistory())}
-                className="h-8 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
-              >
-                <Trash2Icon />
-                Clear History
-              </Button>
-            )}
-          </div>
-        </CardHeader>
-        <ScrollArea className="flex-1 min-h-0">
-          <CardContent className="p-4 relative min-h-[400px]">
-            {/* Background grid pattern */}
-            <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none"></div>
-            
-            <div className="relative z-10 w-full flex flex-col gap-6">
-              
-              {/* Active Loading State */}
-              {isLoading && (
-                <div className="border border-primary/20 rounded-xl bg-primary/5 p-4 animate-pulse space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                      <span className="text-xs font-bold text-primary">
-                        {loadingParams.mediaType === 'video' ? 'Generating video...' : 'Generating images...'}
-                      </span>
-                    </div>
-                    <span className="text-[10px] text-muted-foreground bg-background px-2 py-0.5 rounded border">
-                      {loadingParams.mediaType === 'video' ? 'Nano Banana Video' : 'Nano Banana 3.1'}
-                    </span>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <div className="bg-muted/50 border border-muted/80 p-2.5 rounded text-xs italic text-muted-foreground line-clamp-2">
-                      &quot;{loadingParams.prompt}&quot;
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      <Badge variant="secondary" className="text-[9px] px-1.5 py-0">Ratio: {loadingParams.aspectRatio}</Badge>
-                      {loadingParams.mediaType !== 'video' && <Badge variant="secondary" className="text-[9px] px-1.5 py-0">Size: {loadingParams.imageSize}</Badge>}
-                      <Badge variant="secondary" className="text-[9px] px-1.5 py-0">{loadingParams.isPremium ? 'Premium' : 'Standard'}</Badge>
-                      {loadingParams.thinkingLevel === 'high' && <Badge variant="secondary" className="text-[9px] px-1.5 py-0 text-primary bg-primary/10 border-primary/20">Deep Thinking</Badge>}
-                      {loadingParams.mediaType === 'video' && <Badge variant="secondary" className="text-[9px] px-1.5 py-0 text-blue-600 bg-blue-500/10 border-blue-500/20">Video</Badge>}
-                    </div>
-                  </div>
-                  
-                  {/* Placeholder skeletons matching requested quantity */}
-                  {loadingParams.mediaType === 'video' ? (
-                    <div className="aspect-video bg-muted/40 rounded-lg border border-dashed flex flex-col items-center justify-center text-center">
-                      <Video className="w-8 h-8 text-muted-foreground/30 animate-bounce mb-1" />
-                      <span className="text-[10px] text-muted-foreground/40 font-medium">Generating video...</span>
-                    </div>
-                  ) : (
-                  <div className={`grid gap-3 ${loadingParams.numberOfImages === 1 ? 'grid-cols-1 max-w-sm mx-auto' : loadingParams.numberOfImages === 2 ? 'grid-cols-2' : 'grid-cols-2'}`}>
-                    {Array.from({ length: loadingParams.numberOfImages }).map((_, i) => (
-                      <div key={i} className="aspect-square bg-muted/40 rounded-lg border border-dashed flex flex-col items-center justify-center text-center">
-                        <ImageIcon className="w-6 h-6 text-muted-foreground/30 animate-bounce mb-1" />
-                        <span className="text-[10px] text-muted-foreground/40 font-medium">Variation {i + 1}...</span>
-                      </div>
-                    ))}
-                  </div>
-                  )}
-                </div>
-              )}
+    <div className="h-full min-h-0 flex flex-col overflow-hidden">
+      {/* Sticky header bar */}
+      <div className="flex items-center justify-between shrink-0 h-12 px-1">
+        <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+          <span className="size-2 rounded-full bg-primary/50" />
+          Output
+          {hasHistory && (
+            <span className="text-xs font-normal text-muted-foreground">
+              ({editorState.history.length})
+            </span>
+          )}
+        </h2>
+        {hasHistory && (
+          <button
+            onClick={() => dispatch(clearHistory())}
+            className="h-7 px-2.5 rounded-lg text-[11px] text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors flex items-center gap-1"
+          >
+            <Trash2 className="size-3" />
+            Clear
+          </button>
+        )}
+      </div>
 
-              {/* History List */}
-              {editorState.history && editorState.history.length > 0 ? (
-                <div className="space-y-6">
-                  {editorState.history.map((item) => (
-                    <div 
-                      key={item.id} 
-                      className="border border-muted rounded-xl bg-background shadow-sm hover:shadow transition-all overflow-hidden"
-                    >
-                      {/* Item Header */}
-                      <div className="bg-muted/10 border-b p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
-                        <div className="flex items-center flex-wrap gap-1.5">
-                          <span className="text-[10px] font-semibold text-muted-foreground flex items-center gap-1 shrink-0">
-                            <Clock className="w-3 h-3 text-muted-foreground/60" />
-                            {item.timestamp}
-                          </span>
-                          <Badge variant="outline" className="text-[9px] font-medium px-1.5 py-0">
-                            {item.aspectRatio}
-                          </Badge>
-                          {item.mediaType === 'video' ? (
-                            <Badge variant="outline" className="text-[9px] font-medium px-1.5 py-0 border-blue-500/20 bg-blue-500/5 text-blue-600 dark:text-blue-400">
-                              <Video className="w-2.5 h-2.5 mr-0.5" /> Video {item.duration ? `(${item.duration}s)` : ''}
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="text-[9px] font-medium px-1.5 py-0">
-                              {item.imageSize}
-                            </Badge>
-                          )}
-                          <Badge 
-                            variant="outline" 
-                            className={`text-[9px] font-medium px-1.5 py-0 ${
-                              item.quality === 'Premium' 
-                                ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' 
-                                : ''
-                            }`}
-                          >
-                            {item.quality}
-                          </Badge>
-                          {item.thinkingLevel === 'high' && (
-                            <Badge variant="outline" className="text-[9px] font-medium border-violet-500/20 bg-violet-500/5 text-violet-600 dark:text-violet-400 px-1.5 py-0">
-                              Deep Think
-                            </Badge>
-                          )}
-                        </div>
+      <ScrollArea className="flex-1 min-h-0">
+        <div className="space-y-4 pr-2">
+          {/* Loading skeleton */}
+          {isLoading && <LoadingSkeleton params={loadingParams} />}
 
-                        <div className="flex items-center gap-1 sm:self-auto self-end shrink-0">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleLoadSettings(item)}
-                            className="h-7 text-[10px] px-2 text-muted-foreground hover:text-foreground hover:bg-muted"
-                            title="Load these parameters into form"
-                          >
-                            <Copy className="w-3 h-3 mr-1 text-muted-foreground/75" />
-                            Use settings
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleRegenerate(item)}
-                            disabled={isLoading}
-                            className="h-7 text-[10px] px-2 text-primary hover:text-primary hover:bg-primary/5"
-                            title="Regenerate these images"
-                          >
-                            <RefreshCw className="w-3 h-3 mr-1 text-primary/75" />
-                            Regenerate
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => dispatch(deleteGenerationFromHistory(item.id))}
-                            className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                            title="Remove from history"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </Button>
-                        </div>
-                      </div>
-
-                      {/* Item Details */}
-                      <div className="p-3.5 space-y-3">
-                        {/* Prompt text box */}
-                        <div className="text-xs bg-muted/30 border border-muted/50 p-2.5 rounded-lg text-foreground font-normal leading-relaxed break-words whitespace-pre-wrap select-all">
-                          {item.prompt}
-                        </div>
-
-                        {/* Reference Images if available */}
-                        {item.referenceImages && item.referenceImages.length > 0 && (
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] text-muted-foreground font-medium">Composition References:</span>
-                            <div className="flex gap-1">
-                              {item.referenceImages.map((refImg, rIdx) => (
-                                <div key={rIdx} className="w-6 h-6 rounded border bg-muted overflow-hidden flex items-center justify-center">
-                                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                                  <img src={refImg} alt={`Reference ${rIdx+1}`} className="max-h-full object-contain" />
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Video or Image Grid */}
-                        {item.mediaType === 'video' && item.videoUrls && item.videoUrls.length > 0 ? (
-                          <div className="grid gap-3 grid-cols-1 max-w-lg">
-                            {item.videoUrls.map((url, i) => (
-                              <div key={i} className="relative rounded-lg overflow-hidden border shadow-sm bg-black flex items-center justify-center">
-                                <video
-                                  src={url}
-                                  controls
-                                  className="w-full max-h-[300px] object-contain"
-                                  poster={item.imageUrls?.[0] || undefined}
-                                >
-                                  Your browser does not support the video tag.
-                                </video>
-                                <span className="absolute top-1.5 left-1.5 bg-black/75 text-[9px] text-white font-semibold rounded px-1.5 py-0.5 pointer-events-none select-none flex items-center gap-1">
-                                  <Video className="w-2.5 h-2.5" /> Video
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                        <div className={`grid gap-3 ${
-                          item.imageUrls.length === 1 
-                            ? 'grid-cols-1 max-w-md' 
-                            : item.imageUrls.length === 2 
-                            ? 'grid-cols-2' 
-                            : 'grid-cols-2 lg:grid-cols-4'
-                        }`}>
-                          {item.imageUrls.map((url, i) => (
-                            <div 
-                              key={i} 
-                              className="group relative rounded-lg overflow-hidden border shadow-sm bg-muted/20 flex items-center justify-center aspect-square transition-all duration-300 hover:border-primary/30"
-                            >
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img 
-                                src={url} 
-                                alt={`Generated variation ${i+1}`} 
-                                onClick={() => handleSelectImageFromHistory(item, i)}
-                                className="w-full h-full object-cover cursor-pointer transition-transform duration-500 group-hover:scale-105"
-                              />
-                              
-                              {/* Variation tag */}
-                              <span className="absolute top-1.5 left-1.5 bg-black/75 text-[9px] text-white font-semibold rounded px-1.5 py-0.5 pointer-events-none select-none">
-                                #{i + 1}
-                              </span>
-
-                              {/* Hover Overlay */}
-                              <div 
-                                className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center gap-1.5 p-2 text-center cursor-pointer"
-                                onClick={() => handleSelectImageFromHistory(item, i)}
-                              >
-                                <ImageIcon className="w-5 h-5 text-white/80" />
-                                <span className="text-[10px] text-white/90 font-medium">View / Edit</span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                !isLoading && (
-                  <div className="flex flex-col items-center gap-3 text-muted-foreground/60 py-16 text-center">
-                    <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mb-1">
-                      <ImageIcon className="w-8 h-8 opacity-50" />
-                    </div>
-                    <h3 className="text-sm font-medium text-foreground">Awaiting Instructions</h3>
-                    <p className="text-xs max-w-xs">Configure parameters and click Generate to see your marketing assets come to life. Past generations will be preserved here during your session.</p>
-                  </div>
-                )
-              )}
-            </div>
-          </CardContent>
-        </ScrollArea>
-      </Card>
+          {/* History items */}
+          {hasHistory ? (
+            editorState.history.map((item) => (
+              <HistoryItem
+                key={item.id}
+                item={item}
+                isLoading={isLoading}
+                onLoadSettings={handleLoadSettings}
+                onRegenerate={handleRegenerate}
+                onSelectImage={handleSelectImageFromHistory}
+              />
+            ))
+          ) : !isLoading ? (
+            <EmptyState />
+          ) : null}
+        </div>
+      </ScrollArea>
     </div>
   );
 }

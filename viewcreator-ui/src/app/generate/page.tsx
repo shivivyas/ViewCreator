@@ -25,13 +25,11 @@ export default function GenerateImagePage() {
 
   // Shared params
   const [prompt, setPrompt] = useState(editorState.basePrompt || '');
-  const [isPremium, setIsPremium] = useState(false);
 
   // Image-only params
   const [aspectRatio, setAspectRatio] = useState(editorState.aspectRatio || '1:1');
   const [numberOfImages, setNumberOfImages] = useState(4);
   const [imageSize, setImageSize] = useState('1K');
-  const [thinkingLevel, setThinkingLevel] = useState('minimal');
   const [referenceImages, setReferenceImages] = useState<string[]>([]);
 
   // Video-only params
@@ -94,8 +92,6 @@ export default function GenerateImagePage() {
     setAspectRatio(item.aspectRatio);
     setNumberOfImages(item.numberOfImages);
     setImageSize(item.imageSize);
-    setThinkingLevel(item.thinkingLevel);
-    setIsPremium(item.quality === 'Premium');
     setMediaType(item.mediaType || 'image');
     if (item.duration) setDuration(item.duration);
     if (item.templateId) {
@@ -155,8 +151,8 @@ export default function GenerateImagePage() {
           aspectRatio: params.aspectRatio,
           numberOfImages: params.numberOfImages,
           imageSize: params.imageSize,
-          thinkingLevel: params.thinkingLevel,
-          quality: params.quality,
+          thinkingLevel: 'minimal',
+          quality: 'Standard',
           mediaType: 'image',
           imageUrls: generatedUrls,
           referenceImages: params.referenceImages.length > 0 ? [...params.referenceImages] : undefined,
@@ -222,7 +218,7 @@ export default function GenerateImagePage() {
         prompt,
         style: getSelectedTemplateStyle(),
         aspectRatio,
-        quality: isPremium ? 'Premium' : 'Standard',
+        quality: 'Standard',
         duration,
         templateId: selectedTemplateId
       });
@@ -233,8 +229,8 @@ export default function GenerateImagePage() {
         aspectRatio,
         numberOfImages,
         imageSize,
-        thinkingLevel,
-        quality: isPremium ? 'Premium' : 'Standard',
+        thinkingLevel: 'minimal',
+        quality: 'Standard',
         referenceImages,
         templateId: selectedTemplateId
       });
@@ -274,93 +270,93 @@ export default function GenerateImagePage() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] bg-background overflow-hidden">
-      <div className="container mx-auto px-4 py-4 shrink-0">
-        <div className="flex flex-col items-start gap-1">
-          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <Wand2 className="h-6 w-6 text-primary" />
-            AI Studio
-          </h1>
-          <p className="text-muted-foreground text-sm">
-            Generate stunning marketing visuals and videos.
-          </p>
-        </div>
+    <div className="min-h-[calc(100vh-4rem)] bg-background flex flex-col">
+      {/* ── Sticky Header ─────────────────────────────────── */}
+      <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-lg border-b border-border/50 shrink-0">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-4 h-16">
+            <div className="size-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+              <Wand2 className="size-4 text-primary" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-lg font-semibold truncate">AI Studio</h1>
+              <p className="text-xs text-muted-foreground truncate">Generate marketing visuals and videos</p>
+            </div>
 
-        {/* Media Type Toggle */}
-        <div className="flex items-center gap-2 mt-3 bg-muted/30 rounded-lg p-1 border w-fit">
-          <button
-            type="button"
-            onClick={() => setMediaType('image')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-              mediaType === 'image'
-                ? 'bg-background shadow-sm text-foreground'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <Image className="w-3.5 h-3.5" />
-            Image
-          </button>
-          <button
-            type="button"
-            onClick={() => setMediaType('video')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-              mediaType === 'video'
-                ? 'bg-background shadow-sm text-foreground'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <Video className="w-3.5 h-3.5" />
-            Video
-          </button>
+            {/* Media type toggle */}
+            <div className="flex items-center gap-1 bg-muted/40 rounded-xl p-0.5 border border-border/50 ml-auto shrink-0">
+              <button
+                type="button"
+                onClick={() => setMediaType('image')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] text-xs font-medium transition-all duration-200 ${
+                  mediaType === 'image'
+                    ? 'bg-background shadow-sm text-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <Image className="size-3.5" />
+                Image
+              </button>
+              <button
+                type="button"
+                onClick={() => setMediaType('video')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] text-xs font-medium transition-all duration-200 ${
+                  mediaType === 'video'
+                    ? 'bg-background shadow-sm text-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <Video className="size-3.5" />
+                Video
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 pb-6 flex-1 min-h-0 overflow-hidden">
-        <div className="grid lg:grid-cols-[380px_1fr] gap-6 h-full">
-          <GenerateForm
-            prompt={prompt}
-            setPrompt={setPrompt}
-            aspectRatio={aspectRatio}
-            setAspectRatio={setAspectRatio}
-            numberOfImages={numberOfImages}
-            setNumberOfImages={setNumberOfImages}
-            isPremium={isPremium}
-            setIsPremium={setIsPremium}
-            imageSize={imageSize}
-            setImageSize={setImageSize}
-            thinkingLevel={thinkingLevel}
-            setThinkingLevel={setThinkingLevel}
-            referenceImages={referenceImages}
-            setReferenceImages={setReferenceImages}
-            templates={templates}
-            selectedTemplateId={selectedTemplateId}
-            setSelectedTemplateId={setSelectedTemplateId}
-            isLoadingTemplates={isLoadingTemplates}
-            isLoading={isLoading}
-            mounted={mounted}
-            error={error}
-            handleGenerate={handleGenerate}
-            handleEnhancePrompt={handleEnhancePrompt}
-            mediaType={mediaType}
-            duration={duration}
-            setDuration={setDuration}
-          />
+      {/* ── Content ────────────────────────────────────────── */}
+      <div className="flex-1 min-h-0 overflow-hidden">
+        <div className="h-full mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-5">
+          <div className="grid lg:grid-cols-[400px_1fr] gap-6 h-full">
+            <GenerateForm
+              prompt={prompt}
+              setPrompt={setPrompt}
+              aspectRatio={aspectRatio}
+              setAspectRatio={setAspectRatio}
+              numberOfImages={numberOfImages}
+              setNumberOfImages={setNumberOfImages}
+              imageSize={imageSize}
+              setImageSize={setImageSize}
+              referenceImages={referenceImages}
+              setReferenceImages={setReferenceImages}
+              templates={templates}
+              selectedTemplateId={selectedTemplateId}
+              setSelectedTemplateId={setSelectedTemplateId}
+              isLoadingTemplates={isLoadingTemplates}
+              isLoading={isLoading}
+              mounted={mounted}
+              error={error}
+              handleGenerate={handleGenerate}
+              handleEnhancePrompt={handleEnhancePrompt}
+              mediaType={mediaType}
+              duration={duration}
+              setDuration={setDuration}
+            />
 
-          <HistoryPanel
-            isLoading={isLoading}
-            loadingParams={{
-              prompt,
-              aspectRatio,
-              imageSize,
-              isPremium,
-              thinkingLevel,
-              numberOfImages,
-              mediaType
-            }}
-            handleLoadSettings={handleLoadSettings}
-            handleRegenerate={handleRegenerate}
-            handleSelectImageFromHistory={handleSelectImageFromHistory}
-          />
+            <HistoryPanel
+              isLoading={isLoading}
+              loadingParams={{
+                prompt,
+                aspectRatio,
+                imageSize,
+                numberOfImages,
+                mediaType
+              }}
+              handleLoadSettings={handleLoadSettings}
+              handleRegenerate={handleRegenerate}
+              handleSelectImageFromHistory={handleSelectImageFromHistory}
+            />
+          </div>
         </div>
       </div>
     </div>

@@ -1,20 +1,12 @@
-import React, { useRef } from 'react';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
-import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Card, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Settings2, Sparkles, Upload, X, Video, Image } from 'lucide-react';
-import type { Template, MediaType } from '@/types';
+import React, { useRef } from "react";
+import Link from "next/link";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import { Loader2, Sparkles, Upload, X, LayoutGrid } from "lucide-react";
+import type { Template, MediaType } from "@/types";
 
-const ASPECT_RATIO_DESCRIPTIONS: Record<string, string> = {
-  '1:1': 'Square format (1:1) - Best for feed posts on Instagram, LinkedIn, Threads, Twitter, and Reddit.',
-  '4:5': 'Vertical Portrait (4:5) - Perfect for Instagram, Threads, and LinkedIn feed posts.',
-  '9:16': 'Full Mobile Story (9:16) - Optimized for vertical video/story platforms like TikTok, Instagram Reels, and YouTube Shorts.',
-  '16:9': 'Wide Landscape (16:9) - Standard for Twitter, LinkedIn, YouTube, and Reddit posts.',
-  '2:3': 'Pinterest Pin (2:3) - Optimized specifically for Pinterest pins and tall vertical visual content.'
-};
+const ASPECT_RATIOS = ["1:1", "4:5", "9:16", "16:9", "2:3"] as const;
 
 export interface GenerateFormProps {
   prompt: string;
@@ -23,12 +15,8 @@ export interface GenerateFormProps {
   setAspectRatio: (val: string) => void;
   numberOfImages: number;
   setNumberOfImages: (val: number) => void;
-  isPremium: boolean;
-  setIsPremium: (val: boolean) => void;
   imageSize: string;
   setImageSize: (val: string) => void;
-  thinkingLevel: string;
-  setThinkingLevel: (val: string) => void;
   referenceImages: string[];
   setReferenceImages: React.Dispatch<React.SetStateAction<string[]>>;
   templates: Template[];
@@ -52,12 +40,8 @@ export function GenerateForm({
   setAspectRatio,
   numberOfImages,
   setNumberOfImages,
-  isPremium,
-  setIsPremium,
   imageSize,
   setImageSize,
-  thinkingLevel,
-  setThinkingLevel,
   referenceImages,
   setReferenceImages,
   templates,
@@ -71,362 +55,381 @@ export function GenerateForm({
   handleEnhancePrompt,
   mediaType,
   duration,
-  setDuration
+  setDuration,
 }: GenerateFormProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = React.useState(false);
 
+  const activeTemplate = templates.find((t) => t.id === selectedTemplateId);
+  const recommendedPrompts = activeTemplate?.config?.recommendedPrompts;
+
+  const filteredTemplates = templates.filter(
+    (tpl) =>
+      mediaType === "video"
+        ? tpl.media_type === "video" || !tpl.media_type
+        : true
+  );
+
   const processFiles = (files: FileList | null) => {
     if (!files) return;
-    Array.from(files).forEach((file, index) => {
-      if (referenceImages.length + index < 3 && file.type.startsWith('image/')) {
+    Array.from(files).forEach((file, i) => {
+      if (referenceImages.length + i < 3 && file.type.startsWith("image/")) {
         const reader = new FileReader();
-        reader.onloadend = () => {
-          setReferenceImages(prev => [...prev, reader.result as string]);
-        };
+        reader.onloadend = () =>
+          setReferenceImages((prev) => [...prev, reader.result as string]);
         reader.readAsDataURL(file);
       }
     });
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) =>
     processFiles(e.target.files);
-  };
 
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+  const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(true);
   };
-
-  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+  const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
   };
-
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+  const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
     processFiles(e.dataTransfer.files);
   };
 
-  const clearReferenceImage = (index: number) => {
-    setReferenceImages(prev => prev.filter((_, i) => i !== index));
-  };
-
   return (
-    <Card className="h-full min-h-0 flex flex-col shadow-sm border-primary/10 overflow-hidden">
-      <CardHeader className="bg-primary/5 border-b py-3 shrink-0">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <Settings2 className="w-4 h-4" />
-          Parameters
-          {mediaType === 'video' && (
-            <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium ml-auto flex items-center gap-1">
-              <Video className="w-3 h-3" /> Video Mode
-            </span>
-          )}
-        </CardTitle>
-      </CardHeader>
-      <ScrollArea className="flex-1 min-h-0">
-        <form id="generate-form" onSubmit={handleGenerate} className="flex flex-col gap-5 p-4">
-          
-          {/* 1. Viral Templates */}
-          <div className="space-y-2">
-            <Label className="text-xs font-semibold flex items-center justify-between">
-              <span>Select Viral Template</span>
-              {isLoadingTemplates && <Loader2 className="w-3 h-3 animate-spin text-primary" />}
+    <div className="rounded-2xl border border-border/50 bg-card overflow-y-auto">
+      <form
+        id="generate-form"
+        onSubmit={handleGenerate}
+        className="flex flex-col gap-4 p-5"
+      >
+        {/* ── Prompt ──────────────────────────────────────── */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="prompt" className="text-xs font-semibold">
+              Prompt
             </Label>
-            {templates.filter(tpl => mediaType === 'video' ? tpl.media_type === 'video' || !tpl.media_type : true).length > 0 ? (
-              <div className="grid grid-cols-1 gap-2">
-                {templates
-                  .filter(tpl => mediaType === 'video' ? tpl.media_type === 'video' || !tpl.media_type : true)
-                  .map((tpl) => (
-                  <div
+            <button
+              type="button"
+              onClick={handleEnhancePrompt}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+            >
+              <Sparkles className="size-3" />
+              Enhance
+            </button>
+          </div>
+          <Textarea
+            id="prompt"
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            placeholder="Describe the marketing visual you want to create..."
+            className="min-h-[80px] resize-none rounded-xl text-sm leading-relaxed focus-visible:ring-primary/30"
+            disabled={isLoading}
+          />
+        </div>
+
+        {/* ── Template thumbnails ──────────────────────────── */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <Label className="text-xs font-semibold">
+              Template
+              {selectedTemplateId && activeTemplate && (
+                <span className="font-normal text-muted-foreground ml-1">
+                  — {activeTemplate.title}
+                </span>
+              )}
+            </Label>
+            <Link
+              href="/templates"
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+            >
+              <LayoutGrid className="size-3" />
+              Browse all
+            </Link>
+          </div>
+
+          {isLoadingTemplates ? (
+            <div className="flex items-center justify-center py-6">
+              <Loader2 className="size-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : filteredTemplates.length > 0 ? (
+            <>
+              <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+                <button
+                  type="button"
+                  onClick={() => setSelectedTemplateId(null)}
+                  className={`shrink-0 w-[90px] rounded-xl border-2 transition-all duration-200 overflow-hidden ${
+                    !selectedTemplateId
+                      ? "border-foreground ring-1 ring-foreground"
+                      : "border-border/50 hover:border-muted-foreground/30"
+                  }`}
+                >
+                  <div className="aspect-[4/5] bg-muted flex items-center justify-center">
+                    <span className="text-[10px] font-medium text-muted-foreground">
+                      None
+                    </span>
+                  </div>
+                </button>
+                {filteredTemplates.map((tpl) => (
+                  <button
                     key={tpl.id}
+                    type="button"
                     onClick={() => {
                       setSelectedTemplateId(tpl.id);
-                      if (tpl.config?.aspectRatio) {
+                      if (tpl.config?.aspectRatio)
                         setAspectRatio(tpl.config.aspectRatio);
-                      }
                     }}
-                    className={`cursor-pointer rounded-lg border p-2 flex items-center gap-3 transition-all ${
+                    className={`shrink-0 w-[90px] rounded-xl border-2 transition-all duration-200 overflow-hidden ${
                       selectedTemplateId === tpl.id
-                        ? 'border-primary bg-primary/5 ring-1 ring-primary'
-                        : 'border-muted hover:border-primary/50'
+                        ? "border-foreground ring-1 ring-foreground"
+                        : "border-border/50 hover:border-muted-foreground/30"
                     }`}
                   >
-                    <div className="w-12 h-12 rounded bg-muted overflow-hidden shrink-0 flex items-center justify-center border relative">
-                      {tpl.media_type === 'video' ? (
-                        <div className="w-full h-full flex items-center justify-center bg-muted">
-                          <Video className="w-5 h-5 text-muted-foreground" />
+                    <div className="aspect-[4/5] bg-muted relative">
+                      {tpl.media_type === "video" ? (
+                        <div className="absolute inset-0 flex items-center justify-center bg-muted">
+                          <span className="text-[8px] font-semibold text-muted-foreground uppercase tracking-wider">
+                            Vid
+                          </span>
                         </div>
                       ) : (
                         /* eslint-disable-next-line @next/next/no-img-element */
                         <img
                           src={tpl.s3_link}
                           alt={tpl.title}
-                          className="w-full h-full object-cover"
+                          className="absolute inset-0 w-full h-full object-cover"
+                          loading="lazy"
                         />
                       )}
-                      {tpl.media_type === 'video' && (
-                        <span className="absolute bottom-0.5 right-0.5 bg-black/70 text-white text-[7px] px-1 rounded font-semibold">
-                          VID
-                        </span>
-                      )}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="text-xs font-semibold truncate">{tpl.title}</h4>
-                      <p className="text-[10px] text-muted-foreground line-clamp-2 leading-snug">
-                        {tpl.description}
-                      </p>
-                    </div>
-                  </div>
+                  </button>
                 ))}
-                
-                {/* Recommended prompts selector for the active template */}
-                {(() => {
-                  const activeTemplate = templates.find((t) => t.id === selectedTemplateId);
-                  const recommendedPrompts = activeTemplate?.config?.recommendedPrompts;
-                  if (!recommendedPrompts) return null;
-                  return (
-                    <div className="pt-1.5 space-y-1">
-                      <span className="text-[10px] font-medium text-muted-foreground">Suggested Prompts:</span>
-                      <div className="flex flex-col gap-1">
-                        {recommendedPrompts.map((p: string, idx: number) => (
-                          <button
-                            key={idx}
-                            type="button"
-                            onClick={() => setPrompt(p)}
-                            className="text-[10px] text-left text-primary hover:underline bg-muted/30 p-1.5 rounded border border-dashed hover:bg-muted/50 truncate"
-                            title={p}
-                          >
-                            &quot;{p}&quot;
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })()}
               </div>
-            ) : (
-              <div className="text-xs p-3 text-center border border-dashed rounded-lg bg-muted/10 text-muted-foreground">
-                {!isLoadingTemplates ? "No templates found. Database or API offline." : "Loading viral templates..."}
-              </div>
-            )}
-          </div>
-
-          {/* 2. Prompt */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="prompt" className="text-xs font-semibold">
-                Prompt <span className="text-destructive">*</span>
-              </Label>
-              <Button type="button" variant="ghost" size="sm" onClick={handleEnhancePrompt} className="h-6 text-xs text-primary px-1">
-                <Sparkles className="w-3 h-3 mr-0.5" /> Enhance
-              </Button>
+              {recommendedPrompts && recommendedPrompts.length > 0 && (
+                <div className="pt-0.5 space-y-1">
+                  <p className="text-[10px] font-medium text-muted-foreground">
+                    Suggested prompts
+                  </p>
+                  <div className="flex flex-col gap-1">
+                    {recommendedPrompts.map((p: string, i: number) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => setPrompt(p)}
+                        className="text-[11px] text-left text-primary/80 hover:text-primary bg-primary/5 hover:bg-primary/10 rounded-lg px-2.5 py-1.5 border border-primary/10 transition-colors truncate"
+                      >
+                        &ldquo;{p}&rdquo;
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="text-xs text-muted-foreground py-3 text-center border border-dashed border-border/50 rounded-xl">
+              No templates available
             </div>
-            <Textarea
-              id="prompt"
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Create a premium LinkedIn ad for my AI SaaS dashboard..."
-              className="min-h-[90px] resize-none shadow-sm focus-visible:ring-primary/50 text-xs"
-              disabled={isLoading}
-            />
-          </div>
+          )}
+        </div>
 
-          {/* 3. Reference Images (Image Mode Only) */}
-          {mediaType === 'image' && (
-          <div className="space-y-2">
+        <div className="border-t border-border/50" />
+
+        {/* ── Aspect Ratio + Count ─────────────────────────── */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs font-semibold">Ratio</Label>
+            <div className="flex gap-1">
+              {ASPECT_RATIOS.map((ratio) => (
+                <button
+                  key={ratio}
+                  type="button"
+                  onClick={() => setAspectRatio(ratio)}
+                  className={`flex-1 h-7 rounded-lg text-[10px] font-medium transition-all duration-200 ${
+                    aspectRatio === ratio
+                      ? "bg-foreground text-background shadow-sm"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                  }`}
+                >
+                  {ratio}
+                </button>
+              ))}
+            </div>
+          </div>
+          {mediaType === "image" && (
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Count</Label>
+              <div className="flex gap-1">
+                {[1, 2, 4].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setNumberOfImages(n)}
+                    className={`flex-1 h-7 rounded-lg text-[10px] font-medium transition-all duration-200 ${
+                      numberOfImages === n
+                        ? "bg-foreground text-background shadow-sm"
+                        : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                    }`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ── Resolution (image) / Duration (video) ────────── */}
+        {mediaType === "image" && (
+          <div className="space-y-1.5">
+            <Label className="text-xs font-semibold">Resolution</Label>
+            <div className="flex gap-1">
+              {["512", "1K", "2K", "4K"].map((size) => (
+                <button
+                  key={size}
+                  type="button"
+                  onClick={() => setImageSize(size)}
+                  className={`flex-1 h-7 rounded-lg text-[10px] font-medium transition-all duration-200 ${
+                    imageSize === size
+                      ? "bg-foreground text-background shadow-sm"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                  }`}
+                >
+                  {size}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {mediaType === "video" && (
+          <div className="space-y-1.5">
+            <Label className="text-xs font-semibold">Duration</Label>
+            <div className="flex gap-1">
+              {[3, 6, 10, 15].map((sec) => (
+                <button
+                  key={sec}
+                  type="button"
+                  onClick={() => setDuration(sec)}
+                  className={`flex-1 h-7 rounded-lg text-[10px] font-medium transition-all duration-200 ${
+                    duration === sec
+                      ? "bg-foreground text-background shadow-sm"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                  }`}
+                >
+                  {sec}s
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── Reference Images ────────────────────────────── */}
+        {mediaType === "image" && (
+          <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <Label className="text-xs font-semibold">References ({referenceImages.length}/3)</Label>
+              <Label className="text-xs font-semibold">
+                References ({referenceImages.length}/3)
+              </Label>
               {referenceImages.length > 0 && (
-                <Button type="button" variant="ghost" size="sm" onClick={() => setReferenceImages([])} className="h-6 text-xs text-destructive px-1">
-                  Clear all
-                </Button>
+                <button
+                  type="button"
+                  onClick={() => setReferenceImages([])}
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Clear
+                </button>
               )}
             </div>
-            {referenceImages.length < 3 ? (
-              <div 
-                className={`border-2 border-dashed rounded-lg p-3 flex flex-col items-center justify-center text-center cursor-pointer transition-colors ${isDragging ? 'bg-primary/10 border-primary' : 'hover:bg-muted/50'}`}
+
+            {referenceImages.length < 3 && (
+              <div
+                className={`rounded-xl border-2 border-dashed py-3 flex flex-col items-center justify-center text-center cursor-pointer transition-colors ${
+                  isDragging
+                    ? "border-primary bg-primary/5"
+                    : "border-border/60 hover:border-border bg-muted/20"
+                }`}
                 onClick={() => fileInputRef.current?.click()}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
               >
-                <Upload className="w-5 h-5 text-muted-foreground mb-1" />
-                <p className="text-xs font-medium">Add reference (up to 3)</p>
+                <Upload className="size-4 text-muted-foreground mb-1" />
+                <p className="text-[11px] font-medium text-foreground">
+                  Add reference
+                </p>
               </div>
-            ) : null}
+            )}
+
             {referenceImages.length > 0 && (
-              <div className="flex gap-2 flex-wrap mt-2">
+              <div className="flex gap-2 flex-wrap">
                 {referenceImages.map((img, idx) => (
-                  <div key={idx} className="relative group rounded-lg border bg-muted/20 p-0.5 flex items-center justify-center h-16 w-16">
+                  <div
+                    key={idx}
+                    className="relative group rounded-xl border border-border/50 overflow-hidden size-[60px] bg-muted/20"
+                  >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={img} alt={`Ref ${idx+1}`} className="max-h-full max-w-full object-contain rounded" />
-                    <Button 
+                    <img
+                      src={img}
+                      alt={`Ref ${idx + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                    <button
                       type="button"
-                      variant="destructive" 
-                      className="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 transition-opacity h-5 w-5 rounded-full p-0 flex items-center justify-center shadow-sm"
-                      onClick={() => clearReferenceImage(idx)}
+                      onClick={() =>
+                        setReferenceImages((prev) =>
+                          prev.filter((_, i) => i !== idx)
+                        )
+                      }
+                      className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
                     >
-                      <X className="w-3 h-3" />
-                    </Button>
+                      <X className="size-4 text-white" />
+                    </button>
                   </div>
                 ))}
               </div>
             )}
-            <input 
-              type="file" 
-              ref={fileInputRef} 
-              className="hidden" 
+
+            <input
+              type="file"
+              ref={fileInputRef}
+              className="hidden"
               accept="image/*"
               multiple
-              onChange={handleImageUpload} 
+              onChange={handleImageUpload}
             />
           </div>
-          )}
+        )}
 
-          {/* 3b. Video Duration (Video Mode Only) */}
-          {mediaType === 'video' && (
-          <div className="space-y-2">
-            <Label className="text-xs font-semibold">Duration (seconds)</Label>
-            <div className="flex gap-1">
-              {[3, 6, 10, 15].map(sec => (
-                <Button 
-                  key={sec}
-                  type="button" 
-                  variant={duration === sec ? "default" : "outline"} 
-                  onClick={() => setDuration(sec)}
-                  className="flex-1 h-8 text-xs"
-                  size="sm"
-                >
-                  {sec}s
-                </Button>
-              ))}
-            </div>
+        {/* ── Error ───────────────────────────────────────── */}
+        {error && (
+          <div className="rounded-xl bg-destructive/10 border border-destructive/20 px-3.5 py-2.5 text-xs text-destructive font-medium leading-relaxed">
+            {error}
           </div>
-          )}
+        )}
 
-          {/* 4. Aspect Ratio */}
-          <div className="space-y-2">
-            <Label className="text-xs font-semibold">Aspect Ratio</Label>
-            <div className="flex flex-wrap gap-1.5">
-              {Object.keys(ASPECT_RATIO_DESCRIPTIONS).map((ratio) => (
-                <div key={ratio} className="relative group">
-                  <Button 
-                    type="button" 
-                    variant={aspectRatio === ratio ? "default" : "outline"} 
-                    onClick={() => setAspectRatio(ratio)} 
-                    className="flex items-center gap-0.5 text-xs px-2 h-8" 
-                    size="sm"
-                    title={ASPECT_RATIO_DESCRIPTIONS[ratio]}
-                  >
-                    <span className="text-[10px]">{ratio}</span>
-                  </Button>
-                  {/* Tooltip */}
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block bg-black/90 text-white text-xs rounded px-2 py-1 whitespace-nowrap z-50">
-                    {ASPECT_RATIO_DESCRIPTIONS[ratio]}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* 5. Number of Images & 6. Quality */}
-          <div className="grid grid-cols-2 gap-3">
-            {mediaType === 'image' && (
-            <div className="space-y-2">
-              <Label className="text-xs font-semibold">Images</Label>
-              <div className="flex gap-1">
-                {[1, 2, 4].map(num => (
-                  <Button key={num} type="button" variant={numberOfImages === num ? "default" : "outline"} onClick={() => setNumberOfImages(num)} className="flex-1 h-8 text-xs" size="sm">
-                    {num}
-                  </Button>
-                ))}
-              </div>
-            </div>
-            )}
-            
-            <div className="space-y-2">
-              <Label className="text-xs font-semibold">Quality</Label>
-              <div className="flex items-center justify-between rounded-lg border p-1.5 bg-muted/20 h-8">
-                <span className={`text-[10px] font-medium ${!isPremium ? 'text-foreground' : 'text-muted-foreground'}`}>Std</span>
-                <Switch
-                  checked={isPremium}
-                  onCheckedChange={setIsPremium}
-                  disabled={isLoading}
-                />
-                <span className={`text-[10px] font-medium ${isPremium ? 'text-primary' : 'text-muted-foreground'}`}>Prm</span>
-              </div>
-            </div>
-          </div>
-
-          {/* 7. Image Size (Image Mode Only) */}
-          {mediaType === 'image' && (
-          <div className="space-y-2">
-            <Label className="text-xs font-semibold">Resolution</Label>
-            <div className="flex gap-1">
-              {['512', '1K', '2K', '4K'].map(size => (
-                <Button 
-                  key={size}
-                  type="button" 
-                  variant={imageSize === size ? "default" : "outline"} 
-                  onClick={() => setImageSize(size)}
-                  className="flex-1 h-8 text-xs"
-                  size="sm"
-                  title={size === '512' ? '0.5K - Fast, compact' : size === '1K' ? '1K - Balanced (default)' : size === '2K' ? '2K - High quality' : '4K - Maximum quality'}
-                >
-                  {size}
-                </Button>
-              ))}
-            </div>
-          </div>
-          )}
-
-          {/* 8. Thinking Level (Image Mode Only) */}
-          {mediaType === 'image' && (
-          <div className="space-y-2">
-            <Label className="text-xs font-semibold">Thinking</Label>
-            <div className="flex items-center justify-between rounded-lg border p-1.5 bg-muted/20 h-8">
-              <span className={`text-[10px] font-medium ${thinkingLevel === 'minimal' ? 'text-foreground' : 'text-muted-foreground'}`}>Fast</span>
-              <Switch
-                checked={thinkingLevel === 'high'}
-                onCheckedChange={(checked) => setThinkingLevel(checked ? 'high' : 'minimal')}
-                disabled={isLoading}
-              />
-              <span className={`text-[10px] font-medium ${thinkingLevel === 'high' ? 'text-primary' : 'text-muted-foreground'}`}>Deep</span>
-            </div>
-          </div>
-          )}
-
-          {error && (
-            <div className="p-2 bg-destructive/10 border border-destructive/20 text-destructive text-xs rounded-md font-medium flex items-start gap-2">
-              <span className="shrink-0 mt-0.5">⚠️</span>
-              <span>{error}</span>
-            </div>
-          )}
-        </form>
-      </ScrollArea>
-      <div className="p-3 border-t bg-background shrink-0">
-        <Button 
-          type="submit" 
-          form="generate-form"
-          className="w-full h-10 text-sm font-bold shadow-md hover:shadow-lg transition-all" 
+        {/* ── Generate Button (inline, always visible) ─────── */}
+        <Button
+          type="submit"
+          size="lg"
+          className="w-full h-11 rounded-xl font-semibold shadow-sm transition-all mt-1"
           disabled={!mounted || isLoading || !prompt.trim()}
         >
           {isLoading ? (
             <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              <Loader2 className="size-4 mr-2 animate-spin" />
               Generating...
             </>
           ) : (
             <>
-              <Sparkles className="mr-2 h-4 w-4" />
+              <Sparkles className="size-4 mr-2" />
               Generate
             </>
           )}
         </Button>
-      </div>
-    </Card>
+      </form>
+    </div>
   );
 }

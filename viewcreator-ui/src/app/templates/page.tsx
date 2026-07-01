@@ -20,6 +20,7 @@ import {
 import { getTemplates, uploadTemplate, deleteTemplate, voteTemplate } from "@/services/api/template-service";
 import type { Template, MediaType } from "@/types";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -869,50 +870,25 @@ export default function TemplatesPage() {
         </div>
       )}
 
-      {/* ── Delete Confirmation ─────────────────────────────── */}
-      {showDeleteModal && templateToDelete && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-card w-full max-w-sm rounded-2xl shadow-xl border border-border/50 p-6">
-            <div className="size-10 rounded-xl bg-destructive/10 flex items-center justify-center mb-4">
-              <Trash2 className="size-5 text-destructive" />
-            </div>
-            <h3 className="text-lg font-semibold mb-1">Delete template?</h3>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              Are you sure you want to delete{" "}
-              <strong className="text-foreground">&ldquo;{templateToDelete.title}&rdquo;</strong>?
-              This action cannot be undone.
-            </p>
-            <div className="flex justify-end gap-3 mt-6">
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  setShowDeleteModal(false);
-                  setTemplateToDelete(null);
-                }}
-                disabled={deleting}
-                className="rounded-xl"
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={handleDeleteTemplate}
-                disabled={deleting}
-                className="rounded-xl"
-              >
-                {deleting ? (
-                  <>
-                    <Loader2 className="size-4 mr-2 animate-spin" />
-                    Deleting...
-                  </>
-                ) : (
-                  "Delete"
-                )}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={showDeleteModal && !!templateToDelete}
+        title="Delete template?"
+        description={
+          <>
+            Are you sure you want to delete{" "}
+            <strong className="text-foreground">&ldquo;{templateToDelete?.title}&rdquo;</strong>?
+            This action cannot be undone.
+          </>
+        }
+        confirmLabel={deleting ? "Deleting..." : "Delete"}
+        cancelLabel="Cancel"
+        loading={deleting}
+        onConfirm={handleDeleteTemplate}
+        onCancel={() => {
+          setShowDeleteModal(false);
+          setTemplateToDelete(null);
+        }}
+      />
     </div>
   );
 }

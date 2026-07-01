@@ -25,6 +25,17 @@ export class TemplateRepository {
   }
 
   /**
+   * Find a template by its S3 link (used for idempotent seeding)
+   */
+  static async findByS3Link(s3Link: string): Promise<Template | null> {
+    const result = await query<Template>(
+      'SELECT id, title, description, s3_link, media_type, config, user_id, created_at, updated_at FROM templates WHERE s3_link = $1 LIMIT 1',
+      [s3Link]
+    );
+    return result.rows[0] || null;
+  }
+
+  /**
    * Get all available templates.
    * If a userId is passed, fetches public templates (user_id IS NULL) AND user's private templates.
    * If no userId is passed, fetches public templates only.

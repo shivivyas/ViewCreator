@@ -19,8 +19,9 @@ class VoteRepository {
     }
     /**
      * Get all templates with upvote counts and whether the current user upvoted.
+     * Supports pagination via LIMIT/OFFSET.
      */
-    static async findAllWithVotes(currentUserId) {
+    static async findAllWithVotes(currentUserId, limit = 100, offset = 0) {
         const result = await (0, db_js_1.query)(`SELECT 
         t.id, t.title, t.description, t.s3_link, t.media_type, t.config, t.user_id, t.created_at, t.updated_at,
         COALESCE(v.upvotes, 0)::integer AS upvotes,
@@ -33,7 +34,8 @@ class VoteRepository {
       ) v ON v.template_id = t.id
       LEFT JOIN template_upvotes uv ON uv.template_id = t.id AND uv.user_id = $1
       WHERE (t.user_id IS NULL OR t.user_id = $1)
-      ORDER BY t.created_at DESC`, [currentUserId || null]);
+      ORDER BY t.created_at DESC
+      LIMIT $2 OFFSET $3`, [currentUserId || null, limit, offset]);
         return result.rows;
     }
     /**

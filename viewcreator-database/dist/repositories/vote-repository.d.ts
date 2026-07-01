@@ -20,8 +20,9 @@ export declare class VoteRepository {
     }>;
     /**
      * Get all templates with upvote counts and whether the current user upvoted.
+     * Supports pagination via LIMIT/OFFSET.
      */
-    static findAllWithVotes(currentUserId?: string): Promise<TemplateWithVotes[]>;
+    static findAllWithVotes(currentUserId?: string, limit?: number, offset?: number): Promise<TemplateWithVotes[]>;
     /**
      * Get a single template with upvote count and whether the current user upvoted.
      */

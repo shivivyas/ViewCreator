@@ -3,6 +3,49 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const template_repository_js_1 = require("./repositories/template-repository.js");
 const user_repository_js_1 = require("./repositories/user-repository.js");
 const db_js_1 = require("./db.js");
+const SEED_TEMPLATES = [
+    {
+        title: 'Viral Social Media Template #1',
+        description: 'High-engagement template for Twitter/LinkedIn visual hooks, featuring prominent typography, custom placeholders, and modern high-contrast styling.',
+        s3_link: 'https://viewcreator-templates.s3.us-east-1.amazonaws.com/template-1.webp',
+        tags: ['LinkedIn', 'Social Media', 'Modern'],
+    },
+    {
+        title: 'Minimalist Product Showcase',
+        description: 'Clean, minimal product photography template with soft gradients and centered composition. Perfect for e-commerce hero sections and product launches.',
+        s3_link: 'https://viewcreator-templates.s3.us-east-1.amazonaws.com/templates/public/1782734875897-k1vmjsu.webp',
+        tags: ['Product', 'E-Commerce', 'Minimalist'],
+    },
+    {
+        title: 'Bold Typography Hero',
+        description: 'Striking typography-driven template with dynamic layout and vibrant accents. Ideal for announcements, event promotions, and brand storytelling.',
+        s3_link: 'https://viewcreator-templates.s3.us-east-1.amazonaws.com/templates/public/1782770014447-7kcfpdk.png',
+        tags: ['Typography', 'Branding', 'Hero'],
+    },
+    {
+        title: 'Modern UI Mockup Grid',
+        description: 'Versatile multi-panel UI showcase template with clean grid layout. Great for app store screenshots, feature highlights, and portfolio presentations.',
+        s3_link: 'https://viewcreator-templates.s3.us-east-1.amazonaws.com/templates/public/1782773810875-cgph6ti.webp',
+        tags: ['UI', 'Portfolio', 'Modern'],
+    },
+];
+async function seedTemplate(template) {
+    const existing = await template_repository_js_1.TemplateRepository.findByS3Link(template.s3_link);
+    if (existing) {
+        console.log(`ℹ️ Template already exists: "${existing.title}"`);
+        return;
+    }
+    const created = await template_repository_js_1.TemplateRepository.create({
+        title: template.title,
+        description: template.description,
+        s3_link: template.s3_link,
+        config: {
+            tags: template.tags,
+            seededAt: new Date().toISOString(),
+        },
+    });
+    console.log(`✅ Seeded template: "${created.title}" (${created.id})`);
+}
 async function seed() {
     console.log('🌱 Seeding database...');
     const connected = await (0, db_js_1.checkConnection)();
@@ -24,35 +67,9 @@ async function seed() {
         else {
             console.log('ℹ️ Demo User already exists:', existingUser.email);
         }
-        // 2. Seed the Initial Template (Public S3 link)
-        const templates = await template_repository_js_1.TemplateRepository.findAll();
-        const s3Link = 'https://viewcreator-templates.s3.us-east-1.amazonaws.com/template-1.webp';
-        const existingTemplate = templates.find(t => t.s3_link === s3Link);
-        if (!existingTemplate) {
-            const template = await template_repository_js_1.TemplateRepository.create({
-                title: 'Viral Social Media Template #1',
-                description: 'High-engagement template for Twitter/LinkedIn visual hooks, featuring prominent typography, custom placeholders, and modern high-contrast styling.',
-                s3_link: s3Link,
-                config: {
-                    tags: ['LinkedIn', 'Social Media', 'Modern'],
-                    category: 'LinkedIn',
-                    aspectRatio: '1:1',
-                    width: 1024,
-                    height: 1024,
-                    stylePreset: 'Modern',
-                    recommendedPrompts: [
-                        'A minimalist software dashboard with dark theme showing rapid growth charts',
-                        'An elegant glassmorphism workspace with code editor and coffee cup'
-                    ],
-                    placeholders: [
-                        { id: 'background', description: 'Central showcase/product image placeholder' }
-                    ]
-                }
-            });
-            console.log('✅ Seeded Initial Template:', template.title, `(${template.id})`);
-        }
-        else {
-            console.log('ℹ️ Initial Template already exists:', existingTemplate.title);
+        // 2. Seed all templates (idempotent — skips if S3 link already exists)
+        for (const tpl of SEED_TEMPLATES) {
+            await seedTemplate(tpl);
         }
         console.log('🎉 Seeding successfully completed!');
     }

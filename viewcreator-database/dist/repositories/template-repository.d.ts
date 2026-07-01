@@ -15,6 +15,10 @@ export declare class TemplateRepository {
      */
     static findById(id: string): Promise<Template | null>;
     /**
+     * Find a template by its S3 link (used for idempotent seeding)
+     */
+    static findByS3Link(s3Link: string): Promise<Template | null>;
+    /**
      * Get all available templates.
      * If a userId is passed, fetches public templates (user_id IS NULL) AND user's private templates.
      * If no userId is passed, fetches public templates only.

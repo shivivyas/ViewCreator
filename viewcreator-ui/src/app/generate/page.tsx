@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useRef, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import { toast } from 'sonner';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
@@ -11,14 +11,15 @@ import {
 } from '@/store/slices/image-editor-slice';
 import type { Template, GenerationHistoryItem, GenerateParams, GenerateVideoParams, MediaType } from '@/types';
 import { getTemplates, generateImages as apiGenerateImages, generateVideo as apiGenerateVideo } from '@/services';
-import { Wand2, Video, Image } from 'lucide-react';
+import { Wand2, Video, Image as ImageIcon, Loader2 } from 'lucide-react';
 
 import { GenerateForm } from '@/components/generate/generate-form';
 import { HistoryPanel } from '@/components/generate/history-panel';
 
-export default function GenerateImagePage() {
+function GenerateImagePageContent() {
   const dispatch = useAppDispatch();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const editorState = useAppSelector((state) => state.imageEditor);
 
   const [mounted, setMounted] = useState(false);
@@ -39,6 +40,7 @@ export default function GenerateImagePage() {
   const [mediaType, setMediaType] = useState<MediaType>('image');
 
   const [imageUrls, setImageUrls] = useState<string[]>(editorState.imageUrls || []);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [videoUrls, setVideoUrls] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,6 +48,8 @@ export default function GenerateImagePage() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
+
+  const initialSelectionDone = useRef(false);
   const { getToken } = useAuth();
 
   const getSelectedTemplateStyle = () => {
@@ -67,9 +71,6 @@ export default function GenerateImagePage() {
         const token = await getToken().catch(() => undefined) || undefined;
         const loadedTemplates = await getTemplates(token);
         setTemplates(loadedTemplates);
-        if (loadedTemplates.length > 0) {
-          setSelectedTemplateId(loadedTemplates[0].id);
-        }
       } catch (err) {
         console.error('Error fetching templates:', err);
       } finally {
@@ -78,6 +79,32 @@ export default function GenerateImagePage() {
     };
     fetchTemplates();
   }, [getToken]);
+
+  useEffect(() => {
+    if (templates.length === 0 || initialSelectionDone.current) return;
+    const rafId = requestAnimationFrame(() => {
+      const urlTemplateId = searchParams.get('templateId');
+
+      if (urlTemplateId) {
+        const target = templates.find((t) => t.id === urlTemplateId);
+        if (target) {
+          setSelectedTemplateId(target.id);
+          if (target.media_type) setMediaType(target.media_type);
+          if (target.config?.aspectRatio) setAspectRatio(target.config.aspectRatio);
+          if (target.config?.recommendedPrompts?.length && !prompt.trim()) {
+            setPrompt(target.config.recommendedPrompts[0]);
+          }
+          initialSelectionDone.current = true;
+          return;
+        }
+      }
+
+      // No matching templateId in URL, default to first
+      setSelectedTemplateId(templates[0].id);
+      initialSelectionDone.current = true;
+    });
+    return () => cancelAnimationFrame(rafId);
+  }, [templates, searchParams, prompt]);
 
   useEffect(() => {
     if (imageUrls.length > 0) {
@@ -294,7 +321,7 @@ export default function GenerateImagePage() {
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
-                <Image className="size-3.5" />
+                <ImageIcon className="size-3.5" />
                 Image
               </button>
               <button
@@ -362,5 +389,16 @@ export default function GenerateImagePage() {
         </div>
       </div>
     </div>
+  );
+}
+export default function GenerateImagePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-[calc(100vh-4rem)] bg-background flex items-center justify-center">
+        <Loader2 className="size-7 animate-spin text-muted-foreground" />
+      </div>
+    }>
+      <GenerateImagePageContent />
+    </Suspense>
   );
 }

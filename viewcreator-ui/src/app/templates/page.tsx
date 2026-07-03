@@ -370,6 +370,27 @@ export default function TemplatesPage() {
     router.push(`/generate?templateId=${templateId}`);
   };
 
+  const handleOpenWorkspace = (
+    templateId: string,
+    prompt: string,
+    imageUrl: string,
+    allUrls: string[],
+    style: string,
+    aspectRatio: string
+  ) => {
+    dispatch(
+      setImageEditorState({
+        imageUrls: allUrls,
+        selectedIndex: 0,
+        basePrompt: prompt,
+        style,
+        aspectRatio,
+        previewUrl: imageUrl,
+      })
+    );
+    router.push(`/generate/edit`);
+  };
+
   const getFileType = (file: File): MediaType | null => {
     if (file.type.startsWith("image/")) return "image";
     if (file.type.startsWith("video/")) return "video";
@@ -782,7 +803,7 @@ export default function TemplatesPage() {
       <TemplateDetailModal
         template={viewTemplate}
         onClose={() => setViewTemplate(null)}
-        onUse={handleUseTemplate}
+        onOpenWorkspace={handleOpenWorkspace}
         onDelete={promptDeleteTemplate}
         userId={userId}
       />

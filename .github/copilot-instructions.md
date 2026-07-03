@@ -42,9 +42,6 @@ mcp_codebase-memo_get_architecture({ "project": "<display_name>" })
 - `manage_adr(action)` — CRUD for Architecture Decision Records
 - `ingest_traces(traces)` — Ingest runtime traces to validate HTTP edges
 
-
-# Project Coding Standards
-
 ## Testing
 - Write tests before code (TDD)
 - For bugs: write a failing test first, then fix (Prove-It pattern)

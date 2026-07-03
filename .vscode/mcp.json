@@ -4,6 +4,10 @@
       "type": "stdio",
       "command": "/Users/sidkumar/.local/bin/codebase-memory-mcp",
       "args": []
+    },
+    "dodopayments_api": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote@latest", "https://mcp.dodopayments.com/sse"]
     }
   }
 }

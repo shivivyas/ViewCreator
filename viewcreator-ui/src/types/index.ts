@@ -81,3 +81,47 @@ export interface GenerateVideoParams {
   duration: number;
   templateId: string | null;
 }
+
+// ── Payment & Subscription Types ───────────────────────────────────────────
+
+export type PlanType = 'credits' | 'subscription';
+export type SubscriptionInterval = 'month' | 'year';
+export type SubscriptionStatus = 'active' | 'canceled' | 'past_due' | 'incomplete' | 'trialing';
+
+export interface SubscriptionPlan {
+  id: string;
+  name: string;
+  type: PlanType;
+  credits: number;
+  price_cents: number;
+  currency: string;
+  interval: SubscriptionInterval | null;
+  features: string[];
+  is_active: boolean;
+  sort_order: number;
+  sentra_price_id: string | null;
+  /** Computed display price, e.g. "$9" */
+  display_price: string;
+  /** Per-unit display, e.g. "$0.09/credit" */
+  display_per_unit?: string;
+}
+
+export interface UserCredits {
+  balance: number;
+  lifetime_credits: number;
+}
+
+export interface UserSubscription {
+  id: string;
+  plan_id: string;
+  plan_name: string;
+  status: SubscriptionStatus;
+  current_period_start: string;
+  current_period_end: string;
+  canceled_at: string | null;
+}
+
+export interface UserPaymentStatus {
+  credits: UserCredits | null;
+  subscription: UserSubscription | null;
+}

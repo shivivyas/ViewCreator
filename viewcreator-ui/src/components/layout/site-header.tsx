@@ -10,6 +10,7 @@ const navLinks = [
   { href: "/#features", label: "Features" },
   { href: "/#workflow", label: "How it works" },
   { href: "/#platforms", label: "Platforms" },
+  { href: "/pricing", label: "Pricing" },
 ];
 
 export function SiteHeader() {
@@ -59,6 +60,11 @@ export function SiteHeader() {
               <Link href="/templates" className="mr-1">
                 <Button size="sm" variant="ghost">
                   Templates
+                </Button>
+              </Link>
+              <Link href="/pricing" className="mr-1">
+                <Button size="sm" variant="ghost">
+                  Pricing
                 </Button>
               </Link>
               <Link href="/generate" className="mr-1">

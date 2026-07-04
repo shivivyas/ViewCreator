@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Check, Crown, CreditCard, Loader2, Sparkles } from "lucide-react";
 import Link from "next/link";
-import { useUser, useAuth } from "@clerk/nextjs";
+import { useUser, useAuth, SignUpButton } from "@clerk/nextjs";
 import { toast } from "sonner";
 
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -17,7 +17,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { getPlans, createCheckoutSession, getBalance } from "@/services/api/payment-service";
-import type { SubscriptionPlan, UserSubscription } from "@/types";
+import type { SubscriptionPlan, UserSubscription, UserPaymentStatus } from "@/types";
 
 export default function PricingPage() {
   const { isSignedIn, user } = useUser();
@@ -27,21 +27,35 @@ export default function PricingPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([
-      getPlans(),
-      isSignedIn ? getToken().then((t) => t && getBalance(t)) : Promise.resolve(null),
-    ])
-      .then(([plansData, balanceData]) => {
+    let cancelled = false;
+
+    async function load() {
+      try {
+        const [plansData, balanceData] = await Promise.all([
+          getPlans(),
+          isSignedIn ? getToken().then((t) => (t ? getBalance(t) : null)) : Promise.resolve(null),
+        ]);
+
+        if (cancelled) return;
+
         // Only show the Monthly subscription (the only purchaseable plan)
         const monthly = plansData.subscriptions.find((s) => s.dodo_product_id);
         setPlan(monthly ?? null);
+
         // Track active subscription
-        if (balanceData?.subscription?.status === "active") {
-          setActiveSub(balanceData.subscription);
+        const sub = (balanceData as UserPaymentStatus | null)?.subscription;
+        if (sub?.status === "active") {
+          setActiveSub(sub);
         }
-      })
-      .catch(() => toast.error("Could not load pricing"))
-      .finally(() => setLoading(false));
+      } catch {
+        toast.error("Could not load pricing");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    load();
+    return () => { cancelled = true; };
   }, [isSignedIn, getToken]);
 
   const handleCheckout = useCallback(async () => {
@@ -57,10 +71,10 @@ export default function PricingPage() {
       const successUrl = `${window.location.origin}/generate?checkout=success&plan=${planName}`;
       const data = await createCheckoutSession(plan.id, token, successUrl);
       window.location.href = data.checkout_url;
-    } catch (err: any) {
-      toast.error(err.message || "Checkout failed");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Checkout failed");
     }
-  }, [isSignedIn, user, plan, getToken]);
+  }, [isSignedIn, user, plan, getToken, activeSub]);
 
   if (loading) {
     return (
@@ -142,11 +156,11 @@ export default function PricingPage() {
                       Subscribed
                     </Button>
                   ) : !isSignedIn ? (
-                    <Link href="/sign-up" className="w-full">
+                    <SignUpButton mode="modal">
                       <Button size="lg" className="w-full rounded-xl text-base">
                         Subscribe {plan.name}
                       </Button>
-                    </Link>
+                    </SignUpButton>
                   ) : (
                     <Button
                       size="lg"
@@ -217,9 +231,11 @@ export default function PricingPage() {
           </p>
           <div className="mt-8 flex items-center justify-center gap-4">
             {!isSignedIn ? (
-              <Link href="/sign-up" className={buttonVariants({ size: "lg" })}>
-                Get started
-              </Link>
+              <SignUpButton mode="modal">
+                <Button size="lg" className="rounded-xl text-base">
+                  Get started
+                </Button>
+              </SignUpButton>
             ) : (
               <Button size="lg" onClick={handleCheckout}>
                 Subscribe now

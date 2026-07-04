@@ -118,6 +118,17 @@ router.post('/api/payments/create-checkout', async (req, res) => {
       return res.status(400).json({ error: 'plan_id is required' });
     }
 
+    // ── Prevent duplicate subscriptions ─────────────────────────
+    // If user already has an active subscription, don't allow another
+    const existingSub = await SubscriptionRepository.findActiveByUserId(userId);
+    if (existingSub && existingSub.status === 'active') {
+      return res.status(409).json({
+        error: 'You already have an active subscription. Please manage your existing subscription instead.',
+        subscription_id: existingSub.id,
+        dodo_customer_id: existingSub.dodo_customer_id,
+      });
+    }
+
     // Look up plan
     const plan = await PlanRepository.findById(plan_id);
     if (!plan || !plan.is_active) {

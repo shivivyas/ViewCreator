@@ -16,28 +16,40 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { getPlans, createCheckoutSession } from "@/services/api/payment-service";
-import type { SubscriptionPlan } from "@/types";
+import { getPlans, createCheckoutSession, getBalance } from "@/services/api/payment-service";
+import type { SubscriptionPlan, UserSubscription } from "@/types";
 
 export default function PricingPage() {
   const { isSignedIn, user } = useUser();
   const { getToken } = useAuth();
   const [plan, setPlan] = useState<SubscriptionPlan | null>(null);
+  const [activeSub, setActiveSub] = useState<UserSubscription | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getPlans()
-      .then((data) => {
+    Promise.all([
+      getPlans(),
+      isSignedIn ? getToken().then((t) => t && getBalance(t)) : Promise.resolve(null),
+    ])
+      .then(([plansData, balanceData]) => {
         // Only show the Monthly subscription (the only purchaseable plan)
-        const monthly = data.subscriptions.find((s) => s.dodo_product_id);
+        const monthly = plansData.subscriptions.find((s) => s.dodo_product_id);
         setPlan(monthly ?? null);
+        // Track active subscription
+        if (balanceData?.subscription?.status === "active") {
+          setActiveSub(balanceData.subscription);
+        }
       })
       .catch(() => toast.error("Could not load pricing"))
       .finally(() => setLoading(false));
-  }, []);
+  }, [isSignedIn, getToken]);
 
   const handleCheckout = useCallback(async () => {
     if (!isSignedIn || !user || !plan) return;
+    if (activeSub) {
+      toast.error("You already have an active subscription");
+      return;
+    }
     try {
       const token = await getToken();
       if (!token) return;
@@ -119,7 +131,17 @@ export default function PricingPage() {
                 </CardContent>
 
                 <CardFooter className="pt-0">
-                  {!isSignedIn ? (
+                  {activeSub ? (
+                    <Button
+                      size="lg"
+                      className="w-full rounded-xl text-base"
+                      variant="secondary"
+                      disabled
+                    >
+                      <Check className="mr-2 size-4" />
+                      Subscribed
+                    </Button>
+                  ) : !isSignedIn ? (
                     <Link href="/sign-up" className="w-full">
                       <Button size="lg" className="w-full rounded-xl text-base">
                         Subscribe {plan.name}

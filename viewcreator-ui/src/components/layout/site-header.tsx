@@ -44,9 +44,15 @@ export function SiteHeader() {
     fetchBalance();
     // Refresh every 30 seconds
     const interval = setInterval(fetchBalance, 30000);
+
+    // Listen for post-purchase refresh signal
+    const onPaymentUpdate = () => fetchBalance();
+    window.addEventListener('payment-updated', onPaymentUpdate);
+
     return () => {
       cancelled = true;
       clearInterval(interval);
+      window.removeEventListener('payment-updated', onPaymentUpdate);
     };
   }, [isSignedIn, getToken]);
 
@@ -121,7 +127,7 @@ export function SiteHeader() {
                   {paymentStatus.subscription ? (
                     <>
                       <Crown className="size-3" />
-                      Unlimited
+                      {paymentStatus.subscription.status === 'past_due' ? 'Past Due' : 'Unlimited'}
                     </>
                   ) : (
                     <>
@@ -130,6 +136,16 @@ export function SiteHeader() {
                     </>
                   )}
                 </Link>
+              )}
+
+              {/* Manage Billing — only when subscription is active */}
+              {paymentStatus?.subscription?.dodo_customer_id && (
+                <a
+                  href={`/api/dodo/customer-portal?customer_id=${paymentStatus.subscription.dodo_customer_id}`}
+                  className="hidden sm:inline-flex text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Manage Billing
+                </a>
               )}
 
               <UserButton

@@ -13,7 +13,9 @@ const viewcreator_database_1 = require("viewcreator-database");
 const express_2 = require("@clerk/express");
 const client_s3_1 = require("@aws-sdk/client-s3");
 const payments_js_1 = __importDefault(require("./routes/payments.js"));
+const admin_js_1 = __importDefault(require("./routes/admin.js"));
 const credit_guard_js_1 = require("./middleware/credit-guard.js");
+const rate_limiter_js_1 = require("./middleware/rate-limiter.js");
 const app = (0, express_1.default)();
 const port = process.env.PORT || 3001;
 // Initialize S3 Client
@@ -230,7 +232,7 @@ app.post('/api/templates/upload', (0, express_2.requireAuth)(), syncUserMiddlewa
     }
 });
 // Image Generation Endpoint
-app.post('/api/generate', (0, express_2.requireAuth)(), syncUserMiddleware, async (req, res) => {
+app.post('/api/generate', rate_limiter_js_1.generationRateLimiter, (0, express_2.requireAuth)(), syncUserMiddleware, async (req, res) => {
     try {
         const { prompt, aspectRatio = '1:1', imageSize = '1K', numberOfImages = 1, style = 'None', quality = 'Standard', thinkingLevel = 'minimal', referenceImages = [], personGeneration = 'DONT_ALLOW', templateId } = req.body;
         if (!prompt) {
@@ -379,7 +381,7 @@ app.post('/api/generate', (0, express_2.requireAuth)(), syncUserMiddleware, asyn
     }
 });
 // Video Generation Endpoint
-app.post('/api/generate/video', (0, express_2.requireAuth)(), syncUserMiddleware, async (req, res) => {
+app.post('/api/generate/video', rate_limiter_js_1.videoGenerationRateLimiter, (0, express_2.requireAuth)(), syncUserMiddleware, async (req, res) => {
     try {
         const { prompt, aspectRatio = '16:9', style = 'None', quality = 'Standard', duration = 6, templateId } = req.body;
         if (!prompt) {
@@ -490,6 +492,8 @@ app.post('/api/generate/video', (0, express_2.requireAuth)(), syncUserMiddleware
 });
 // Payment Routes
 app.use(payments_js_1.default);
+// Admin Routes (protected by x-admin-key header)
+app.use(admin_js_1.default);
 // Start Server
 app.listen(port, () => {
     console.log(`🚀 ViewCreator API is running on http://localhost:${port}`);

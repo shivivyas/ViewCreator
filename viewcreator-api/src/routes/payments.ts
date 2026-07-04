@@ -59,6 +59,7 @@ router.get('/api/payments/balance', async (req, res) => {
         current_period_start: subscription.current_period_start,
         current_period_end: subscription.current_period_end,
         canceled_at: subscription.canceled_at,
+        dodo_customer_id: subscription.dodo_customer_id,
       };
     }
 
@@ -209,6 +210,9 @@ router.post('/api/payments/webhook-event', async (req, res) => {
           return res.json({ received: true, skipped: true });
         }
 
+        // Extract Dodo customer ID for customer portal access
+        const dodoCustomerId = sub.customer?.customer_id ?? sub.customer_id ?? null;
+
         // Create or update the subscription in our DB
         const existing = await SubscriptionRepository.findByDodoSubscriptionId(sub.id);
         const status = mapDodoStatus(sub.status);
@@ -218,6 +222,7 @@ router.post('/api/payments/webhook-event', async (req, res) => {
             status,
             current_period_start: sub.previous_billing_date ? new Date(sub.previous_billing_date) : undefined,
             current_period_end: sub.next_billing_date ? new Date(sub.next_billing_date) : undefined,
+            dodo_customer_id: dodoCustomerId,
           });
         } else {
           await SubscriptionRepository.create({
@@ -227,6 +232,7 @@ router.post('/api/payments/webhook-event', async (req, res) => {
             current_period_start: sub.previous_billing_date ? new Date(sub.previous_billing_date) : undefined,
             current_period_end: sub.next_billing_date ? new Date(sub.next_billing_date) : undefined,
             dodo_subscription_id: sub.id,
+            dodo_customer_id: dodoCustomerId,
           });
         }
 

@@ -51,7 +51,58 @@ export class CreditRepository {
   }
 
   /**
+   * Atomic check-and-deduct with row-level locking.
+   * Prevents concurrent requests from over-drafting credits.
+   * Uses SELECT ... FOR UPDATE within a transaction.
+   */
+  static async checkAndDeductAtomic(
+    userId: string,
+    cost: number,
+    description: string = 'Generation usage',
+    metadata: Record<string, any> = {}
+  ): Promise<{ success: boolean; remaining?: number; reason?: string }> {
+    if (cost <= 0) return { success: false, reason: 'invalid_amount' };
+
+    return await transaction(async (client) => {
+      // Row-level lock — prevents concurrent deductions from other requests
+      const lockResult = await client.query(
+        'SELECT balance FROM user_credits WHERE user_id = $1 FOR UPDATE',
+        [userId]
+      );
+
+      const currentBalance = lockResult.rows[0]?.balance ?? 0;
+
+      if (currentBalance < cost) {
+        return { success: false, reason: 'insufficient', remaining: currentBalance };
+      }
+
+      // Atomic deduct
+      const updateResult = await client.query(
+        `UPDATE user_credits
+         SET balance = balance - $2, updated_at = CURRENT_TIMESTAMP
+         WHERE user_id = $1 AND balance >= $2
+         RETURNING balance`,
+        [userId, cost]
+      );
+
+      if (updateResult.rows.length === 0) {
+        return { success: false, reason: 'race_lost', remaining: currentBalance };
+      }
+
+      // Log the transaction in the same transaction
+      await client.query(
+        `INSERT INTO credit_transactions (user_id, type, amount, balance_after, description, metadata)
+         VALUES ($1, 'usage', $2, $3, $4, $5)`,
+        [userId, -cost, updateResult.rows[0].balance, description, JSON.stringify(metadata)]
+      );
+
+      return { success: true, remaining: updateResult.rows[0].balance };
+    });
+  }
+
+  /**
    * Deduct credits atomically. Returns false if insufficient balance.
+   * Uses a transaction to ensure balance update and audit log are atomic.
    */
   static async deductCredits(
     userId: string,

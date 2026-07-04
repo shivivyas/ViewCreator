@@ -26,11 +26,12 @@ export async function getBalance(token: string): Promise<UserPaymentStatus> {
  */
 export async function createCheckoutSession(
   planId: string,
-  token: string
+  token: string,
+  successUrl?: string
 ): Promise<{ checkout_url: string }> {
   return request<{ checkout_url: string }>('/api/payments/create-checkout', {
     method: 'POST',
-    body: { plan_id: planId },
+    body: { plan_id: planId, success_url: successUrl },
     token,
   });
 }

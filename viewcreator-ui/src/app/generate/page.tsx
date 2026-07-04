@@ -12,6 +12,7 @@ import {
 import type { Template, GenerationHistoryItem, GenerateParams, GenerateVideoParams, MediaType } from '@/types';
 import { getTemplates, generateImages as apiGenerateImages, generateVideo as apiGenerateVideo } from '@/services';
 import { Wand2, Video, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { getBalance } from '@/services/api/payment-service';
 
 import { GenerateForm } from '@/components/generate/generate-form';
 import { HistoryPanel } from '@/components/generate/history-panel';
@@ -63,6 +64,33 @@ function GenerateImagePageContent() {
     }, 0);
     return () => clearTimeout(timer);
   }, []);
+
+  // Check for post-purchase redirect (checkout=success param)
+  useEffect(() => {
+    const checkout = searchParams.get('checkout');
+    const planName = searchParams.get('plan');
+
+    if (checkout === 'success') {
+      // Remove query params from URL without page reload
+      const url = new URL(window.location.href);
+      url.searchParams.delete('checkout');
+      url.searchParams.delete('plan');
+      url.searchParams.delete('status');
+      url.searchParams.delete('subscription_id');
+      url.searchParams.delete('email');
+      window.history.replaceState({}, '', url.toString());
+
+      // Show success toast
+      if (planName) {
+        toast.success(`Welcome to ${planName}! Your subscription is active.`);
+      } else {
+        toast.success('Purchase successful! Credits have been added to your account.');
+      }
+
+      // Refresh balance in header by dispatching a custom event
+      window.dispatchEvent(new CustomEvent('payment-updated'));
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     const fetchTemplates = async () => {

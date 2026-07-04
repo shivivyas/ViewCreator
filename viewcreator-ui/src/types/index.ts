@@ -119,6 +119,7 @@ export interface UserSubscription {
   current_period_start: string;
   current_period_end: string;
   canceled_at: string | null;
+  dodo_customer_id?: string | null;
 }
 
 export interface UserPaymentStatus {

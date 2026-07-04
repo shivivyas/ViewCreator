@@ -131,6 +131,7 @@ CREATE TABLE IF NOT EXISTS user_subscriptions (
     current_period_end TIMESTAMP WITH TIME ZONE,
     canceled_at TIMESTAMP WITH TIME ZONE,
     dodo_subscription_id VARCHAR(255),     -- Dodo Payments subscription ID
+    dodo_customer_id VARCHAR(255),          -- Dodo Payments customer ID (for portal access)
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
 );

@@ -9,6 +9,7 @@ export interface UserSubscription {
   current_period_end: Date | null;
   canceled_at: Date | null;
   dodo_subscription_id: string | null;
+  dodo_customer_id: string | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -49,10 +50,11 @@ export class SubscriptionRepository {
     current_period_start?: Date;
     current_period_end?: Date;
     dodo_subscription_id?: string;
+    dodo_customer_id?: string;
   }): Promise<UserSubscription> {
     const result = await query<UserSubscription>(
-      `INSERT INTO user_subscriptions (user_id, plan_id, status, current_period_start, current_period_end, dodo_subscription_id)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO user_subscriptions (user_id, plan_id, status, current_period_start, current_period_end, dodo_subscription_id, dodo_customer_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
       [
         data.user_id,
@@ -61,6 +63,7 @@ export class SubscriptionRepository {
         data.current_period_start ?? null,
         data.current_period_end ?? null,
         data.dodo_subscription_id ?? null,
+        data.dodo_customer_id ?? null,
       ]
     );
     return result.rows[0];
@@ -77,6 +80,7 @@ export class SubscriptionRepository {
       current_period_end?: Date;
       canceled_at?: Date | null;
       plan_id?: string;
+      dodo_customer_id?: string;
     }
   ): Promise<UserSubscription | null> {
     const fields: string[] = [];
@@ -102,6 +106,10 @@ export class SubscriptionRepository {
     if (updates.plan_id !== undefined) {
       fields.push(`plan_id = $${paramIndex++}`);
       values.push(updates.plan_id);
+    }
+    if (updates.dodo_customer_id !== undefined) {
+      fields.push(`dodo_customer_id = $${paramIndex++}`);
+      values.push(updates.dodo_customer_id);
     }
 
     if (fields.length === 0) return null;

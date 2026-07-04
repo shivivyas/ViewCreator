@@ -282,7 +282,10 @@ export default function PricingPage() {
         const token = await getToken();
         if (!token) throw new Error("Not authenticated");
 
-        const data = await createCheckoutSession(plan.id, token);
+        const planName = encodeURIComponent(plan.name);
+        const successUrl = `${window.location.origin}/generate?checkout=success&plan=${planName}`;
+
+        const data = await createCheckoutSession(plan.id, token, successUrl);
         window.location.href = data.checkout_url;
       } catch (err: any) {
         toast.error(err.message || "Checkout failed. Please try again.");

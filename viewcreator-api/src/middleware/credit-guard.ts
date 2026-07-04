@@ -20,7 +20,7 @@ export const CREDIT_COSTS = {
  * - Credit users must have sufficient balance.
  *
  * Returns the result WITHOUT deducting — deduction happens AFTER
- * a successful generation.
+ * a successful generation using the atomic checkAndDeductAtomic.
  */
 export async function checkCredits(
   userId: string,
@@ -32,7 +32,7 @@ export async function checkCredits(
     return { allowed: true, reason: 'subscription' };
   }
 
-  // 2. Check credit balance
+  // 2. Check credit balance (read-only, no lock)
   const credits = await CreditRepository.findByUserId(userId);
   const balance = credits?.balance ?? 0;
 
@@ -53,20 +53,22 @@ export async function checkCredits(
 }
 
 /**
- * Deduct credits after a successful generation.
- * Only deducts for credit-based users (subscription users skip deduction).
+ * Deduct credits after a successful generation using atomic row-level locking.
+ * This prevents concurrent requests from over-drafting credits.
+ * Subscription users skip deduction entirely.
  */
 export async function deductForGeneration(
   userId: string,
   cost: number,
   description: string,
   metadata: Record<string, any> = {}
-): Promise<void> {
+): Promise<{ success: boolean; remaining?: number; reason?: string }> {
   // Check subscription again to avoid deducting from subscribers
   const subscription = await SubscriptionRepository.findActiveByUserId(userId);
   if (subscription && subscription.status === 'active') {
-    return; // Subscription users don't pay per-generation
+    return { success: true }; // Subscription users don't pay per-generation
   }
 
-  await CreditRepository.deductCredits(userId, cost, description, metadata);
+  // Use atomic check-and-deduct with row-level locking
+  return await CreditRepository.checkAndDeductAtomic(userId, cost, description, metadata);
 }

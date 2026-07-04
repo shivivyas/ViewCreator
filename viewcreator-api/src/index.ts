@@ -9,7 +9,9 @@ import { TemplateRepository, UserRepository, VoteRepository } from 'viewcreator-
 import { clerkMiddleware, requireAuth, clerkClient, getAuth } from '@clerk/express';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import paymentRoutes from './routes/payments.js';
+import adminRoutes from './routes/admin.js';
 import { checkCredits, deductForGeneration, CREDIT_COSTS } from './middleware/credit-guard.js';
+import { generationRateLimiter, videoGenerationRateLimiter } from './middleware/rate-limiter.js';
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -259,7 +261,7 @@ app.post('/api/templates/upload', requireAuth(), syncUserMiddleware, async (req:
 });
 
 // Image Generation Endpoint
-app.post('/api/generate', requireAuth(), syncUserMiddleware, async (req: express.Request, res: express.Response): Promise<any> => {
+app.post('/api/generate', generationRateLimiter, requireAuth(), syncUserMiddleware, async (req: express.Request, res: express.Response): Promise<any> => {
   try {
     const { 
       prompt, 
@@ -443,7 +445,7 @@ app.post('/api/generate', requireAuth(), syncUserMiddleware, async (req: express
 });
 
 // Video Generation Endpoint
-app.post('/api/generate/video', requireAuth(), syncUserMiddleware, async (req: express.Request, res: express.Response): Promise<any> => {
+app.post('/api/generate/video', videoGenerationRateLimiter, requireAuth(), syncUserMiddleware, async (req: express.Request, res: express.Response): Promise<any> => {
   try {
     const {
       prompt,
@@ -577,6 +579,9 @@ app.post('/api/generate/video', requireAuth(), syncUserMiddleware, async (req: e
 
 // Payment Routes
 app.use(paymentRoutes);
+
+// Admin Routes (protected by x-admin-key header)
+app.use(adminRoutes);
 
 // Start Server
 app.listen(port, () => {

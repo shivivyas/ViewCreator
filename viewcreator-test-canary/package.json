@@ -1,0 +1,14 @@
+{
+  "name": "viewcreator-test-canary",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Independent E2E test canary + dashboard for ViewCreator payment system. Plugs into a running ViewCreator instance — no coupling to app internals.",
+  "scripts": {
+    "test": "playwright test",
+    "dashboard": "node dashboard/serve.mjs",
+    "canary": "playwright test && node dashboard/serve.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1"
+  }
+}

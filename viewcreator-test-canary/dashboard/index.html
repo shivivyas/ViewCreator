@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ViewCreator — Test Canary Dashboard</title>
+<style>
+  :root {
+    --bg: #0a0a0b;
+    --surface: #141416;
+    --surface2: #1c1c1f;
+    --border: #2a2a2e;
+    --text: #e4e4e7;
+    --text2: #a1a1aa;
+    --text3: #71717a;
+    --green: #22c55e;
+    --green-bg: #052e16;
+    --red: #ef4444;
+    --red-bg: #3b0a0a;
+    --amber: #f59e0b;
+    --amber-bg: #2d1a04;
+    --blue: #3b82f6;
+    --blue-bg: #0a1e3b;
+    --purple: #8b5cf6;
+    --purple-bg: #1a0f2e;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+  .container { max-width: 1200px; margin: 0 auto; padding: 32px 24px; }
+
+  /* Header */
+  .header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 32px; flex-wrap: wrap; gap: 16px;
+  }
+  .header-left { display: flex; align-items: center; gap: 12px; }
+  .logo {
+    width: 36px; height: 36px; background: var(--purple);
+    border-radius: 10px; display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 18px; color: white;
+  }
+  .title { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; }
+  .subtitle { color: var(--text2); font-size: 14px; margin-top: 2px; }
+  .timestamp { color: var(--text3); font-size: 13px; }
+
+  /* Summary Cards */
+  .summary-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px; margin-bottom: 32px;
+  }
+  .summary-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px 24px;
+    display: flex; flex-direction: column; gap: 4px;
+    transition: border-color 0.2s;
+  }
+  .summary-card:hover { border-color: var(--text3); }
+  .card-label { font-size: 13px; color: var(--text2); font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
+  .card-value { font-size: 36px; font-weight: 800; letter-spacing: -0.03em; }
+  .card-total .card-value { color: var(--text); }
+  .card-passed .card-value { color: var(--green); }
+  .card-failed .card-value { color: var(--red); }
+  .card-skipped .card-value { color: var(--amber); }
+
+  /* Progress Bar */
+  .progress-bar {
+    height: 6px; background: var(--surface2); border-radius: 3px;
+    margin-bottom: 32px; overflow: hidden; display: flex;
+  }
+  .progress-pass { background: var(--green); transition: width 0.4s ease; }
+  .progress-fail { background: var(--red); transition: width 0.4s ease; }
+  .progress-skip { background: var(--amber); transition: width 0.4s ease; }
+
+  /* Filters */
+  .filters { display: flex; gap: 8px; margin-bottom: 24px; }
+  .filter-btn {
+    padding: 6px 16px; border-radius: 999px; font-size: 13px; font-weight: 500;
+    border: 1px solid var(--border); background: var(--surface); color: var(--text2);
+    cursor: pointer; transition: all 0.15s;
+  }
+  .filter-btn:hover { border-color: var(--text3); color: var(--text); }
+  .filter-btn.active { background: var(--purple-bg); border-color: var(--purple); color: var(--purple); }
+
+  /* Suite */
+  .suite {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); margin-bottom: 16px; overflow: hidden;
+  }
+  .suite-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 20px; cursor: pointer; user-select: none;
+    transition: background 0.15s;
+  }
+  .suite-header:hover { background: var(--surface2); }
+  .suite-name { font-weight: 600; font-size: 15px; display: flex; align-items: center; gap: 10px; }
+  .suite-stats { display: flex; gap: 12px; font-size: 13px; color: var(--text2); }
+  .suite-stats span { display: flex; align-items: center; gap: 4px; }
+  .suite-chevron { transition: transform 0.2s; color: var(--text3); }
+  .suite.open .suite-chevron { transform: rotate(180deg); }
+
+  /* Test Cases */
+  .test-list { display: none; }
+  .suite.open .test-list { display: block; }
+  .test-case {
+    display: flex; align-items: flex-start; gap: 14px;
+    padding: 14px 20px; border-top: 1px solid var(--border);
+    transition: background 0.1s;
+  }
+  .test-case:hover { background: var(--surface2); }
+  .test-case.hidden { display: none; }
+  .test-icon {
+    width: 22px; height: 22px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; margin-top: 1px;
+  }
+  .test-icon.pass { background: var(--green-bg); color: var(--green); }
+  .test-icon.fail { background: var(--red-bg); color: var(--red); }
+  .test-icon.skip { background: var(--amber-bg); color: var(--amber); }
+  .test-body { flex: 1; min-width: 0; }
+  .test-title { font-size: 14px; font-weight: 500; }
+  .test-meta { font-size: 12px; color: var(--text3); margin-top: 2px; }
+  .test-error {
+    margin-top: 10px; padding: 12px 16px; background: var(--red-bg);
+    border-radius: var(--radius-sm); font-size: 13px; font-family: 'SF Mono', 'Fira Code', monospace;
+    color: #fca5a5; overflow-x: auto; white-space: pre-wrap; word-break: break-all;
+    max-height: 200px; overflow-y: auto; line-height: 1.6;
+  }
+
+  /* Attachments */
+  .attachments { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .attach-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 12px; border-radius: var(--radius-sm); font-size: 12px; font-weight: 500;
+    border: 1px solid var(--border); background: var(--surface2); color: var(--text2);
+    cursor: pointer; transition: all 0.15s; text-decoration: none;
+  }
+  .attach-btn:hover { border-color: var(--purple); color: var(--purple); }
+  .attach-btn.screenshot { color: var(--blue); border-color: #1e3a5f; }
+  .attach-btn.screenshot:hover { background: var(--blue-bg); }
+  .attach-btn.video { color: var(--purple); border-color: #2a1a4f; }
+  .attach-btn.video:hover { background: var(--purple-bg); }
+  .attach-btn.trace { color: var(--amber); border-color: #3d2808; }
+  .attach-btn.trace:hover { background: var(--amber-bg); }
+
+  /* Lightbox */
+  .lightbox {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.92);
+    z-index: 1000; align-items: center; justify-content: center;
+    flex-direction: column; gap: 16px;
+  }
+  .lightbox.open { display: flex; }
+  .lightbox img, .lightbox video {
+    max-width: 90vw; max-height: 80vh; border-radius: var(--radius);
+    box-shadow: 0 25px 80px rgba(0,0,0,0.5);
+  }
+  .lightbox-close {
+    position: absolute; top: 24px; right: 24px;
+    width: 40px; height: 40px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.2);
+    background: rgba(255,255,255,0.06); color: white; font-size: 20px;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s;
+  }
+  .lightbox-close:hover { background: rgba(255,255,255,0.15); }
+  .lightbox-caption {
+    color: var(--text2); font-size: 13px; max-width: 600px; text-align: center;
+  }
+
+  /* Empty State */
+  .empty-state {
+    text-align: center; padding: 80px 24px;
+  }
+  .empty-state h3 { font-size: 18px; margin-bottom: 8px; }
+  .empty-state p { color: var(--text2); max-width: 400px; margin: 0 auto 24px; }
+  .empty-state code {
+    background: var(--surface2); padding: 12px 20px; border-radius: var(--radius-sm);
+    font-size: 14px; display: inline-block; border: 1px solid var(--border);
+  }
+
+  /* Loading */
+  .loading {
+    display: flex; align-items: center; justify-content: center;
+    padding: 80px 24px; flex-direction: column; gap: 16px;
+  }
+  .spinner {
+    width: 36px; height: 36px; border: 3px solid var(--border);
+    border-top-color: var(--purple); border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  @media (max-width: 640px) {
+    .container { padding: 20px 16px; }
+    .title { font-size: 20px; }
+    .card-value { font-size: 28px; }
+    .summary-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div class="header-left">
+      <div class="logo">VC</div>
+      <div>
+        <h1 class="title">Test Canary Dashboard</h1>
+        <p class="subtitle">ViewCreator Payment System — E2E Verification</p>
+      </div>
+    </div>
+    <div class="timestamp" id="timestamp"></div>
+  </div>
+
+  <div class="summary-grid" id="summary"></div>
+  <div class="progress-bar" id="progress"></div>
+
+  <div class="filters">
+    <button class="filter-btn active" data-filter="all">All Tests</button>
+    <button class="filter-btn" data-filter="passed">✅ Passed</button>
+    <button class="filter-btn" data-filter="failed">❌ Failed</button>
+    <button class="filter-btn" data-filter="skipped">⏭️ Skipped</button>
+  </div>
+
+  <div id="suites"></div>
+
+  <div class="empty-state" id="empty" style="display:none">
+    <h3>No test results found</h3>
+    <p>Run the test canary first to generate a report:</p>
+    <code>cd viewcreator-test-canary && npm test</code>
+  </div>
+
+  <div class="loading" id="loading">
+    <div class="spinner"></div>
+    <span style="color:var(--text2)">Loading test results…</span>
+  </div>
+</div>
+
+<div class="lightbox" id="lightbox">
+  <button class="lightbox-close" onclick="closeLightbox()">✕</button>
+  <div id="lightbox-content"></div>
+  <div class="lightbox-caption" id="lightbox-caption"></div>
+</div>
+
+<script>
+let currentFilter = 'all';
+let reportData = null;
+
+async function loadReport() {
+  try {
+    const resp = await fetch('../test-results/report.json');
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    reportData = await resp.json();
+    render();
+  } catch (err) {
+    console.error('Failed to load report:', err);
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('empty').style.display = 'block';
+  }
+}
+
+function render() {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('timestamp').textContent = new Date().toLocaleString();
+
+  const { suites, stats } = processReport(reportData);
+  if (stats.total === 0) {
+    document.getElementById('empty').style.display = 'block';
+    return;
+  }
+
+  renderSummary(stats);
+  renderProgress(stats);
+  renderSuites(suites);
+  setupFilters();
+}
+
+function processReport(report) {
+  const suites = [];
+  let total = 0, passed = 0, failed = 0, skipped = 0;
+
+  function walkSuites(parentSuite, parentName) {
+    const childSuites = parentSuite.suites || [];
+    if (childSuites.length === 0) {
+      const suiteData = {
+        name: parentSuite.title || parentName || 'Unnamed Suite',
+        file: parentSuite.file || '',
+        tests: [],
+        passed: 0, failed: 0, skipped: 0
+      };
+      processSpecs(parentSuite.specs || [], suiteData);
+      if (suiteData.tests.length > 0) suites.push(suiteData);
+    } else {
+      for (const child of childSuites) walkSuites(child, child.title);
+    }
+  }
+
+  function processSpecs(specs, suiteData) {
+    for (const spec of specs) {
+      for (const test of (spec.tests || [])) {
+        const results = test.results || [];
+        const lastResult = results[results.length - 1] || {};
+        const status = lastResult.status || test.expectedStatus || 'skipped';
+        const duration = lastResult.duration || 0;
+        const error = lastResult.error;
+        const attachments = (lastResult.attachments || [])
+          .filter(a => a.path)
+          .map(a => ({ name: a.name || '', path: a.path || '', contentType: a.contentType || '' }));
+
+        const testCase = {
+          title: test.title,
+          status,
+          duration,
+          error: error ? (error.message || error.stack || String(error)) : null,
+          attachments,
+          retry: results.length - 1
+        };
+
+        suiteData.tests.push(testCase);
+        total++;
+        if (status === 'passed' || status === 'expected') { passed++; suiteData.passed++; }
+        else if (status === 'failed' || status === 'unexpected') { failed++; suiteData.failed++; }
+        else { skipped++; suiteData.skipped++; }
+      }
+    }
+  }
+
+  for (const topSuite of (report.suites || [])) walkSuites(topSuite, topSuite.title);
+
+  if (suites.length === 0) {
+    for (const topSuite of (report.suites || [])) {
+      const suiteData = { name: topSuite.title || 'Unnamed', file: topSuite.file || '', tests: [], passed: 0, failed: 0, skipped: 0 };
+      processSpecs(topSuite.specs || [], suiteData);
+      if (suiteData.tests.length > 0) suites.push(suiteData);
+    }
+  }
+
+  return { suites, stats: { total, passed, failed, skipped } };
+}
+
+function renderSummary(stats) {
+  document.getElementById('summary').innerHTML = `
+    <div class="summary-card card-total"><span class="card-label">Total</span><span class="card-value">${stats.total}</span></div>
+    <div class="summary-card card-passed"><span class="card-label">Passed</span><span class="card-value">${stats.passed}</span></div>
+    <div class="summary-card card-failed"><span class="card-label">Failed</span><span class="card-value">${stats.failed}</span></div>
+    <div class="summary-card card-skipped"><span class="card-label">Skipped</span><span class="card-value">${stats.skipped}</span></div>`;
+}
+
+function renderProgress(stats) {
+  const pct = (n) => stats.total ? (n / stats.total * 100) : 0;
+  document.getElementById('progress').innerHTML = `
+    <div class="progress-pass" style="width:${pct(stats.passed)}%"></div>
+    <div class="progress-fail" style="width:${pct(stats.failed)}%"></div>
+    <div class="progress-skip" style="width:${pct(stats.skipped)}%"></div>`;
+}
+
+function renderSuites(suites) {
+  document.getElementById('suites').innerHTML = suites.map((suite, i) => `
+    <div class="suite open" data-suite="${i}">
+      <div class="suite-header" onclick="toggleSuite(${i})">
+        <div class="suite-name"><span>${esc(suite.name)}</span></div>
+        <div class="suite-stats">
+          ${suite.passed > 0 ? `<span style="color:var(--green)">✓ ${suite.passed}</span>` : ''}
+          ${suite.failed > 0 ? `<span style="color:var(--red)">✗ ${suite.failed}</span>` : ''}
+          <span class="suite-chevron">▾</span>
+        </div>
+      </div>
+      <div class="test-list">${suite.tests.map((t, j) => renderTestCase(t, i, j)).join('')}</div>
+    </div>`).join('');
+}
+
+function renderTestCase(test, suiteIdx, testIdx) {
+  const statusIcon = test.status === 'passed' || test.status === 'expected' ? '✓'
+    : test.status === 'failed' || test.status === 'unexpected' ? '✗' : '—';
+  const statusClass = test.status === 'passed' || test.status === 'expected' ? 'pass'
+    : test.status === 'failed' || test.status === 'unexpected' ? 'fail' : 'skip';
+  const duration = test.duration > 1000 ? `${(test.duration / 1000).toFixed(1)}s` : `${test.duration}ms`;
+  const atts = renderAttachments(test.attachments, test.title);
+  const errBlock = test.error ? `<div class="test-error">${esc(test.error)}</div>` : '';
+
+  return `<div class="test-case" data-status="${statusClass}" data-suite="${suiteIdx}" data-test="${testIdx}">
+    <div class="test-icon ${statusClass}">${statusIcon}</div>
+    <div class="test-body">
+      <div class="test-title">${esc(test.title)}</div>
+      <div class="test-meta">${duration}${test.retry > 0 ? ` · retried ${test.retry}x` : ''}</div>
+      ${errBlock}${atts}
+    </div></div>`;
+}
+
+function renderAttachments(attachments, testTitle) {
+  if (!attachments.length) return '';
+
+  const screenshots = attachments.filter(a => a.contentType.startsWith('image/') || a.name === 'screenshot');
+  const videos = attachments.filter(a => a.contentType.startsWith('video/') || a.name === 'video');
+  const traces = attachments.filter(a => a.name === 'trace' || a.path.endsWith('.zip'));
+
+  let html = '<div class="attachments">';
+
+  if (screenshots.length) {
+    html += screenshots.map((s, i) => {
+      const url = getAssetUrl(s.path);
+      return `<button class="attach-btn screenshot" onclick="openLightbox('img','${attr(url)}','${attr(testTitle)} — screenshot ${i+1}')" title="${attr(s.name)}">📸 Screenshot</button>`;
+    }).join('');
+  }
+
+  if (videos.length) {
+    html += videos.map((v, i) => {
+      const url = getAssetUrl(v.path);
+      return `<button class="attach-btn video" onclick="openLightbox('video','${attr(url)}','${attr(testTitle)} — recording ${i+1}')" title="${attr(v.name)}">🎬 Video</button>`;
+    }).join('');
+  }
+
+  if (traces.length && screenshots.length === 0 && videos.length === 0) {
+    html += traces.map(() => `<span class="attach-btn trace">🔍 Trace available</span>`).join('');
+  }
+
+  html += '</div>';
+  return html;
+}
+
+function getAssetUrl(absPath) {
+  if (!absPath) return '';
+  const idx = absPath.indexOf('viewcreator-test-canary/');
+  if (idx !== -1) return '/' + absPath.substring(idx + 'viewcreator-test-canary/'.length);
+  const trIdx = absPath.indexOf('test-results/');
+  if (trIdx !== -1) return '/' + absPath.substring(trIdx);
+  return absPath;
+}
+
+// ── Lightbox ───────────────────────────────────────────────────────────────
+function openLightbox(type, path, caption) {
+  const lb = document.getElementById('lightbox');
+  const content = document.getElementById('lightbox-content');
+  content.innerHTML = '';
+
+  if (type === 'img') {
+    const img = document.createElement('img');
+    img.src = path;
+    img.alt = caption;
+    img.onerror = () => { content.innerHTML = '<p style="color:var(--red)">Failed to load image</p>'; };
+    content.appendChild(img);
+  } else if (type === 'video') {
+    const video = document.createElement('video');
+    video.src = path;
+    video.controls = true;
+    video.autoplay = true;
+    video.onerror = () => {
+      content.innerHTML = `<div style="text-align:center;padding:40px">
+        <p style="color:var(--amber);font-size:15px;margin-bottom:12px">⚠️ Video playback not supported in this browser</p>
+        <a href="${path}" download style="display:inline-block;padding:10px 24px;background:var(--purple);color:white;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px">📥 Download Video</a>
+      </div>`;
+    };
+    content.appendChild(video);
+  }
+
+  document.getElementById('lightbox-caption').textContent = caption;
+  lb.classList.add('open');
+}
+
+function closeLightbox() {
+  document.getElementById('lightbox').classList.remove('open');
+  setTimeout(() => { document.getElementById('lightbox-content').innerHTML = ''; }, 200);
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeLightbox(); });
+document.getElementById('lightbox').addEventListener('click', function(e) { if (e.target === this) closeLightbox(); });
+
+function toggleSuite(i) { document.querySelector(`.suite[data-suite="${i}"]`)?.classList.toggle('open'); }
+
+function setupFilters() {
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentFilter = btn.dataset.filter;
+      applyFilter();
+    });
+  });
+}
+
+function applyFilter() {
+  document.querySelectorAll('.test-case').forEach(tc => {
+    if (currentFilter === 'all') tc.classList.remove('hidden');
+    else if (currentFilter === 'passed') tc.classList.toggle('hidden', !tc.classList.contains('pass'));
+    else if (currentFilter === 'failed') tc.classList.toggle('hidden', !tc.classList.contains('fail'));
+    else if (currentFilter === 'skipped') tc.classList.toggle('hidden', !tc.classList.contains('skip'));
+  });
+}
+
+function esc(str) { const d = document.createElement('div'); d.textContent = str; return d.innerHTML; }
+function attr(str) { if (!str) return ''; return str.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+loadReport();
+</script>
+</body>
+</html>

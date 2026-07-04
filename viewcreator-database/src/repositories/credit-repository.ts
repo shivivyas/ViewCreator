@@ -1,0 +1,128 @@
+import { query, transaction } from '../db.js';
+
+export interface UserCredits {
+  id: string;
+  user_id: string;
+  balance: number;
+  lifetime_credits: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface CreditTransaction {
+  id: string;
+  user_id: string;
+  type: 'purchase' | 'usage' | 'refund' | 'expiration' | 'grant';
+  amount: number;
+  balance_after: number;
+  description: string | null;
+  dodo_payment_id: string | null;
+  dodo_subscription_id: string | null;
+  metadata: Record<string, any>;
+  created_at: Date;
+}
+
+export class CreditRepository {
+  /**
+   * Get a user's current credit balance
+   */
+  static async findByUserId(userId: string): Promise<UserCredits | null> {
+    const result = await query<UserCredits>(
+      'SELECT * FROM user_credits WHERE user_id = $1',
+      [userId]
+    );
+    return result.rows[0] || null;
+  }
+
+  /**
+   * Ensure a user_credits row exists (auto-create if missing)
+   */
+  static async ensureUser(userId: string): Promise<UserCredits> {
+    const existing = await this.findByUserId(userId);
+    if (existing) return existing;
+
+    const result = await query<UserCredits>(
+      `INSERT INTO user_credits (user_id, balance, lifetime_credits)
+       VALUES ($1, 0, 0)
+       RETURNING *`,
+      [userId]
+    );
+    return result.rows[0];
+  }
+
+  /**
+   * Deduct credits atomically. Returns false if insufficient balance.
+   */
+  static async deductCredits(
+    userId: string,
+    amount: number,
+    description: string = 'Generation usage',
+    metadata: Record<string, any> = {}
+  ): Promise<boolean> {
+    if (amount <= 0) return false;
+
+    // Uses a single atomic UPDATE with a CHECK to prevent going negative
+    const updateResult = await query<UserCredits>(
+      `UPDATE user_credits
+       SET balance = balance - $2, updated_at = CURRENT_TIMESTAMP
+       WHERE user_id = $1 AND balance >= $2
+       RETURNING *`,
+      [userId, amount]
+    );
+
+    if (updateResult.rows.length === 0) return false;
+
+    // Log the transaction
+    await query(
+      `INSERT INTO credit_transactions (user_id, type, amount, balance_after, description, metadata)
+       VALUES ($1, 'usage', $2, $3, $4, $5)`,
+      [userId, -amount, updateResult.rows[0].balance, description, JSON.stringify(metadata)]
+    );
+
+    return true;
+  }
+
+  /**
+   * Add credits to a user's balance (for purchases, grants, refunds)
+   */
+  static async addCredits(
+    userId: string,
+    amount: number,
+    type: CreditTransaction['type'],
+    description: string,
+    metadata: Record<string, any> = {}
+  ): Promise<UserCredits> {
+    if (amount <= 0) throw new Error('Amount must be positive');
+
+    const userCredits = await this.ensureUser(userId);
+
+    return await transaction(async (client) => {
+      const updateResult = await client.query(
+        `UPDATE user_credits
+         SET balance = balance + $2, lifetime_credits = lifetime_credits + $2, updated_at = CURRENT_TIMESTAMP
+         WHERE user_id = $1
+         RETURNING *`,
+        [userId, amount]
+      );
+
+      await client.query(
+        `INSERT INTO credit_transactions (user_id, type, amount, balance_after, description, metadata)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [userId, type, amount, updateResult.rows[0].balance, description, JSON.stringify(metadata)]
+      );
+
+      return updateResult.rows[0];
+    });
+  }
+
+  /**
+   * Get recent credit transactions for a user
+   */
+  static async getTransactions(userId: string, limit: number = 20): Promise<CreditTransaction[]> {
+    const result = await query<CreditTransaction>(
+      'SELECT * FROM credit_transactions WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2',
+      [userId, limit]
+    );
+    return result.rows;
+  }
+}

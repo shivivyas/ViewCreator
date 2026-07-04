@@ -8,6 +8,7 @@ import { GoogleGenAI } from "@google/genai";
 import { TemplateRepository, UserRepository, VoteRepository } from 'viewcreator-database';
 import { clerkMiddleware, requireAuth, clerkClient, getAuth } from '@clerk/express';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import paymentRoutes from './routes/payments.js';
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -528,6 +529,9 @@ app.post('/api/generate/video', requireAuth(), syncUserMiddleware, async (req: e
     return res.status(500).json({ error: error.message || 'Internal Server Error' });
   }
 });
+
+// Payment Routes
+app.use(paymentRoutes);
 
 // Start Server
 app.listen(port, () => {

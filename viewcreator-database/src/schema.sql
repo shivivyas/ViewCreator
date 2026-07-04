@@ -71,3 +71,88 @@ CREATE TABLE IF NOT EXISTS template_upvotes (
 
 CREATE INDEX IF NOT EXISTS idx_template_upvotes_template_id ON template_upvotes(template_id);
 CREATE INDEX IF NOT EXISTS idx_template_upvotes_user_id ON template_upvotes(user_id);
+
+-- ── Payment & Subscription Tables ─────────────────────────────────────────────────────
+
+-- Subscription Plans: Defines available plans (credit packs and subscriptions)
+-- These are seeded from Dodo Payments product catalog
+CREATE TABLE IF NOT EXISTS subscription_plans (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(255) NOT NULL,
+    type VARCHAR(20) NOT NULL CHECK (type IN ('credits', 'subscription')),
+    credits INT NOT NULL DEFAULT 0,       -- Credits granted (for credit packs) or 0 for unlimited subscriptions
+    price_cents INT NOT NULL,             -- Price in cents (e.g., 900 = $9.00)
+    currency VARCHAR(3) DEFAULT 'USD',
+    interval VARCHAR(10) CHECK (interval IN ('month', 'year', NULL)), -- NULL for credit packs
+    features JSONB DEFAULT '[]'::jsonb,   -- Feature list for UI display
+    is_active BOOLEAN DEFAULT true,
+    sort_order INT DEFAULT 0,
+    dodo_product_id VARCHAR(255),         -- Dodo Payments product ID
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_subscription_plans_active ON subscription_plans(is_active, sort_order);
+
+-- User Credits: Current credit balance (cached from Dodo Payments)
+CREATE TABLE IF NOT EXISTS user_credits (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    balance INT NOT NULL DEFAULT 0,             -- Current available credits
+    lifetime_credits INT NOT NULL DEFAULT 0,    -- Total credits ever purchased (for tracking)
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    UNIQUE (user_id)
+);
+
+-- Credit Transactions: Audit log of all credit changes
+CREATE TABLE IF NOT EXISTS credit_transactions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    type VARCHAR(20) NOT NULL CHECK (type IN ('purchase', 'usage', 'refund', 'expiration', 'grant')),
+    amount INT NOT NULL,                   -- Positive = credits added, Negative = credits deducted
+    balance_after INT NOT NULL,
+    description TEXT,
+    dodo_payment_id VARCHAR(255),          -- Reference to Dodo payment/event
+    dodo_subscription_id VARCHAR(255),     -- Reference to Dodo subscription
+    metadata JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_credit_transactions_user ON credit_transactions(user_id, created_at DESC);
+
+-- User Subscriptions: Active subscription tracking (synced from Dodo webhooks)
+CREATE TABLE IF NOT EXISTS user_subscriptions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    plan_id UUID NOT NULL REFERENCES subscription_plans(id),
+    status VARCHAR(20) NOT NULL CHECK (status IN ('active', 'canceled', 'past_due', 'incomplete', 'trialing', 'expired')),
+    current_period_start TIMESTAMP WITH TIME ZONE,
+    current_period_end TIMESTAMP WITH TIME ZONE,
+    canceled_at TIMESTAMP WITH TIME ZONE,
+    dodo_subscription_id VARCHAR(255),     -- Dodo Payments subscription ID
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_subscriptions_user ON user_subscriptions(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_subscriptions_dodo ON user_subscriptions(dodo_subscription_id);
+
+-- Apply update_timestamp trigger to new tables
+DROP TRIGGER IF EXISTS update_subscription_plans_timestamp ON subscription_plans;
+CREATE TRIGGER update_subscription_plans_timestamp
+    BEFORE UPDATE ON subscription_plans
+    FOR EACH ROW
+    EXECUTE FUNCTION update_timestamp();
+
+DROP TRIGGER IF EXISTS update_user_credits_timestamp ON user_credits;
+CREATE TRIGGER update_user_credits_timestamp
+    BEFORE UPDATE ON user_credits
+    FOR EACH ROW
+    EXECUTE FUNCTION update_timestamp();
+
+DROP TRIGGER IF EXISTS update_user_subscriptions_timestamp ON user_subscriptions;
+CREATE TRIGGER update_user_subscriptions_timestamp
+    BEFORE UPDATE ON user_subscriptions
+    FOR EACH ROW
+    EXECUTE FUNCTION update_timestamp();

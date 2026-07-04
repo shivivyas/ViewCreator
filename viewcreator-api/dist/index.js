@@ -12,6 +12,7 @@ const genai_1 = require("@google/genai");
 const viewcreator_database_1 = require("viewcreator-database");
 const express_2 = require("@clerk/express");
 const client_s3_1 = require("@aws-sdk/client-s3");
+const payments_js_1 = __importDefault(require("./routes/payments.js"));
 const app = (0, express_1.default)();
 const port = process.env.PORT || 3001;
 // Initialize S3 Client
@@ -85,11 +86,15 @@ async function fetchS3ImageAsBase64(url) {
 app.get('/health', (req, res) => {
     res.json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
-// Get All Templates Endpoint (with vote counts)
+// Get All Templates Endpoint (with vote counts, pagination, and caching)
 app.get('/api/templates', (0, express_2.requireAuth)(), syncUserMiddleware, async (req, res) => {
     try {
         const { userId } = (0, express_2.getAuth)(req);
-        const templates = await viewcreator_database_1.VoteRepository.findAllWithVotes(userId || undefined);
+        const limit = Math.min(parseInt(req.query.limit) || 100, 200);
+        const offset = parseInt(req.query.offset) || 0;
+        const templates = await viewcreator_database_1.VoteRepository.findAllWithVotes(userId || undefined, limit, offset);
+        // Cache for 30s on the browser/CDN; stale data can be served while revalidating for up to 60s
+        res.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
         res.json({ templates });
     }
     catch (error) {
@@ -170,7 +175,7 @@ app.post('/api/templates/upload', (0, express_2.requireAuth)(), syncUserMiddlewa
         let s3Key;
         if (isVideo) {
             // Handle video upload
-            const videoMatch = base64Video.match(/^data:(video\/[a-zA-Z+]+);base64,(.+)$/);
+            const videoMatch = base64Video.match(/^data:(video\/[\w.+-]+);base64,(.+)$/);
             if (!videoMatch) {
                 return res.status(400).json({ error: 'Invalid base64 video data format' });
             }
@@ -182,7 +187,7 @@ app.post('/api/templates/upload', (0, express_2.requireAuth)(), syncUserMiddlewa
         }
         else {
             // Handle image upload (existing logic)
-            const match = base64Image.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
+            const match = base64Image.match(/^data:(image\/[\w.+-]+);base64,(.+)$/);
             if (!match) {
                 return res.status(400).json({ error: 'Invalid base64 image data format' });
             }
@@ -453,6 +458,8 @@ app.post('/api/generate/video', (0, express_2.requireAuth)(), syncUserMiddleware
         return res.status(500).json({ error: error.message || 'Internal Server Error' });
     }
 });
+// Payment Routes
+app.use(payments_js_1.default);
 // Start Server
 app.listen(port, () => {
     console.log(`🚀 ViewCreator API is running on http://localhost:${port}`);

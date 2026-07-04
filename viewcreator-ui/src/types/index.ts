@@ -99,7 +99,7 @@ export interface SubscriptionPlan {
   features: string[];
   is_active: boolean;
   sort_order: number;
-  sentra_price_id: string | null;
+  dodo_product_id: string | null;
   /** Computed display price, e.g. "$9" */
   display_price: string;
   /** Per-unit display, e.g. "$0.09/credit" */

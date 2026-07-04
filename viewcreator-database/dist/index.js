@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.VoteRepository = exports.TemplateRepository = exports.UserRepository = exports.closePool = exports.checkConnection = exports.transaction = exports.query = exports.pool = void 0;
+exports.SubscriptionRepository = exports.CreditRepository = exports.PlanRepository = exports.VoteRepository = exports.TemplateRepository = exports.UserRepository = exports.closePool = exports.checkConnection = exports.transaction = exports.query = exports.pool = void 0;
 // Core database connection and helper exports
 var db_js_1 = require("./db.js");
 Object.defineProperty(exports, "pool", { enumerable: true, get: function () { return db_js_1.pool; } });
@@ -17,4 +17,13 @@ Object.defineProperty(exports, "TemplateRepository", { enumerable: true, get: fu
 // Vote repository and types (upvote only)
 var vote_repository_js_1 = require("./repositories/vote-repository.js");
 Object.defineProperty(exports, "VoteRepository", { enumerable: true, get: function () { return vote_repository_js_1.VoteRepository; } });
+// Plan repository
+var plan_repository_js_1 = require("./repositories/plan-repository.js");
+Object.defineProperty(exports, "PlanRepository", { enumerable: true, get: function () { return plan_repository_js_1.PlanRepository; } });
+// Credit repository
+var credit_repository_js_1 = require("./repositories/credit-repository.js");
+Object.defineProperty(exports, "CreditRepository", { enumerable: true, get: function () { return credit_repository_js_1.CreditRepository; } });
+// Subscription repository
+var subscription_repository_js_1 = require("./repositories/subscription-repository.js");
+Object.defineProperty(exports, "SubscriptionRepository", { enumerable: true, get: function () { return subscription_repository_js_1.SubscriptionRepository; } });
 //# sourceMappingURL=index.js.map

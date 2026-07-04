@@ -24,3 +24,22 @@ export {
   TemplateWithVotes,
   VoteRepository,
 } from './repositories/vote-repository.js';
+
+// Plan repository
+export {
+  SubscriptionPlan,
+  PlanRepository,
+} from './repositories/plan-repository.js';
+
+// Credit repository
+export {
+  UserCredits,
+  CreditTransaction,
+  CreditRepository,
+} from './repositories/credit-repository.js';
+
+// Subscription repository
+export {
+  UserSubscription,
+  SubscriptionRepository,
+} from './repositories/subscription-repository.js';

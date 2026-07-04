@@ -1,10 +1,15 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { SignInButton, SignUpButton, UserButton, useUser } from "@clerk/nextjs";
+import { SignInButton, SignUpButton, UserButton, useUser, useAuth } from "@clerk/nextjs";
+import { Crown, Zap, Loader2 } from "lucide-react";
 
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
+import { getBalance } from "@/services/api/payment-service";
+import type { UserPaymentStatus } from "@/types";
+import { cn } from "@/lib/utils";
 
 const navLinks = [
   { href: "/#features", label: "Features" },
@@ -15,6 +20,35 @@ const navLinks = [
 
 export function SiteHeader() {
   const { isSignedIn } = useUser();
+  const { getToken } = useAuth();
+  const [paymentStatus, setPaymentStatus] = useState<UserPaymentStatus | null>(null);
+
+  useEffect(() => {
+    if (!isSignedIn) {
+      setPaymentStatus(null);
+      return;
+    }
+
+    let cancelled = false;
+    const fetchBalance = async () => {
+      try {
+        const token = await getToken();
+        if (!token) return;
+        const status = await getBalance(token);
+        if (!cancelled) setPaymentStatus(status);
+      } catch {
+        // Silently fail — balance is non-critical
+      }
+    };
+
+    fetchBalance();
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchBalance, 30000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [isSignedIn, getToken]);
 
   return (
     <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-md">
@@ -72,6 +106,32 @@ export function SiteHeader() {
                   AI Studio
                 </Button>
               </Link>
+
+              {/* Credit / Subscription Badge */}
+              {paymentStatus && (
+                <Link
+                  href="/pricing"
+                  className={cn(
+                    "hidden sm:inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors",
+                    paymentStatus.subscription
+                      ? "border-primary/30 bg-primary/5 text-primary"
+                      : "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                  )}
+                >
+                  {paymentStatus.subscription ? (
+                    <>
+                      <Crown className="size-3" />
+                      Unlimited
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="size-3" />
+                      {paymentStatus.credits?.balance ?? 0} credits
+                    </>
+                  )}
+                </Link>
+              )}
+
               <UserButton
                 appearance={{
                   elements: {

@@ -1,22 +1,36 @@
 /**
  * Dodo Payments Webhook Route Handler
  *
- * Receives raw webhook payloads from Dodo Payments and forwards them
- * to the Express API for database sync.
- * Signature verification will be added once we confirm the signing key format.
+ * Verifies webhook signatures using Svix SDK, then forwards
+ * verified payloads to the Express API for database sync.
  */
 
 import { type NextRequest } from "next/server";
+import { verifyDodoWebhook } from "@/lib/webhook-verifier";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    // Read payload as raw text for signature verification
+    const payloadText = await request.text();
+
+    // Extract Svix headers
+    const svixId = request.headers.get("svix-id") || "";
+    const svixTimestamp = request.headers.get("svix-timestamp") || "";
+    const svixSignature = request.headers.get("svix-signature") || "";
+
+    // Verify signature — reject if invalid
+    if (!verifyDodoWebhook(payloadText, { "svix-id": svixId, "svix-timestamp": svixTimestamp, "svix-signature": svixSignature })) {
+      return new Response("Invalid webhook signature", { status: 401 });
+    }
+
+    // Parse verified payload
+    const body = JSON.parse(payloadText);
     const eventType = body.type ?? "unknown";
     const payload = body.data ?? body;
 
-    console.log(`[Dodo Webhook] Received: ${eventType}`);
+    console.log(`[Dodo Webhook] Verified: ${eventType}`);
 
     // Forward to Express API for processing
     const res = await fetch(`${API_URL}/api/payments/webhook-event`, {

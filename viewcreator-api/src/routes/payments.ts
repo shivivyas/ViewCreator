@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { getAuth } from '@clerk/express';
-import { PlanRepository, CreditRepository, SubscriptionRepository } from 'viewcreator-database';
+import { PlanRepository, CreditRepository, SubscriptionRepository, WebhookEventRepository } from 'viewcreator-database';
 
 const router = Router();
 
@@ -98,6 +98,76 @@ router.get('/api/payments/transactions', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/payments/create-checkout
+ *
+ * Creates a Dodo Payments checkout session server-side.
+ * Keeps user IDs and plan IDs out of browser URL params.
+ * Auth required.
+ */
+router.post('/api/payments/create-checkout', async (req, res) => {
+  try {
+    const { userId } = getAuth(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { plan_id, success_url, cancel_url } = req.body;
+    if (!plan_id) {
+      return res.status(400).json({ error: 'plan_id is required' });
+    }
+
+    // Look up plan
+    const plan = await PlanRepository.findById(plan_id);
+    if (!plan || !plan.is_active) {
+      return res.status(404).json({ error: 'Plan not found or inactive' });
+    }
+    if (!plan.dodo_product_id) {
+      return res.status(400).json({ error: 'Payment not configured for this plan' });
+    }
+
+    // Get user info for Dodo checkout
+    const { clerkClient } = await import('@clerk/express');
+    const clerkUser = await clerkClient.users.getUser(userId);
+    const email = clerkUser.emailAddresses[0]?.emailAddress;
+    const name = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ') || email;
+
+    if (!email) {
+      return res.status(400).json({ error: 'User has no email address' });
+    }
+
+    // Create Dodo checkout session via the SDK
+    const { default: DodoPayments } = await import('dodopayments');
+    const dodoClient = new DodoPayments({
+      bearerToken: process.env.DODO_PAYMENTS_API_KEY!,
+      environment: process.env.DODO_PAYMENTS_ENVIRONMENT as 'test_mode' | 'live_mode' | undefined,
+    });
+
+    const session = await dodoClient.checkoutSessions.create({
+      product_cart: [
+        {
+          product_id: plan.dodo_product_id,
+          quantity: 1,
+        },
+      ],
+      customer: {
+        email,
+        name,
+      },
+      metadata: {
+        user_id: userId,
+        plan_id: plan.id,
+      },
+      return_url: success_url || process.env.DODO_PAYMENTS_RETURN_URL || 'http://localhost:3000/generate',
+    });
+
+    return res.json({ checkout_url: session.checkout_url });
+  } catch (error: any) {
+    console.error('[Payments API] Create checkout error:', error);
+    return res.status(500).json({ error: 'Failed to create checkout' });
+  }
+});
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 /**
@@ -114,6 +184,17 @@ router.post('/api/payments/webhook-event', async (req, res) => {
     };
 
     console.log(`[Webhook Event] Processing: ${type}`);
+
+    // ── Idempotency check ──────────────────────────────────────
+    // Prevent duplicate processing from at-least-once webhook delivery
+    const eventId = data?.id;
+    if (eventId) {
+      const alreadyProcessed = await WebhookEventRepository.isProcessed(eventId);
+      if (alreadyProcessed) {
+        console.log(`[Webhook Event] Skipping already-processed event: ${eventId}`);
+        return res.json({ received: true, deduplicated: true });
+      }
+    }
 
     switch (type) {
       case 'subscription.active':
@@ -237,6 +318,11 @@ router.post('/api/payments/webhook-event', async (req, res) => {
 
       default:
         console.log(`[Webhook Event] Unhandled type: ${type}`);
+    }
+
+    // Mark event as processed for idempotency
+    if (eventId) {
+      await WebhookEventRepository.markProcessed(eventId, type);
     }
 
     return res.json({ received: true });

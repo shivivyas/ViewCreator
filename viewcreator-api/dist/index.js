@@ -13,6 +13,7 @@ const viewcreator_database_1 = require("viewcreator-database");
 const express_2 = require("@clerk/express");
 const client_s3_1 = require("@aws-sdk/client-s3");
 const payments_js_1 = __importDefault(require("./routes/payments.js"));
+const credit_guard_js_1 = require("./middleware/credit-guard.js");
 const app = (0, express_1.default)();
 const port = process.env.PORT || 3001;
 // Initialize S3 Client
@@ -235,6 +236,19 @@ app.post('/api/generate', (0, express_2.requireAuth)(), syncUserMiddleware, asyn
         if (!prompt) {
             return res.status(400).json({ error: 'Prompt is required' });
         }
+        // ── Credit Check ───────────────────────────────────────────
+        const { userId } = (0, express_2.getAuth)(req);
+        const costPerImage = quality === 'Premium' ? credit_guard_js_1.CREDIT_COSTS.IMAGE_PREMIUM : credit_guard_js_1.CREDIT_COSTS.IMAGE_STANDARD;
+        const totalCost = costPerImage * Math.min(Math.max(1, numberOfImages), 4);
+        const guard = await (0, credit_guard_js_1.checkCredits)(userId, totalCost);
+        if (!guard.allowed) {
+            return res.status(402).json({
+                error: 'Insufficient credits',
+                credits_balance: guard.credits_balance,
+                required: guard.required,
+                upgrade_url: '/pricing',
+            });
+        }
         const apiKey = process.env.GEMINI_NANO_BANANA_API_KEY;
         if (!apiKey || apiKey === 'your_api_key_here') {
             return res.status(500).json({
@@ -354,6 +368,9 @@ app.post('/api/generate', (0, express_2.requireAuth)(), syncUserMiddleware, asyn
         if (imageUrls.length === 0) {
             throw new Error('API did not return any images.');
         }
+        // Deduct credits after successful generation
+        const promptPreview = prompt.substring(0, 100);
+        await (0, credit_guard_js_1.deductForGeneration)(userId, totalCost, `Generated ${imageUrls.length} image(s)`, { prompt_preview: promptPreview, quality, count: imageUrls.length });
         return res.json({ imageUrls });
     }
     catch (error) {
@@ -367,6 +384,17 @@ app.post('/api/generate/video', (0, express_2.requireAuth)(), syncUserMiddleware
         const { prompt, aspectRatio = '16:9', style = 'None', quality = 'Standard', duration = 6, templateId } = req.body;
         if (!prompt) {
             return res.status(400).json({ error: 'Prompt is required' });
+        }
+        // ── Credit Check ───────────────────────────────────────────
+        const { userId } = (0, express_2.getAuth)(req);
+        const guard = await (0, credit_guard_js_1.checkCredits)(userId, credit_guard_js_1.CREDIT_COSTS.VIDEO);
+        if (!guard.allowed) {
+            return res.status(402).json({
+                error: 'Insufficient credits',
+                credits_balance: guard.credits_balance,
+                required: credit_guard_js_1.CREDIT_COSTS.VIDEO,
+                upgrade_url: '/pricing',
+            });
         }
         const apiKey = process.env.GEMINI_NANO_BANANA_API_KEY;
         if (!apiKey || apiKey === 'your_api_key_here') {
@@ -446,6 +474,8 @@ app.post('/api/generate/video', (0, express_2.requireAuth)(), syncUserMiddleware
             if (videoUrls.length === 0) {
                 throw new Error('API did not return any content.');
             }
+            // Deduct credits after successful generation
+            await (0, credit_guard_js_1.deductForGeneration)(userId, credit_guard_js_1.CREDIT_COSTS.VIDEO, 'Generated video', { prompt_preview: prompt.substring(0, 100), quality });
             return res.json({ videoUrls, duration });
         }
         catch (genError) {

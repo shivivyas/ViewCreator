@@ -21,33 +21,18 @@ export async function getBalance(token: string): Promise<UserPaymentStatus> {
 }
 
 /**
- * Create a Dodo Payments checkout session for a given plan
- * Redirects user to Dodo-hosted checkout page.
+ * Create a Dodo Payments checkout session server-side.
+ * Returns checkout URL — user is redirected to Dodo-hosted checkout.
  */
-export async function createCheckout(
+export async function createCheckoutSession(
   planId: string,
-  customerEmail: string,
-  customerName: string,
-  metadata?: Record<string, string>
+  token: string
 ): Promise<{ checkout_url: string }> {
-  const params = new URLSearchParams({
-    productId: planId,
-    email: customerEmail,
-    fullName: customerName,
+  return request<{ checkout_url: string }>('/api/payments/create-checkout', {
+    method: 'POST',
+    body: { plan_id: planId },
+    token,
   });
-
-  if (metadata) {
-    Object.entries(metadata).forEach(([key, value]) => {
-      params.set(`metadata_${key}`, value);
-    });
-  }
-
-  const res = await fetch(`/api/dodo/checkout?${params.toString()}`);
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: 'Checkout failed' }));
-    throw new Error(err.error || 'Failed to create checkout session');
-  }
-  return res.json();
 }
 
 /**

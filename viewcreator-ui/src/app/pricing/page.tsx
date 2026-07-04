@@ -12,7 +12,7 @@ import {
   Zap,
 } from "lucide-react";
 import Link from "next/link";
-import { useUser } from "@clerk/nextjs";
+import { useUser, useAuth } from "@clerk/nextjs";
 import { toast } from "sonner";
 
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -26,7 +26,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { getPlans } from "@/services/api/payment-service";
+import { getPlans, createCheckoutSession } from "@/services/api/payment-service";
 import type { SubscriptionPlan } from "@/types";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -253,6 +253,7 @@ function PlanSkeleton({ highlighted }: { highlighted?: boolean }) {
 
 export default function PricingPage() {
   const { user, isSignedIn } = useUser();
+  const { getToken } = useAuth();
   const [creditPacks, setCreditPacks] = useState<PricingTier[]>([]);
   const [subscriptionPlans, setSubscriptionPlans] = useState<PricingTier[]>([]);
   const [loading, setLoading] = useState(true);
@@ -278,26 +279,16 @@ export default function PricingPage() {
       if (!isSignedIn || !user) return;
 
       try {
-        const email = user.primaryEmailAddress?.emailAddress ?? "";
-        const name = user.fullName ?? user.firstName ?? "";
+        const token = await getToken();
+        if (!token) throw new Error("Not authenticated");
 
-        if (plan.dodo_product_id) {
-          const params = new URLSearchParams({
-            productId: plan.dodo_product_id,
-            email,
-            fullName: name,
-            metadata_user_id: user.id,
-            metadata_plan_id: plan.id,
-          });
-          window.location.href = `/api/dodo/checkout?${params.toString()}`;
-        } else {
-          toast.info("Payment setup is not yet configured. Check back soon!");
-        }
+        const data = await createCheckoutSession(plan.id, token);
+        window.location.href = data.checkout_url;
       } catch (err: any) {
         toast.error(err.message || "Checkout failed. Please try again.");
       }
     },
-    [isSignedIn, user],
+    [isSignedIn, user, getToken],
   );
 
   return (

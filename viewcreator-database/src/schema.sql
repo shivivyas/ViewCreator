@@ -156,3 +156,13 @@ CREATE TRIGGER update_user_subscriptions_timestamp
     BEFORE UPDATE ON user_subscriptions
     FOR EACH ROW
     EXECUTE FUNCTION update_timestamp();
+
+-- Webhook Events: Idempotency tracking for Dodo Payments webhooks
+-- Prevents duplicate processing of the same event
+CREATE TABLE IF NOT EXISTS webhook_events (
+    event_id VARCHAR(255) PRIMARY KEY,
+    event_type VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_webhook_events_created_at ON webhook_events(created_at);

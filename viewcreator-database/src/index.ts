@@ -43,3 +43,8 @@ export {
   UserSubscription,
   SubscriptionRepository,
 } from './repositories/subscription-repository.js';
+
+// Webhook event repository
+export {
+  WebhookEventRepository,
+} from './repositories/webhook-repository.js';

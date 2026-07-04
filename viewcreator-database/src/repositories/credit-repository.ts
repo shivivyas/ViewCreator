@@ -61,25 +61,27 @@ export class CreditRepository {
   ): Promise<boolean> {
     if (amount <= 0) return false;
 
-    // Uses a single atomic UPDATE with a CHECK to prevent going negative
-    const updateResult = await query<UserCredits>(
-      `UPDATE user_credits
-       SET balance = balance - $2, updated_at = CURRENT_TIMESTAMP
-       WHERE user_id = $1 AND balance >= $2
-       RETURNING *`,
-      [userId, amount]
-    );
+    return await transaction(async (client) => {
+      // Atomic UPDATE with balance check — wrapped in transaction
+      const updateResult = await client.query(
+        `UPDATE user_credits
+         SET balance = balance - $2, updated_at = CURRENT_TIMESTAMP
+         WHERE user_id = $1 AND balance >= $2
+         RETURNING *`,
+        [userId, amount]
+      );
 
-    if (updateResult.rows.length === 0) return false;
+      if (updateResult.rows.length === 0) return false;
 
-    // Log the transaction
-    await query(
-      `INSERT INTO credit_transactions (user_id, type, amount, balance_after, description, metadata)
-       VALUES ($1, 'usage', $2, $3, $4, $5)`,
-      [userId, -amount, updateResult.rows[0].balance, description, JSON.stringify(metadata)]
-    );
+      // Log the transaction in the same transaction
+      await client.query(
+        `INSERT INTO credit_transactions (user_id, type, amount, balance_after, description, metadata)
+         VALUES ($1, 'usage', $2, $3, $4, $5)`,
+        [userId, -amount, updateResult.rows[0].balance, description, JSON.stringify(metadata)]
+      );
 
-    return true;
+      return true;
+    });
   }
 
   /**

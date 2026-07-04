@@ -35,3 +35,4 @@ This directory is the organization's collective memory. Every bug fixed, design 
 
 | Date | Title | Type | Applied To |
 |------|-------|------|------------|
+| 2026-07-04 | Dodo Payments Integration — Full Payment System | Systemic + Pattern | Multiple files (see learning doc) |

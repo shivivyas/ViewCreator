@@ -1,6 +1,6 @@
 # Payment System Architecture — ViewCreator
 
-> **Status**: Spec — Ready for Sentra Integration
+> **Status**: Implemented — Dodo Payments + Svix + Supabase
 > **Last Updated**: 2026-07-04
 
 ---
@@ -12,7 +12,7 @@ ViewCreator uses a dual-model payment system:
 1. **Credits (Pay-as-you-go)** — Users buy bundles of credits, each generation costs a fixed number of credits
 2. **Subscription (Monthly/Annual)** — Recurring fee for unlimited generations
 
-Both models are powered by **Sentra** for payment processing (checkout, webhooks, customer portal).
+Both models are powered by **Dodo Payments** for payment processing (checkout, webhooks, customer portal). Webhooks are delivered via **Svix** with cryptographic signature verification.
 
 ---
 

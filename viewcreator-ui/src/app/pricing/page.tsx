@@ -54,13 +54,13 @@ export default function PricingPage() {
       const token = await getToken();
       if (!token) throw new Error('Not authenticated');
 
+      sessionStorage.setItem('pending_plan_id', plan.id);
       const successUrl = `${window.location.origin}/generate?checkout=success`;
       const { checkout_url } = await createCheckoutSession(plan.id, token, successUrl);
       window.location.href = checkout_url;
-    } catch (err: any) {
+    } catch (err) {
       console.error('Purchase failed:', err);
-      // Toast would be better but we keep it simple
-      alert(err.message || 'Failed to start checkout');
+      alert(err instanceof Error ? err.message : 'Failed to start checkout');
     } finally {
       setPurchasing(false);
     }

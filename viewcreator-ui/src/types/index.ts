@@ -126,3 +126,14 @@ export interface UserPaymentStatus {
   credits: UserCredits | null;
   subscription: UserSubscription | null;
 }
+
+export interface CreditTransaction {
+  id: string;
+  type: 'purchase' | 'usage' | 'refund' | 'expiration' | 'grant';
+  amount: number;
+  balance_after: number;
+  description: string | null;
+  dodo_payment_id: string | null;
+  dodo_subscription_id: string | null;
+  created_at: string;
+}

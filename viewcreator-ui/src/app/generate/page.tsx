@@ -18,6 +18,21 @@ import { Button } from '@/components/ui/button';
 import { GenerateForm } from '@/components/generate/generate-form';
 import { HistoryPanel } from '@/components/generate/history-panel';
 
+/**
+ * Call the confirm-purchase endpoint to grant credits immediately.
+ * Idempotent — safe to call multiple times.
+ */
+async function grantPurchaseCredits(planId: string, token: string) {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/payments/confirm-purchase`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify({ plan_id: planId }),
+  });
+  const data = await res.json();
+  console.log('[Purchase Confirm]', data);
+  if (!res.ok) console.error('[Purchase Confirm] Failed:', data);
+}
+
 function GenerateImagePageContent() {
   const dispatch = useAppDispatch();
   const router = useRouter();
@@ -99,6 +114,20 @@ function GenerateImagePageContent() {
       // Refresh balance in header
       window.dispatchEvent(new CustomEvent('payment-updated'));
 
+      // Step 1: Always grant credits (whether or not there's a pending generation)
+      const grantCredits = async () => {
+        const token = await getToken();
+        if (!token) return;
+        const storedPlanId = sessionStorage.getItem('pending_plan_id');
+        if (storedPlanId) {
+          try {
+            await grantPurchaseCredits(storedPlanId, token);
+          } catch { /* non-critical */ }
+          sessionStorage.removeItem('pending_plan_id');
+        }
+      };
+      grantCredits();
+
       // Restore pending generation from sessionStorage (survives Dodo redirect)
       const stored = sessionStorage.getItem('pending_generate');
       const savedPending: {
@@ -114,25 +143,12 @@ function GenerateImagePageContent() {
             const token = await getToken();
             if (!token) return;
 
-            // Step 1: Grant credits immediately (synchronous — no webhook wait)
+            // Step 1: Grant credits (idempotent — safe even if already granted above)
             const storedPlanId = sessionStorage.getItem('pending_plan_id');
-            if (storedPlanId && token) {
-              try {
-                const confirmRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/payments/confirm-purchase`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                  body: JSON.stringify({ plan_id: storedPlanId }),
-                });
-                const confirmData = await confirmRes.json();
-                console.log('[Purchase Confirm] Response:', confirmData);
-                if (!confirmRes.ok) {
-                  console.error('[Purchase Confirm] Failed:', confirmData);
-                }
-              } catch (err) {
-                console.error('[Purchase Confirm] Network error:', err);
-              }
+            if (storedPlanId) {
+              await grantPurchaseCredits(storedPlanId, token);
+              sessionStorage.removeItem('pending_plan_id');
             }
-            sessionStorage.removeItem('pending_plan_id');
 
             // Step 2: Check balance (credits should be there now)
             const status = await getBalance(token);

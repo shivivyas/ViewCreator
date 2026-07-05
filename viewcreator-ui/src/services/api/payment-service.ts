@@ -1,5 +1,5 @@
 import { request } from '../base/api-client';
-import type { SubscriptionPlan, UserPaymentStatus } from '@/types';
+import type { SubscriptionPlan, UserPaymentStatus, CreditTransaction } from '@/types';
 
 export interface PlansResponse {
   creditPacks: SubscriptionPlan[];
@@ -54,4 +54,11 @@ export async function createCustomerPortal(
     throw new Error(err.error || 'Failed to create portal session');
   }
   return res.json();
+}
+
+/**
+ * Fetch the authenticated user's credit transaction history.
+ */
+export async function getTransactions(token: string): Promise<{ transactions: CreditTransaction[] }> {
+  return request<{ transactions: CreditTransaction[] }>('/api/payments/transactions', { token });
 }

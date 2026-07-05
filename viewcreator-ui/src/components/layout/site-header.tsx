@@ -151,6 +151,11 @@ export function SiteHeader() {
                   AI Studio
                 </Button>
               </Link>
+              <Link href="/payments/history">
+                <Button size="sm" variant="ghost" className="text-xs text-muted-foreground">
+                  History
+                </Button>
+              </Link>
 
               {/* Credit Balance Badge */}
               {paymentStatus && <CreditBadge status={paymentStatus} />}

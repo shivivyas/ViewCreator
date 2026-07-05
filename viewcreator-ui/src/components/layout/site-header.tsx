@@ -81,17 +81,24 @@ export function SiteHeader() {
     };
 
     fetchBalance();
-    // Refresh every 30 seconds
-    const interval = setInterval(fetchBalance, 30000);
+    // Poll every 10s for credit updates
+    const interval = setInterval(fetchBalance, 10000);
 
-    // Listen for post-purchase refresh signal
+    // Instant refresh on custom event
     const onPaymentUpdate = () => fetchBalance();
     window.addEventListener('payment-updated', onPaymentUpdate);
+
+    // Refresh when user returns to the tab
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') fetchBalance();
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
 
     return () => {
       cancelled = true;
       clearInterval(interval);
       window.removeEventListener('payment-updated', onPaymentUpdate);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   }, [isSignedIn, getToken]);
 

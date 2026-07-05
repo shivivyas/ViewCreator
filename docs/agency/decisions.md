@@ -98,6 +98,32 @@ Need per-action credit costs that can be model-driven in the future.
 | Video generation | 5 credits |
 | AI edit | 1 credit |
 
+---
+
+## 2026-07-05: FirstMate agent orchestration framework
+
+### Context
+The Director + specialist agent model worked well but lacked infrastructure for worktree isolation, multi-agent parallelism, zero-token supervision, and structured PR lifecycle management.
+
+### Decision
+Adopt **firstmate** (vendored at `firstmate/`) as the agent orchestration layer. The Director becomes the First Mate — the Captain's single point of contact. Specialist agents become crewmates, deployed via `bin/fm-spawn.sh` into isolated git worktrees.
+
+### Rationale
+- Firstmate provides a proven operational layer (tmux/herdr backend, watcher, worktrees, PR management)
+- Zero-token supervision via `bin/fm-watch.sh` is more efficient than manual polling
+- Worktree isolation prevents parallel work collisions
+- The existing agent definitions (Analyst, Architect, Builder, Reviewer, Communicator) map cleanly to firstmate crewmates
+
+### Changes Made
+- `director.instructions.md` — Updated to First Mate role with firstmate lifecycle
+- All 5 `.agent.md` files — Updated with firstmate crewmate protocol (worktree, brief, status reporting)
+- `AGENTS.md` (project root) — Added firstmate integration section
+- `docs/agency/` — KB files updated to note firstmate integration
+
+### Alternatives Considered
+- Keep manual Director delegation without firstmate — Rejected because we already have firstmate vendored; using it reduces manual overhead
+- Use a different orchestration framework — Firstmate is already present and mature
+
 ### Rationale
 Simple starting point. The cost system is configurable by design (`CREDIT_COSTS` constant) so it can become model-priced later without rewriting the engine.
 

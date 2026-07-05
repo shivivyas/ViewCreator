@@ -1,3 +1,70 @@
+<!-- BEGIN:firstmate-integration -->
+# FirstMate Agent Orchestration
+
+This project uses **firstmate** for agent orchestration — it's vendored at `firstmate/`. The firstmate framework provides the operational layer: session management, worktree isolation, crewmate spawning, supervision, PR lifecycle, and backlog tracking.
+
+## How It Works
+
+```
+Captain (User)
+  └── First Mate / Director (this agent)
+        ├── Analyst Agent      → Scout tasks: investigate, trace, find root causes
+        ├── Architect Agent    → Scout tasks: design, plan, define interfaces
+        ├── Builder Agent      → Ship tasks: implement, build, fix, refactor
+        ├── Reviewer Agent     → Scout tasks: review code, audit, write tests
+        └── Communicator Agent → Ship/scout: docs, specs, PRs, commit messages
+```
+
+### Key Operations
+
+| Operation | Command |
+|-----------|---------|
+| **Session start** | `bin/fm-session-start.sh` — context digest, fleet state, wake queue |
+| **Spawn crewmate** | `bin/fm-spawn.sh <id> projects/<repo>` — isolated worktree + agent |
+| **Scaffold brief** | `bin/fm-brief.sh <id> <repo>` — writes `data/<id>/brief.md` |
+| **Arm watcher** | `bin/fm-watch-arm.sh` — zero-token supervision |
+| **Teardown** | `bin/fm-teardown.sh <id>` — clean up finished tasks |
+| **Self-update** | `/updatefirstmate` — pull latest firstmate + re-read |
+
+### FirstMate Directory Layout
+
+```
+firstmate/
+  AGENTS.md            → FirstMate operating manual (CLAUDE.md symlinks to it)
+  bin/                 → Helper scripts (spawn, brief, watch, teardown, etc.)
+  .agents/skills/      → FirstMate internal skills (harness-adapters, afk, stow, etc.)
+  data/                → Fleet records (backlog, projects, learnings)
+  state/               → Runtime signals (task meta, status, watcher state)
+  projects/            → Cloned repos (READ-ONLY — only crewmates edit via worktrees)
+  config/              → Local config (crew harness, dispatch profiles, backend)
+```
+
+### FirstMate Skills Reference
+
+Load these at the indicated trigger points:
+- `harness-adapters` — Before spawning or recovering any crewmate
+- `stuck-crewmate-recovery` — On stale wake, looping pane, or failed steer
+- `secondmate-provisioning` — Before creating/seeding/retiring a persistent secondmate
+- `afk` — When captain goes away (`/afk`), daemon takes over supervision
+- `stow` — On `/stow`, sweep session for uncaptured knowledge
+
+### Worktree Isolation
+
+Every crewmate works in an **isolated git worktree** — never the primary checkout. The First Mate reads the project to understand it; crewmates change it. This prevents parallel work collisions.
+
+---
+
+## Secondmate Architecture (Optional)
+
+For persistent domain supervisors (e.g., a "database admin" secondmate that always runs), each secondmate gets its own isolated `FM_HOME` with its own projects, backlog, and session lock. Route work by scope via `data/secondmates.md`.
+
+---
+
+## When FirstMate Is Absent
+
+If the `firstmate/` directory is not present, fall back to the standard agency workflow (Director → specialist agents, no worktree isolation, manual KB reads).
+<!-- END:firstmate-integration -->
+
 <!-- BEGIN:nextjs-agent-rules -->
 # This is NOT the Next.js you know
 

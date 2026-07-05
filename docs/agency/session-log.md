@@ -26,15 +26,41 @@ agency-import
 
 ### State At End
 Knowledge base seeded. Awaiting next feature request or task.
+
+---
+
+## 2026-07-05 — FirstMate integration into all agent files
+
+### Agent
+Director (First Mate)
+
 ### Skill
-{{agency-grill / agency-spec / agency-handoff / agency-review / agency-retro / agency-report / agency-orchestrate / agency-import / none}}
+none
 
 ### Summary
-- {{What happened — 3-5 bullet points}}
+- Integrated firstmate agent orchestration framework into all agent definition files
+- Updated `director.instructions.md` — Director is now First Mate to the Captain, with firstmate lifecycle (session start → spawn → supervise → teardown), firstmate decomposition model, and fallback protocol
+- Updated all 5 specialist `.agent.md` files — Added firstmate crewmate protocol (worktree isolation check, brief reading, status reporting protocol, ship vs scout task distinction)
+- Updated project `AGENTS.md` — Added `<!-- BEGIN:firstmate-integration -->` section with key operations, directory layout, skills reference, worktree isolation, secondmate architecture, and fallback behavior
+- Updated `docs/agency/decisions.md` — Added firstmate integration decision
+- Updated `docs/agency/project-learnings.md` — Added firstmate integration notes
+- Updated `docs/agency/session-log.md` — This entry
+
+### Decisions Made
+- FirstMate as the agent orchestration layer (vendored at `firstmate/`)
+- Director role merged with First Mate role
+- Specialist agents become firstmate crewmates
 
 ### Artifacts Produced
-- {{file path}} — {{description}}
+- `../prompts/director.instructions.md` — Updated with firstmate lifecycle
+- `../prompts/analyst.agent.md` — Added scout crewmate protocol
+- `../prompts/architect.agent.md` — Added scout crewmate protocol
+- `../prompts/builder.agent.md` — Added ship crewmate protocol
+- `../prompts/communicator.agent.md` — Added crewmate protocol
+- `../prompts/reviewer.agent.md` — Added scout crewmate protocol
+- `AGENTS.md` — Added firstmate integration section
+- `docs/agency/decisions.md` — Added firstmate decision
+- `docs/agency/project-learnings.md` — Added firstmate learnings
 
 ### State At End
-{{What was the last thing done? What's pending? — this is the resume hook}}
--->
+FirstMate integrated into all agent files. Director is now First Mate. All specialist agents understand they may operate as firstmate crewmates with worktree isolation, brief-driven tasks, and sparse status reporting. FirstMate infrastructure at `firstmate/` is configured and ready. Awaiting next feature request or task.

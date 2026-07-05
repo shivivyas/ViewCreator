@@ -38,3 +38,11 @@ mcp_codebase-memo_get_code_snippet({ "project": "<display_name>", "qualified_nam
 - Faster and more accurate than manual file search.
 - Prevents reading stale files or following ghost references.
 - Using `list_projects` avoids guessing project identifiers.
+
+### FirstMate Integration Note
+
+This project uses **firstmate** (vendored at `firstmate/`). When operating as a firstmate crewmate:
+- Your brief (at `data/<id>/brief.md`) may already specify which project files to focus on
+- You are in an isolated git worktree — always use the worktree path, not the primary checkout
+- Report status via `FM_STATUS_FILE` or `data/<id>.status`
+- The Codebase Memory MCP workflow still applies — explore the indexed graph first, read raw files second

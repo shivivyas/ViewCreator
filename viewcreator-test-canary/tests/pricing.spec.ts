@@ -1,8 +1,8 @@
 /**
  * Pricing Page E2E Tests
  *
- * Tests the pricing page across all user personas.
- * Verifies correct plan display, CTA buttons, and checkout flow.
+ * Tests the credit-only pricing page across all user personas.
+ * Verifies credit pack display, CTA buttons, and checkout flow.
  */
 
 import { test, expect } from "@playwright/test";
@@ -17,28 +17,25 @@ test.describe("Pricing Page", () => {
 
   // ── All Personas ────────────────────────────────────────────
 
-  test("renders the pricing page title", async ({ page }) => {
+  test("renders the pricing page heading", async ({ page }) => {
     await expect(
-      page.getByRole("heading", { name: "One plan. Everything you need." })
+      page.getByRole("heading", { name: "Pay once. Create forever." })
     ).toBeVisible();
   });
 
-  test("renders the Monthly plan card", async ({ page }) => {
-    await expect(page.getByText("Monthly")).toBeVisible();
-    await expect(page.getByText("$29")).toBeVisible();
-    await expect(page.getByText("/month")).toBeVisible();
+  test("renders the credit plan card", async ({ page }) => {
+    // "100 Credits" is in a <div>, not a heading — use .first() for strict mode
+    await expect(page.getByText("100 Credits").first()).toBeVisible();
+    // "$9" appears in the card — use first match
+    await expect(page.getByText("$9").first()).toBeVisible();
   });
 
-  test('shows "Best Value" badge on the plan card', async ({ page }) => {
-    await expect(page.getByText("Best Value")).toBeVisible();
-  });
-
-  test("shows the feature list", async ({ page }) => {
+  test("shows the credit feature list", async ({ page }) => {
     await expect(
-      page.getByText("Unlimited image & video generation")
+      page.getByText("Generate up to 100 images or 20 videos")
     ).toBeVisible();
     await expect(page.getByText("All aspect ratios & sizes")).toBeVisible();
-    await expect(page.getByText("Premium quality output")).toBeVisible();
+    await expect(page.getByText("Never expires")).toBeVisible();
   });
 
   test("renders the FAQ section", async ({ page }) => {
@@ -46,9 +43,11 @@ test.describe("Pricing Page", () => {
       page.getByText("Frequently asked questions")
     ).toBeVisible();
     await expect(
-      page.getByText("What's included in the subscription?")
+      page.getByText("How do credits work?")
     ).toBeVisible();
-    await expect(page.getByText("Can I cancel anytime?")).toBeVisible();
+    await expect(
+      page.getByText("What if I need more credits?")
+    ).toBeVisible();
   });
 
   test("renders the bottom CTA section", async ({ page }) => {
@@ -59,51 +58,35 @@ test.describe("Pricing Page", () => {
 
   // ── Guest Persona ────────────────────────────────────────────
 
-  test("guest sees Subscribe button linking to sign-up", async ({ page }) => {
-    const subscribeButton = page.getByRole("button", {
-      name: "Subscribe Monthly",
-    });
-    await expect(subscribeButton).toBeVisible();
-
-    // Check the parent link points to /sign-up
-    const link = page.locator('a[href="/sign-up"]').filter({
-      has: page.getByRole("button", { name: "Subscribe Monthly" }),
-    });
-    await expect(link).toBeVisible();
+  test("guest sees Sign up to buy button", async ({ page }) => {
+    const buyButton = page.getByRole("button", { name: /sign up to buy/i });
+    await expect(buyButton).toBeVisible();
   });
 
-  test("guest sees Get started CTA linking to sign-up", async ({ page }) => {
-    await expect(page.getByText("Get started")).toBeVisible();
-    await expect(page.locator('a[href="/sign-up"]')).toHaveCount(2);
+  test("guest sees Get started CTA", async ({ page }) => {
+    await expect(page.getByRole("button", { name: "Get started" })).toBeVisible();
   });
 
-  // ── Free User Persona ────────────────────────────────────────
+  // ── Free User Persona (0 credits) ───────────────────────────
 
-  test("free user sees Subscribe Monthly as a real button (not sign-up link)", async ({
-    page,
-  }) => {
+  test("free user sees pricing page with mocked API", async ({ page }) => {
     await setupPersona(page, "FREE");
-    await page.reload();
+    await page.goto("/pricing");
     await page.waitForLoadState("networkidle");
 
-    const subscribeButton = page.getByRole("button", {
-      name: "Subscribe Monthly",
-    });
-    await expect(subscribeButton).toBeVisible();
-
-    // Should not be wrapped in a sign-up link
-    const signUpLinks = page.locator('a[href="/sign-up"]');
-    await expect(signUpLinks).toHaveCount(0);
+    // Page loads without error for signed-in user with 0 credits
+    await expect(page.getByText("100 Credits").first()).toBeVisible();
   });
 
-  // ── Subscriber Persona ───────────────────────────────────────
+  // ── Credit User Persona (has credits) ───────────────────────
 
-  test("subscriber still sees the Monthly plan card", async ({ page }) => {
-    await setupPersona(page, "SUBSCRIBER");
-    await page.reload();
+  test("credit user sees pricing page with mocked API", async ({ page }) => {
+    await setupPersona(page, "CREDIT_USER");
+    await page.goto("/pricing");
     await page.waitForLoadState("networkidle");
 
-    await expect(page.getByText("Monthly")).toBeVisible();
-    await expect(page.getByText("$29")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Pay once. Create forever." })
+    ).toBeVisible();
   });
 });

@@ -17,6 +17,16 @@ Feature Request
   → Loop to next feature
 ```
 
+## FirstMate Integration
+
+This project now uses **firstmate** (vendored at `firstmate/`) as the agent orchestration layer.
+- The Director role is merged with the First Mate role
+- All specialist agents are firstmate crewmates
+- Session start: `bin/fm-session-start.sh`
+- Crewmate dispatch: `bin/fm-spawn.sh`
+- Supervision: `bin/fm-watch-arm.sh`
+- See `AGENTS.md` (project root) for full integration guide
+
 ## Current Feature Cycle
 
 **Feature**: Pure credit payment system — single product "100 credits for $9"
@@ -39,5 +49,6 @@ Feature Request
 |------|--------|-----------|
 | Requirements (grill) | ✅ | 2026-07-05 |
 | Development | ⏳ | — |
+| FirstMate Integration | ✅ | 2026-07-05 |
 | Code Review | ❌ | — |
 | Retrospective | ❌ | — |

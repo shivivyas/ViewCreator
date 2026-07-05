@@ -11,19 +11,21 @@ tools:
 
 # Test Runner Agent — ViewCreator Payment System Canary
 
-You are the **Test Runner** for ViewCreator. Your job is to run the E2E test suite from the **independent** `viewcreator-test-canary` package, verify results, and present them in the dashboard.
+You are the **Test Runner** for ViewCreator. You may be dispatched as a firstmate crewmate for a verification task.
 
-The test canary is a **plug** — it lives at `viewcreator-test-canary/` and has zero coupling to app internals.
+## FirstMate Crewmate Protocol
+
+When dispatched as a firstmate crewmate:
+- **Worktree**: Your worktree is the project's main checkout (the test runner runs the app, so it needs the full environment). If working in an isolated worktree, ensure the app can be started from there.
+- **Brief**: Read `data/<id>/brief.md` for specific test scope.
+- **Status reporting**: Report `working: running tests`, `done: <summary>`, or `failed: <reason>` to the status file from `FM_STATUS_FILE` or `data/<id>.status`.
+- **Deliverable**: Test results and dashboard URL. For scout tasks, write results to `data/<id>/report.md`.
 
 ---
 
-## When to Use This Agent
+## Run Instructions
 
-Route to the Test Runner whenever:
-- The user says "run the tests", "run canary", "test dashboard", "show me test results"
-- After implementing any change to the payment system, pricing page, header, or API
-- Before merging to `main` (pre-merge verification)
-- The user asks "did I break anything?" or "is the payment flow still working?"
+Run the E2E test suite from the **independent** `viewcreator-test-canary` package.
 
 ---
 

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef, Suspense } from 'react';
+import { useState, useEffect, useRef, Suspense, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useAuth } from '@clerk/nextjs';
+import { useAuth, useUser, useClerk } from '@clerk/nextjs';
 import { toast } from 'sonner';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { 
@@ -11,8 +11,9 @@ import {
 } from '@/store/slices/image-editor-slice';
 import type { Template, GenerationHistoryItem, GenerateParams, GenerateVideoParams, MediaType } from '@/types';
 import { getTemplates, generateImages as apiGenerateImages, generateVideo as apiGenerateVideo } from '@/services';
-import { Wand2, Video, Image as ImageIcon, Loader2 } from 'lucide-react';
-import { getBalance } from '@/services/api/payment-service';
+import { Wand2, Video, Image as ImageIcon, Loader2, Zap, X } from 'lucide-react';
+import { getBalance, createCheckoutSession, getPlans } from '@/services/api/payment-service';
+import { Button } from '@/components/ui/button';
 
 import { GenerateForm } from '@/components/generate/generate-form';
 import { HistoryPanel } from '@/components/generate/history-panel';
@@ -22,8 +23,23 @@ function GenerateImagePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const editorState = useAppSelector((state) => state.imageEditor);
+  const { isSignedIn } = useUser();
+  const { openSignUp } = useClerk();
 
   const [mounted, setMounted] = useState(false);
+
+  // ── Credit Gate State ───────────────────────────────────────
+  const [showCreditModal, setShowCreditModal] = useState(false);
+  const [creditModalLoading, setCreditModalLoading] = useState(false);
+  const [pendingGenerate, setPendingGenerate] = useState<{
+    type: 'image';
+    params: GenerateParams;
+  } | {
+    type: 'video';
+    params: GenerateVideoParams;
+  } | null>(null);
+  const [userBalance, setUserBalance] = useState<number | null>(null);
+  const [requiredCredits, setRequiredCredits] = useState(0);
 
   // Shared params
   const [prompt, setPrompt] = useState(editorState.basePrompt || '');
@@ -41,8 +57,7 @@ function GenerateImagePageContent() {
   const [mediaType, setMediaType] = useState<MediaType>('image');
 
   const [imageUrls, setImageUrls] = useState<string[]>(editorState.imageUrls || []);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [videoUrls, setVideoUrls] = useState<string[]>([]);
+  const [, setVideoUrls] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -68,7 +83,6 @@ function GenerateImagePageContent() {
   // Check for post-purchase redirect (checkout=success param)
   useEffect(() => {
     const checkout = searchParams.get('checkout');
-    const planName = searchParams.get('plan');
 
     if (checkout === 'success') {
       // Remove query params from URL without page reload
@@ -80,17 +94,140 @@ function GenerateImagePageContent() {
       url.searchParams.delete('email');
       window.history.replaceState({}, '', url.toString());
 
-      // Show success toast
-      if (planName) {
-        toast.success(`Welcome to ${planName}! Your subscription is active.`);
-      } else {
-        toast.success('Purchase successful! Credits have been added to your account.');
-      }
+      toast.success('Purchase successful! Confirming credits...');
 
-      // Refresh balance in header by dispatching a custom event
+      // Refresh balance in header
       window.dispatchEvent(new CustomEvent('payment-updated'));
+
+      // Restore pending generation from sessionStorage (survives Dodo redirect)
+      const stored = sessionStorage.getItem('pending_generate');
+      const savedPending: {
+        type: 'image' | 'video';
+        params: GenerateParams | GenerateVideoParams;
+      } | null = stored ? JSON.parse(stored) : null;
+
+      if (savedPending) {
+        const pg = savedPending;
+
+        const resumeGeneration = async () => {
+          try {
+            const token = await getToken();
+            if (!token) return;
+
+            // Step 1: Grant credits immediately (synchronous — no webhook wait)
+            const storedPlanId = sessionStorage.getItem('pending_plan_id');
+            if (storedPlanId && token) {
+              try {
+                const confirmRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/payments/confirm-purchase`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                  body: JSON.stringify({ plan_id: storedPlanId }),
+                });
+                const confirmData = await confirmRes.json();
+                console.log('[Purchase Confirm] Response:', confirmData);
+                if (!confirmRes.ok) {
+                  console.error('[Purchase Confirm] Failed:', confirmData);
+                }
+              } catch (err) {
+                console.error('[Purchase Confirm] Network error:', err);
+              }
+            }
+            sessionStorage.removeItem('pending_plan_id');
+
+            // Step 2: Check balance (credits should be there now)
+            const status = await getBalance(token);
+            const balance = status.credits?.balance ?? 0;
+            setUserBalance(balance);
+
+            const cost = pg.type === 'video' ? 5
+              : 1 * Math.min(Math.max(1, (pg.params as GenerateParams).numberOfImages), 4);
+
+            if (balance >= cost) {
+              toast.success('Credits confirmed. Starting generation...');
+              if (pg.type === 'video') {
+                const vp = pg.params as GenerateVideoParams;
+                const result = await apiGenerateVideo(vp, await getToken() || undefined);
+                if (result.videoUrls.length > 0) {
+                  const historyItem: GenerationHistoryItem = {
+                    id: `vid-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    prompt: vp.prompt,
+                    style: vp.style,
+                    aspectRatio: vp.aspectRatio,
+                    numberOfImages: 1,
+                    imageSize: '1K',
+                    thinkingLevel: 'minimal',
+                    quality: vp.quality,
+                    mediaType: 'video',
+                    imageUrls: [],
+                    videoUrls: result.videoUrls,
+                    duration: result.duration,
+                    templateId: vp.templateId,
+                  };
+                  dispatch(addGenerationToHistory(historyItem));
+                  setVideoUrls(result.videoUrls);
+                  toast.success('Video generated successfully!');
+                }
+              } else {
+                const ip = pg.params as GenerateParams;
+                const urls = await apiGenerateImages(ip, await getToken() || undefined);
+                if (urls.length > 0) {
+                  const historyItem: GenerationHistoryItem = {
+                    id: `gen-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    prompt: ip.prompt,
+                    style: ip.style,
+                    aspectRatio: ip.aspectRatio,
+                    numberOfImages: ip.numberOfImages,
+                    imageSize: ip.imageSize,
+                    thinkingLevel: 'minimal',
+                    quality: 'Standard',
+                    mediaType: 'image',
+                    imageUrls: urls,
+                    referenceImages: ip.referenceImages.length > 0 ? [...ip.referenceImages] : undefined,
+                    templateId: ip.templateId,
+                  };
+                  dispatch(addGenerationToHistory(historyItem));
+                  setImageUrls(urls);
+                  toast.success(`Successfully generated ${urls.length} image(s)!`);
+                }
+              }
+              setPendingGenerate(null);
+              sessionStorage.removeItem('pending_generate');
+              setShowCreditModal(false);
+            } else {
+              // Poll a few more times as fallback (webhook race)
+              toast.info('Waiting for credit confirmation...');
+              let retries = 0;
+              const poll = async () => {
+                if (retries >= 10) {
+                  setRequiredCredits(cost);
+                  setShowCreditModal(true);
+                  return;
+                }
+                retries++;
+                const recheck = await getBalance(token);
+                if ((recheck.credits?.balance ?? 0) >= cost) {
+                  setUserBalance(recheck.credits?.balance ?? 0);
+                  setShowCreditModal(false);
+                  setPendingGenerate(null);
+                  sessionStorage.removeItem('pending_generate');
+                  toast.success('Credits confirmed! Try generating again.');
+                } else {
+                  setTimeout(poll, 2000);
+                }
+              };
+              poll();
+            }
+          } catch {
+            // Silently fail — modal will show again
+          }
+        };
+
+        resumeGeneration();
+      }
     }
-  }, [searchParams]);
+  }, [searchParams, pendingGenerate, getToken, dispatch]);
 
   useEffect(() => {
     const fetchTemplates = async () => {
@@ -264,10 +401,86 @@ function GenerateImagePageContent() {
     }
   };
 
+  /**
+   * Check credit balance before generation.
+   * Returns true if the user has enough credits (or is subscribed — legacy).
+   */
+  const checkCreditsBeforeGenerate = useCallback(async (cost: number): Promise<boolean> => {
+    try {
+      const token = await getToken();
+      if (!token) return false;
+      const status = await getBalance(token);
+      const balance = status.credits?.balance ?? 0;
+      setUserBalance(balance);
+
+      if (balance < cost) {
+        setRequiredCredits(cost);
+        setShowCreditModal(true);
+        return false;
+      }
+
+      return true;
+    } catch {
+      // If balance check fails, allow generation to proceed
+      return true;
+    }
+  }, [getToken]);
+
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!prompt.trim()) return;
 
+    // ── Guest Gate ─────────────────────────────────────────
+    if (!isSignedIn) {
+      openSignUp();
+      return;
+    }
+
+    // ── Credit Check ───────────────────────────────────────
+    if (mediaType === 'image') {
+      const cost = 1 * Math.min(Math.max(1, numberOfImages), 4); // 1 credit per standard image
+      const hasCredits = await checkCreditsBeforeGenerate(cost);
+      if (!hasCredits) {
+        // Save form state for resume after purchase
+        const pending = {
+          type: 'image' as const,
+          params: {
+            prompt,
+            style: getSelectedTemplateStyle(),
+            aspectRatio,
+            numberOfImages,
+            imageSize,
+            thinkingLevel: 'minimal',
+            quality: 'Standard' as const,
+            referenceImages,
+            templateId: selectedTemplateId,
+          },
+        };
+        setPendingGenerate(pending);
+        sessionStorage.setItem('pending_generate', JSON.stringify(pending));
+        return;
+      }
+    } else {
+      const hasCredits = await checkCreditsBeforeGenerate(5); // 5 credits per video
+      if (!hasCredits) {
+        const pending = {
+          type: 'video' as const,
+          params: {
+            prompt,
+            style: getSelectedTemplateStyle(),
+            aspectRatio,
+            quality: 'Standard' as const,
+            duration,
+            templateId: selectedTemplateId,
+          },
+        };
+        setPendingGenerate(pending);
+        sessionStorage.setItem('pending_generate', JSON.stringify(pending));
+        return;
+      }
+    }
+
+    // ── Proceed with generation ────────────────────────────
     if (mediaType === 'video') {
       await generateVideo({
         prompt,
@@ -416,6 +629,94 @@ function GenerateImagePageContent() {
           </div>
         </div>
       </div>
+
+      {/* ── Credit Gate Modal ────────────────────────────────── */}
+      {showCreditModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="relative w-full max-w-md rounded-2xl border border-border/50 bg-card p-6 shadow-xl mx-4">
+            {/* Close */}
+            <button
+              onClick={() => {
+                setShowCreditModal(false);
+                setPendingGenerate(null);
+                sessionStorage.removeItem('pending_generate');
+              }}
+              className="absolute right-4 top-4 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <X className="size-5" />
+            </button>
+
+            {/* Icon */}
+            <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-2xl bg-amber-50 dark:bg-amber-950">
+              <Zap className="size-6 text-amber-500" />
+            </div>
+
+            {/* Title */}
+            <h3 className="text-center text-lg font-semibold">
+              You need more credits
+            </h3>
+            <p className="mt-2 text-center text-sm text-muted-foreground">
+              {userBalance !== null && userBalance > 0 ? (
+                <>You have <strong>{userBalance.toLocaleString()}</strong> credits but need <strong>{requiredCredits}</strong> for this generation.</>
+              ) : (
+                <>You don&apos;t have enough credits to generate content.</>
+              )}
+            </p>
+
+            {/* CTA */}
+            <div className="mt-6 space-y-3">
+              <Button
+                size="lg"
+                className="w-full rounded-xl text-base"
+                disabled={creditModalLoading}
+                onClick={async () => {
+                  setCreditModalLoading(true);
+                  try {
+                    const token = await getToken();
+                    if (!token) throw new Error('Not authenticated');
+
+                    // Find the credit plan ID
+                    const plans = await getPlans();
+                    const creditPlan = plans.creditPacks.find(p => p.dodo_product_id);
+                    if (!creditPlan) throw new Error('No credit plan available');
+
+                    // Store plan ID so post-purchase can grant credits immediately
+                    sessionStorage.setItem('pending_plan_id', creditPlan.id);
+                    const successUrl = `${window.location.origin}/generate?checkout=success`;
+                    const { checkout_url } = await createCheckoutSession(creditPlan.id, token, successUrl);
+                    window.location.href = checkout_url;
+                  } catch (err) {
+                    toast.error(err instanceof Error ? err.message : 'Failed to start checkout');
+                    setCreditModalLoading(false);
+                  }
+                }}
+              >
+                {creditModalLoading ? (
+                  <><Loader2 className="mr-2 size-4 animate-spin" /> Opening checkout...</>
+                ) : (
+                  'Buy 100 Credits — $9'
+                )}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="w-full text-sm text-muted-foreground"
+                onClick={() => {
+                  setShowCreditModal(false);
+                  setPendingGenerate(null);
+                  sessionStorage.removeItem('pending_generate');
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
+
+            <p className="mt-4 text-center text-xs text-muted-foreground">
+              After purchase, your generation will start automatically.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,27 +1,27 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Check, Crown, CreditCard, Loader2, Sparkles } from "lucide-react";
-import Link from "next/link";
-import { useUser, SignUpButton } from "@clerk/nextjs";
+import { useEffect, useState, useCallback } from "react";
+import { Check, Zap, CreditCard, Loader2, LogIn } from "lucide-react";
+import { useUser, useAuth, SignUpButton } from "@clerk/nextjs";
 
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { getPlans } from "@/services/api/payment-service";
+import { getPlans, createCheckoutSession } from "@/services/api/payment-service";
 import type { SubscriptionPlan } from "@/types";
 
 export default function PricingPage() {
   const { isSignedIn } = useUser();
+  const { getToken } = useAuth();
   const [plan, setPlan] = useState<SubscriptionPlan | null>(null);
   const [loading, setLoading] = useState(true);
+  const [purchasing, setPurchasing] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -29,7 +29,9 @@ export default function PricingPage() {
     getPlans()
       .then((data) => {
         if (cancelled) return;
-        setPlan(data.subscriptions.find((s) => s.dodo_product_id) ?? null);
+        // Show the first active credit pack with a Dodo product ID
+        const creditPlan = data.creditPacks.find((p) => p.dodo_product_id) ?? null;
+        setPlan(creditPlan);
       })
       .catch(() => {})
       .finally(() => {
@@ -38,6 +40,31 @@ export default function PricingPage() {
 
     return () => { cancelled = true; };
   }, []);
+
+  const handlePurchase = useCallback(async () => {
+    if (!plan || !plan.dodo_product_id) return;
+
+    if (!isSignedIn) {
+      // The SignUpButton will handle this via the modal
+      return;
+    }
+
+    setPurchasing(true);
+    try {
+      const token = await getToken();
+      if (!token) throw new Error('Not authenticated');
+
+      const successUrl = `${window.location.origin}/generate?checkout=success`;
+      const { checkout_url } = await createCheckoutSession(plan.id, token, successUrl);
+      window.location.href = checkout_url;
+    } catch (err: any) {
+      console.error('Purchase failed:', err);
+      // Toast would be better but we keep it simple
+      alert(err.message || 'Failed to start checkout');
+    } finally {
+      setPurchasing(false);
+    }
+  }, [plan, isSignedIn, getToken]);
 
   if (loading) {
     return (
@@ -57,44 +84,35 @@ export default function PricingPage() {
             Simple, transparent pricing
           </Badge>
           <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
-            One plan. Everything you need.
+            Pay once. Create forever.
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-lg text-muted-foreground">
-            Unlimited AI-powered content generation. No hidden fees, no credit tracking.
+            Buy credits when you need them. No subscriptions, no hidden fees.
           </p>
         </div>
       </section>
 
-      {/* Pricing Card */}
+      {/* Single Product Card */}
       <section className="border-b border-border/50">
         <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
           {plan ? (
             <div className="mx-auto max-w-md">
               <Card className="relative border-primary/30 shadow-lg shadow-primary/5">
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <Badge className="bg-primary text-primary-foreground px-4 py-1 text-xs font-semibold shadow-sm">
-                    Best Value
-                  </Badge>
-                </div>
-
                 <CardHeader className="pt-8 pb-4 text-center">
                   <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-2xl bg-primary/10">
-                    <Crown className="size-6 text-primary" />
+                    <Zap className="size-6 text-primary" />
                   </div>
                   <CardTitle className="text-2xl">{plan.name}</CardTitle>
-                  <CardDescription className="text-sm">
-                    Go unlimited with a monthly plan
-                  </CardDescription>
                 </CardHeader>
 
                 <CardContent className="pb-6">
                   <div className="mb-6 text-center">
                     <span className="text-5xl font-bold tracking-tight">{plan.display_price}</span>
-                    <span className="ml-1 text-sm text-muted-foreground">/month</span>
-                    <div className="mt-1 flex items-center justify-center gap-1 text-sm text-muted-foreground">
-                      <Sparkles className="size-3.5 text-primary" />
-                      <span>Unlimited generations</span>
-                    </div>
+                    {plan.display_per_unit && (
+                      <div className="mt-1 text-sm text-muted-foreground">
+                        {plan.display_per_unit}
+                      </div>
+                    )}
                   </div>
 
                   <ul className="space-y-3">
@@ -112,14 +130,20 @@ export default function PricingPage() {
                     <Button
                       size="lg"
                       className="w-full rounded-xl text-base"
-                      onClick={() => { window.location.href = "/templates"; }}
+                      onClick={handlePurchase}
+                      disabled={purchasing}
                     >
-                      Go to templates
+                      {purchasing ? (
+                        <><Loader2 className="mr-2 size-4 animate-spin" /> Opening checkout...</>
+                      ) : (
+                        `Buy ${plan.name}`
+                      )}
                     </Button>
                   ) : (
                     <SignUpButton mode="modal" forceRedirectUrl="/pricing">
                       <Button size="lg" className="w-full rounded-xl text-base">
-                        Subscribe
+                        <LogIn className="mr-2 size-4" />
+                        Sign up to buy
                       </Button>
                     </SignUpButton>
                   )}
@@ -143,20 +167,20 @@ export default function PricingPage() {
           <div className="mx-auto max-w-2xl space-y-3">
             {[
               {
-                q: "What's included in the subscription?",
-                a: "Unlimited image and video generation, all aspect ratios and sizes, premium quality output, reference image uploads, priority queue, and all templates unlocked.",
+                q: "How do credits work?",
+                a: "Each credit lets you generate one standard-quality image. Premium images cost 2 credits and videos cost 5 credits. When you buy 100 credits, they never expire.",
               },
               {
-                q: "Can I cancel anytime?",
-                a: "Yes. Your subscription remains active until the end of the current billing period. No questions asked.",
-              },
-              {
-                q: "Is there a free trial?",
-                a: "Not yet, but you can start with a credit pack at just $9 to try the platform before committing to a subscription.",
+                q: "Can I use credits across multiple projects?",
+                a: "Yes! Credits are tied to your account, not to a specific project or template. Use them for images, videos, and edits across all your work.",
               },
               {
                 q: "What payment methods do you accept?",
                 a: "We accept all major credit and debit cards, digital wallets, and local payment methods through our secure checkout.",
+              },
+              {
+                q: "What if I need more credits?",
+                a: "You can buy another 100-credit pack anytime. There's no limit on how many you can purchase. Simply click your credit balance in the header or visit this page.",
               },
             ].map((faq) => (
               <div
@@ -180,16 +204,21 @@ export default function PricingPage() {
             Ready to create?
           </h2>
           <p className="mt-2 text-muted-foreground">
-            Join creators using ViewCreator to generate content at scale.
+            Start with 100 credits for just $9. No subscription required.
           </p>
           <div className="mt-8 flex items-center justify-center gap-4">
             {isSignedIn ? (
               <Button
                 size="lg"
                 className="rounded-xl text-base"
-                onClick={() => { window.location.href = "/templates"; }}
+                onClick={handlePurchase}
+                disabled={purchasing}
               >
-                Go to templates
+                {purchasing ? (
+                  <><Loader2 className="mr-2 size-4 animate-spin" /> Opening checkout...</>
+                ) : (
+                  'Buy 100 Credits'
+                )}
               </Button>
             ) : (
               <SignUpButton mode="modal" forceRedirectUrl="/pricing">
@@ -198,12 +227,6 @@ export default function PricingPage() {
                 </Button>
               </SignUpButton>
             )}
-            <Link
-              href="/templates"
-              className={buttonVariants({ size: "lg", variant: "outline" })}
-            >
-              Browse templates
-            </Link>
           </div>
         </div>
       </section>

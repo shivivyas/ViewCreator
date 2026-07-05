@@ -2,10 +2,16 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const template_repository_js_1 = require("./repositories/template-repository.js");
 const user_repository_js_1 = require("./repositories/user-repository.js");
+const credit_repository_js_1 = require("./repositories/credit-repository.js");
 const db_js_1 = require("./db.js");
+/**
+ * Single product: 100 Credits for $9.
+ * All subscription and multi-tier credit plans removed.
+ * Dodo product ID: pdt_0NiWo2CjaeJBzhplGXxWT
+ */
 const SEED_PLANS = [
     {
-        name: 'Starter Pack',
+        name: '100 Credits',
         type: 'credits',
         credits: 100,
         price_cents: 900,
@@ -13,79 +19,12 @@ const SEED_PLANS = [
         features: [
             'Generate up to 100 images or 20 videos',
             'All aspect ratios & sizes',
-            'Standard quality output',
+            'Standard & premium quality output',
             'Reference image upload',
-            '7-day credit expiry',
+            'Never expires',
         ],
         sort_order: 1,
-        dodo_product_id: null, // ← Set after creating product in Dodo Dashboard
-    },
-    {
-        name: 'Creator Pack',
-        type: 'credits',
-        credits: 500,
-        price_cents: 3900,
-        interval: null,
-        features: [
-            'Generate up to 500 images or 100 videos',
-            'All aspect ratios & sizes',
-            'Premium quality output',
-            'Reference image upload (up to 3)',
-            '30-day credit expiry',
-            'Priority generation queue',
-        ],
-        sort_order: 2,
-        dodo_product_id: null,
-    },
-    {
-        name: 'Pro Pack',
-        type: 'credits',
-        credits: 2000,
-        price_cents: 12900,
-        interval: null,
-        features: [
-            'Generate up to 2,000 images or 400 videos',
-            'All aspect ratios & sizes',
-            'Premium quality output',
-            'Reference image upload (up to 5)',
-            '90-day credit expiry',
-            'Priority generation queue',
-            'Early access to new features',
-        ],
-        sort_order: 3,
-        dodo_product_id: null,
-    },
-    {
-        name: 'Monthly',
-        type: 'subscription',
-        credits: 0,
-        price_cents: 2900,
-        interval: 'month',
-        features: [
-            'Unlimited image & video generation',
-            'All aspect ratios & sizes',
-            'Premium quality output',
-            'Reference image upload (up to 10)',
-            'Priority generation queue',
-            'All templates unlocked',
-            'Early access to new features',
-        ],
-        sort_order: 4,
-        dodo_product_id: 'pdt_0NiRFIFGpSZACnckj3yuS',
-    },
-    {
-        name: 'Annual',
-        type: 'subscription',
-        credits: 0,
-        price_cents: 29000,
-        interval: 'year',
-        features: [
-            'Everything in Monthly',
-            'Priority support',
-            'Cancel anytime',
-        ],
-        sort_order: 5,
-        dodo_product_id: null,
+        dodo_product_id: 'pdt_0NiWo2CjaeJBzhplGXxWT',
     },
 ];
 const SEED_TEMPLATES = [
@@ -139,20 +78,38 @@ async function seed() {
         process.exit(1);
     }
     try {
-        // 1. Seed a test User
-        const existingUser = await user_repository_js_1.UserRepository.findByEmail('demo@viewcreator.com');
-        if (!existingUser) {
-            const user = await user_repository_js_1.UserRepository.create({
-                id: 'user_demo123',
-                email: 'demo@viewcreator.com',
-                name: 'Demo Creator',
-            });
-            console.log('✅ Created Demo User:', user.email, `(${user.id})`);
+        // 1. Seed test users
+        const SEED_USERS = [
+            { id: 'user_3FmDRMiUXHVNrF36YH6IzKuPMvH', email: 'sidshadi4444@gmail.com', name: 'Free User', credits: 0 },
+            { id: 'user_3Fi7Uo9fodfdjrEgY7oxTcTJE07', email: 'sid6641@gmail.com', name: 'Credit User', credits: 500 },
+        ];
+        for (const su of SEED_USERS) {
+            const existingUser = await user_repository_js_1.UserRepository.findByEmail(su.email);
+            if (!existingUser) {
+                const user = await user_repository_js_1.UserRepository.create({
+                    id: su.id,
+                    email: su.email,
+                    name: su.name,
+                });
+                console.log(`✅ Created user: ${user.email} (${user.id})`);
+                // Give the user their starting credit balance
+                if (su.credits > 0) {
+                    const credits = await credit_repository_js_1.CreditRepository.ensureUser(user.id);
+                    await (0, db_js_1.query)(`UPDATE user_credits SET balance = $2, lifetime_credits = $2, updated_at = CURRENT_TIMESTAMP WHERE user_id = $1`, [user.id, su.credits]);
+                    await (0, db_js_1.query)(`INSERT INTO credit_transactions (user_id, type, amount, balance_after, description)
+             VALUES ($1, 'grant', $2, $2, 'Seed credits for development')`, [user.id, su.credits]);
+                    console.log(`  💰 Granted ${su.credits} credits to ${user.email}`);
+                }
+                else {
+                    // Ensure credits row exists even at zero
+                    await credit_repository_js_1.CreditRepository.ensureUser(user.id);
+                }
+            }
+            else {
+                console.log(`ℹ️ User already exists: ${existingUser.email}`);
+            }
         }
-        else {
-            console.log('ℹ️ Demo User already exists:', existingUser.email);
-        }
-        // 2. Seed subscription plans (idempotent — name unique via upsert)
+        // 2. Seed the single credit plan (idempotent — name unique via upsert)
         for (const plan of SEED_PLANS) {
             const existing = await (0, db_js_1.query)('SELECT id FROM subscription_plans WHERE name = $1', [plan.name]);
             if (existing.rows.length > 0) {

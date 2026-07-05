@@ -41,6 +41,8 @@ router.get('/api/payments/balance', async (req, res) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
+    console.log(`[Balance] Fetching for user ${userId}`);
+
     // Get credit balance (auto-creates row if missing)
     const credits = await CreditRepository.ensureUser(userId);
 
@@ -62,6 +64,8 @@ router.get('/api/payments/balance', async (req, res) => {
         dodo_customer_id: subscription.dodo_customer_id,
       };
     }
+
+    console.log(`[Balance] User ${userId}: ${credits.balance} credits, lifetime ${credits.lifetime_credits}`);
 
     return res.json({
       credits: {
@@ -118,17 +122,6 @@ router.post('/api/payments/create-checkout', async (req, res) => {
       return res.status(400).json({ error: 'plan_id is required' });
     }
 
-    // ── Prevent duplicate subscriptions ─────────────────────────
-    // If user already has an active subscription, don't allow another
-    const existingSub = await SubscriptionRepository.findActiveByUserId(userId);
-    if (existingSub && existingSub.status === 'active') {
-      return res.status(409).json({
-        error: 'You already have an active subscription. Please manage your existing subscription instead.',
-        subscription_id: existingSub.id,
-        dodo_customer_id: existingSub.dodo_customer_id,
-      });
-    }
-
     // Look up plan
     const plan = await PlanRepository.findById(plan_id);
     if (!plan || !plan.is_active) {
@@ -177,6 +170,72 @@ router.post('/api/payments/create-checkout', async (req, res) => {
   } catch (error: any) {
     console.error('[Payments API] Create checkout error:', error);
     return res.status(500).json({ error: 'Failed to create checkout' });
+  }
+});
+
+/**
+ * POST /api/payments/confirm-purchase
+ *
+ * Called by the frontend immediately after the user returns from Dodo checkout.
+ * Grants credits synchronously so the user doesn't have to wait for the webhook.
+ * Idempotent — safe to call multiple times.
+ *
+ * Auth required.
+ */
+router.post('/api/payments/confirm-purchase', async (req, res) => {
+  try {
+    const { userId } = getAuth(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { plan_id } = req.body;
+    if (!plan_id) {
+      return res.status(400).json({ error: 'plan_id is required' });
+    }
+
+    // Look up plan
+    const plan = await PlanRepository.findById(plan_id);
+    if (!plan || !plan.is_active) {
+      return res.status(404).json({ error: 'Plan not found or inactive' });
+    }
+    if (plan.credits <= 0) {
+      return res.status(400).json({ error: 'Plan does not grant credits' });
+    }
+
+    console.log(`[Confirm Purchase] User ${userId} requesting plan ${plan_id} (${plan.name}, ${plan.credits} credits)`);
+
+    // Idempotency: check if credits were already granted for this plan recently
+    const existing = await CreditRepository.getRecentPurchase(userId, plan_id);
+    if (existing) {
+      const balance = await CreditRepository.findByUserId(userId);
+      console.log(`[Confirm Purchase] Already granted — balance is ${balance?.balance}`);
+      return res.json({
+        already_granted: true,
+        credits: { balance: balance?.balance ?? 0, lifetime_credits: balance?.lifetime_credits ?? 0 },
+      });
+    }
+
+    // Grant credits
+    console.log(`[Confirm Purchase] Granting ${plan.credits} credits...`);
+    await CreditRepository.addCredits(
+      userId,
+      plan.credits,
+      'purchase',
+      `Purchased ${plan.name}`,
+      { plan_id, granted_via: 'confirm-purchase' }
+    );
+
+    const balance = await CreditRepository.findByUserId(userId);
+    console.log(`[Confirm Purchase] Done — new balance is ${balance?.balance}`);
+
+    return res.json({
+      granted: true,
+      credits: { balance: balance?.balance ?? 0, lifetime_credits: balance?.lifetime_credits ?? 0 },
+    });
+  } catch (error: any) {
+    console.error('[Payments API] Confirm purchase error:', error);
+    return res.status(500).json({ error: 'Failed to confirm purchase' });
   }
 });
 

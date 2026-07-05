@@ -1,24 +1,22 @@
 # Current Task
 
-**Agent**: Director
-**Skill**: agency-import (completed)
+**Agent**: Builder
+**Skill**: N/A — full feature implementation
 **Started**: 2026-07-05
-**Step Detail**: Knowledge base seeded. Project context captured from existing files and client interview.
+**Step Detail**: Implement pure credit payment system — single product "100 credits for $9". Strip subscriptions, wire credit purchase flow, add generate gate with modal, add header credit badge, update seed data.
 
-## Progress
+## Scope (from requirements alignment)
 
-- ✅ 8 agency skills installed globally
-- ✅ KB scaffolded (7 files)
-- ✅ README.md populated from PRD + AGENTS.md + interview
-- ✅ phase.md configured for continuous development loop
-- ✅ decisions.md populated (4 entries)
-- ✅ session-log.md first entry written
-- ✅ state/current-task.md written
-- ✅ state/context.md written
+1. Strip Monthly + Annual subscription plans from seed data
+2. Update seed script with Dodo product ID `pdt_0NiWo2CjaeJBzhplGXxWT`
+3. Add credit balance badge to site header (becomes "Buy Credits" at 0)
+4. Add "insufficient credits" modal on generate page with inline Dodo checkout
+5. Wire Dodo webhook → credit grant flow (already partially exists)
+6. Ensure idempotent generation + atomic credit deduction (already exists)
+7. Update pricing page for single product
+8. Guest gate on generate page (Clerk modal → check credits → generate)
 
-## Open Questions
-
-None — ready for next task.
+## See decisions.md for full rationale
 
 - <!-- Things that need answers before continuing -->
 

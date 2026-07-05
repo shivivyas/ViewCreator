@@ -178,4 +178,22 @@ export class CreditRepository {
     );
     return result.rows;
   }
+
+  /**
+   * Check if a user has already purchased a specific plan recently (within last hour).
+   * Used by confirm-purchase endpoint for idempotency.
+   */
+  static async getRecentPurchase(userId: string, planId: string): Promise<CreditTransaction | null> {
+    const result = await query<CreditTransaction>(
+      `SELECT * FROM credit_transactions
+       WHERE user_id = $1
+         AND type = 'purchase'
+         AND metadata @> $2::jsonb
+         AND created_at > NOW() - INTERVAL '1 hour'
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [userId, JSON.stringify({ plan_id: planId })]
+    );
+    return result.rows[0] || null;
+  }
 }

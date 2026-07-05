@@ -19,15 +19,19 @@ Feature Request
 
 ## Current Feature Cycle
 
-**Feature**: Seed script enhancement — Add 3 test users
-**Step**: Development
+**Feature**: Pure credit payment system — single product "100 credits for $9"
+**Step**: Requirements complete. Ready for Development.
 **Started**: 2026-07-05
 
-### Details
-Enhancing the database seed script to create three test users:
-1. Zero credits, no subscription
-2. Active monthly subscriber
-3. 500 credits, no subscription
+### Scope
+1. Strip subscription plans from seed data (Monthly + Annual removed)
+2. Update seed script with Dodo product ID (`pdt_0NiWo2CjaeJBzhplGXxWT`)
+3. Add credit balance badge to site header
+4. Add "insufficient credits" modal on generate page with inline Dodo checkout
+5. Wire payment webhook → credit grant flow
+6. Ensure idempotent generation + atomic credit deduction
+7. Update pricing page for single product
+8. Guest gate on generate page (Clerk modal → check credits → generate)
 
 ## Progress
 

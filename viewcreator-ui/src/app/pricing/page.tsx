@@ -1,10 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, Crown, CreditCard, Loader2, Sparkles } from "lucide-react";
 import Link from "next/link";
-import { useUser, useAuth, SignUpButton } from "@clerk/nextjs";
-import { toast } from "sonner";
+import { useUser, SignUpButton } from "@clerk/nextjs";
 
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,65 +15,29 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { getPlans, createCheckoutSession, getBalance } from "@/services/api/payment-service";
-import type { SubscriptionPlan, UserSubscription, UserPaymentStatus } from "@/types";
+import { getPlans } from "@/services/api/payment-service";
+import type { SubscriptionPlan } from "@/types";
 
 export default function PricingPage() {
-  const { isSignedIn, user } = useUser();
-  const { getToken } = useAuth();
+  const { isSignedIn } = useUser();
   const [plan, setPlan] = useState<SubscriptionPlan | null>(null);
-  const [activeSub, setActiveSub] = useState<UserSubscription | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
 
-    async function load() {
-      try {
-        const [plansData, balanceData] = await Promise.all([
-          getPlans(),
-          isSignedIn ? getToken().then((t) => (t ? getBalance(t) : null)) : Promise.resolve(null),
-        ]);
-
+    getPlans()
+      .then((data) => {
         if (cancelled) return;
-
-        // Only show the Monthly subscription (the only purchaseable plan)
-        const monthly = plansData.subscriptions.find((s) => s.dodo_product_id);
-        setPlan(monthly ?? null);
-
-        // Track active subscription
-        const sub = (balanceData as UserPaymentStatus | null)?.subscription;
-        if (sub?.status === "active") {
-          setActiveSub(sub);
-        }
-      } catch {
-        toast.error("Could not load pricing");
-      } finally {
+        setPlan(data.subscriptions.find((s) => s.dodo_product_id) ?? null);
+      })
+      .catch(() => {})
+      .finally(() => {
         if (!cancelled) setLoading(false);
-      }
-    }
+      });
 
-    load();
     return () => { cancelled = true; };
-  }, [isSignedIn, getToken]);
-
-  const handleCheckout = useCallback(async () => {
-    if (!isSignedIn || !user || !plan) return;
-    if (activeSub) {
-      toast.error("You already have an active subscription");
-      return;
-    }
-    try {
-      const token = await getToken();
-      if (!token) return;
-      const planName = encodeURIComponent(plan.name);
-      const successUrl = `${window.location.origin}/generate?checkout=success&plan=${planName}`;
-      const data = await createCheckoutSession(plan.id, token, successUrl);
-      window.location.href = data.checkout_url;
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Checkout failed");
-    }
-  }, [isSignedIn, user, plan, getToken, activeSub]);
+  }, []);
 
   if (loading) {
     return (
@@ -145,30 +108,20 @@ export default function PricingPage() {
                 </CardContent>
 
                 <CardFooter className="pt-0">
-                  {activeSub ? (
+                  {isSignedIn ? (
                     <Button
                       size="lg"
                       className="w-full rounded-xl text-base"
-                      variant="secondary"
-                      disabled
+                      onClick={() => { window.location.href = "/templates"; }}
                     >
-                      <Check className="mr-2 size-4" />
-                      Subscribed
+                      Go to templates
                     </Button>
-                  ) : !isSignedIn ? (
-                    <SignUpButton mode="modal">
+                  ) : (
+                    <SignUpButton mode="modal" forceRedirectUrl="/pricing">
                       <Button size="lg" className="w-full rounded-xl text-base">
-                        Subscribe {plan.name}
+                        Subscribe
                       </Button>
                     </SignUpButton>
-                  ) : (
-                    <Button
-                      size="lg"
-                      className="w-full rounded-xl text-base"
-                      onClick={handleCheckout}
-                    >
-                      Subscribe {plan.name}
-                    </Button>
                   )}
                 </CardFooter>
               </Card>
@@ -230,16 +183,20 @@ export default function PricingPage() {
             Join creators using ViewCreator to generate content at scale.
           </p>
           <div className="mt-8 flex items-center justify-center gap-4">
-            {!isSignedIn ? (
-              <SignUpButton mode="modal">
+            {isSignedIn ? (
+              <Button
+                size="lg"
+                className="rounded-xl text-base"
+                onClick={() => { window.location.href = "/templates"; }}
+              >
+                Go to templates
+              </Button>
+            ) : (
+              <SignUpButton mode="modal" forceRedirectUrl="/pricing">
                 <Button size="lg" className="rounded-xl text-base">
                   Get started
                 </Button>
               </SignUpButton>
-            ) : (
-              <Button size="lg" onClick={handleCheckout}>
-                Subscribe now
-              </Button>
             )}
             <Link
               href="/templates"

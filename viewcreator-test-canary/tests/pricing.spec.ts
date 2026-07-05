@@ -8,7 +8,7 @@
 import { test, expect } from "@playwright/test";
 import { setupPersona } from "./helpers";
 
-test.describe("Pricing Page", () => {
+test.describe("Pricing Page — Contract Tests (mock API)", () => {
   test.beforeEach(async ({ page }) => {
     await setupPersona(page, "GUEST");
     await page.goto("/pricing");

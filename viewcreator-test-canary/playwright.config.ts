@@ -9,6 +9,11 @@ import { defineConfig, devices } from "@playwright/test";
  * Required before running:
  *   Terminal 1: cd ../viewcreator-ui  && npm run dev   (port 3000)
  *   Terminal 2: cd ../viewcreator-api && npm run dev   (port 3001)
+ *
+ * Projects:
+ *   global-setup   — Obtains Clerk testing token once before all tests
+ *   chromium       — API contract tests + guest UI tests (mock-based)
+ *   chromium-auth  — Clerk-authenticated persona tests (real Clerk sign-in)
  */
 
 export default defineConfig({
@@ -30,8 +35,22 @@ export default defineConfig({
   },
   projects: [
     {
+      name: "global-setup",
+      testDir: "./tests",
+      testMatch: "global.setup.ts",
+    },
+    {
       name: "chromium",
+      testIgnore: ["clerk-auth.spec.ts", "global.setup.ts"],
       use: { ...devices["Desktop Chrome"] },
+      dependencies: ["global-setup"],
+    },
+    {
+      name: "chromium-auth",
+      testMatch: "clerk-auth.spec.ts",
+      use: { ...devices["Desktop Chrome"] },
+      dependencies: ["global-setup"],
+      timeout: 120000,
     },
   ],
   // DO NOT auto-start webServer — the app must already be running.

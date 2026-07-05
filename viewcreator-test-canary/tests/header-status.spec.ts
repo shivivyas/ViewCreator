@@ -13,7 +13,7 @@
 import { test, expect } from "@playwright/test";
 import { setupPersona } from "./helpers";
 
-test.describe("Header — Credit Balance Badge", () => {
+test.describe("Header — Credit Balance Badge — Contract Tests (mock API)", () => {
   // ── Guest ────────────────────────────────────────────────────
 
   test("guest sees sign in and sign up buttons", async ({ page }) => {

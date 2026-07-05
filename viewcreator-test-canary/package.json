@@ -10,5 +10,8 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1"
+  },
+  "dependencies": {
+    "@clerk/testing": "^2.2.2"
   }
 }

@@ -1,11 +1,14 @@
 /**
  * E2E Test Helpers — API mocking for different user personas.
  *
- * Personas reflect the credit-only payment model (no subscriptions):
+ * Personas reflect the credit-only payment model (no subscriptions).
+ * Credit boundaries tested: 0 (FREE), 1 (LOW_CREDIT — can generate once),
+ * and 100 (CREDIT_USER — normal happy path).
  *
- *   GUEST       — not authenticated, sees public pricing page
- *   FREE        — signed in, 0 credits
- *   CREDIT_USER — signed in, 100 credits (one pack)
+ *   GUEST        — not authenticated, sees public pricing page
+ *   FREE         — signed in, 0 credits
+ *   LOW_CREDIT   — signed in, 1 credit (boundary: can generate once)
+ *   CREDIT_USER  — signed in, 100 credits (one pack)
  */
 
 import { Page, Route } from "@playwright/test";
@@ -19,8 +22,13 @@ export const PERSONAS = {
   },
   FREE: {
     name: "Free User",
-    description: "Signed in, 0 credits",
+    description: "Signed in, 0 credits — blocked from generating",
     credits: { balance: 0, lifetime_credits: 0 },
+  },
+  LOW_CREDIT: {
+    name: "Low Credit User",
+    description: "Signed in, 1 credit — boundary: can generate once then hits 0",
+    credits: { balance: 1, lifetime_credits: 100 },
   },
   CREDIT_USER: {
     name: "Credit User",

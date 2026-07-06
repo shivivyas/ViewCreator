@@ -189,9 +189,38 @@ router.post('/api/payments/confirm-purchase', async (req, res) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const { plan_id } = req.body;
+    const { plan_id, idempotency_key } = req.body;
     if (!plan_id) {
       return res.status(400).json({ error: 'plan_id is required' });
+    }
+
+    console.log('[Confirm Purchase] Request received', {
+      userId,
+      plan_id,
+      idempotency_key: idempotency_key || '(auto-generated)',
+      timestamp: new Date().toISOString(),
+    });
+
+    // Idempotency: use a unique key per purchase flow to prevent double-grant
+    // on page refresh or concurrent calls, while still allowing repeat purchases
+    // of the same plan (unlike the old getRecentPurchase by plan_id).
+    const key = idempotency_key || `confirm-${userId}-${plan_id}-${Date.now()}`;
+    console.log('[Confirm Purchase] Attempting atomic claim', { key });
+
+    // Atomic claim — prevents double-grant even if two concurrent requests arrive
+    const claimed = await WebhookEventRepository.tryClaim(key, 'confirm_purchase');
+    console.log('[Confirm Purchase] Atomic claim result', { key, claimed });
+
+    if (!claimed) {
+      // Another request already processed this key — return current balance
+      console.log(`[Confirm Purchase] DUPLICATE BLOCKED: key=${key} was already claimed. Returning existing balance.`);
+      const balance = await CreditRepository.findByUserId(userId);
+      return res.json({
+        already_granted: true,
+        credits: { balance: balance?.balance ?? 0, lifetime_credits: balance?.lifetime_credits ?? 0 },
+      });
+    } else {
+      console.log('[Confirm Purchase] Key claimed successfully — proceeding to grant credits', { key, userId, plan_id });
     }
 
     // Look up plan
@@ -203,21 +232,9 @@ router.post('/api/payments/confirm-purchase', async (req, res) => {
       return res.status(400).json({ error: 'Plan does not grant credits' });
     }
 
-    console.log(`[Confirm Purchase] User ${userId} requesting plan ${plan_id} (${plan.name}, ${plan.credits} credits)`);
+    console.log(`[Confirm Purchase] Granting credits: User ${userId} — ${plan.name} (${plan.credits} credits)`);
 
-    // Idempotency: check if credits were already granted for this plan recently
-    const existing = await CreditRepository.getRecentPurchase(userId, plan_id);
-    if (existing) {
-      const balance = await CreditRepository.findByUserId(userId);
-      console.log(`[Confirm Purchase] Already granted — balance is ${balance?.balance}`);
-      return res.json({
-        already_granted: true,
-        credits: { balance: balance?.balance ?? 0, lifetime_credits: balance?.lifetime_credits ?? 0 },
-      });
-    }
-
-    // Grant credits
-    console.log(`[Confirm Purchase] Granting ${plan.credits} credits...`);
+    // Grant credits atomically
     await CreditRepository.addCredits(
       userId,
       plan.credits,
@@ -225,9 +242,12 @@ router.post('/api/payments/confirm-purchase', async (req, res) => {
       `Purchased ${plan.name}`,
       { plan_id, granted_via: 'confirm-purchase' }
     );
+    console.log('[Confirm Purchase] Credits written to DB successfully');
+
+    // Credits already recorded atomically by tryClaim() above — no separate markProcessed needed
 
     const balance = await CreditRepository.findByUserId(userId);
-    console.log(`[Confirm Purchase] Done — new balance is ${balance?.balance}`);
+    console.log(`[Confirm Purchase] Done — new balance is ${balance?.balance} (lifetime: ${balance?.lifetime_credits})`);
 
     return res.json({
       granted: true,
@@ -327,14 +347,18 @@ router.post('/api/payments/webhook-event', async (req, res) => {
     console.log(`[Webhook Event] Processing: ${type}`);
 
     // ── Idempotency check ──────────────────────────────────────
-    // Prevent duplicate processing from at-least-once webhook delivery
+    // Atomic claim — prevents duplicate processing from at-least-once webhook delivery
     const eventId = data?.id;
     if (eventId) {
-      const alreadyProcessed = await WebhookEventRepository.isProcessed(eventId);
-      if (alreadyProcessed) {
-        console.log(`[Webhook Event] Skipping already-processed event: ${eventId}`);
+      console.log('[Webhook Event] Attempting atomic claim', { eventId, type });
+      const claimed = await WebhookEventRepository.tryClaim(eventId, type);
+      console.log('[Webhook Event] Atomic claim result', { eventId, claimed });
+      if (!claimed) {
+        console.log(`[Webhook Event] DUPLICATE BLOCKED: event ${eventId} (${type}) was already processed.`);
         return res.json({ received: true, deduplicated: true });
       }
+    } else {
+      console.warn('[Webhook Event] No event ID in payload — cannot enforce idempotency for this event');
     }
 
     switch (type) {
@@ -466,10 +490,7 @@ router.post('/api/payments/webhook-event', async (req, res) => {
         console.log(`[Webhook Event] Unhandled type: ${type}`);
     }
 
-    // Mark event as processed for idempotency
-    if (eventId) {
-      await WebhookEventRepository.markProcessed(eventId, type);
-    }
+    // Claim already recorded atomically by tryClaim() above — no separate markProcessed needed
 
     return res.json({ received: true });
   } catch (error: any) {

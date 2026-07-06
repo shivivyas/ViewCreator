@@ -53,7 +53,15 @@ export default function PricingPage() {
       const token = await getToken();
       if (!token) throw new Error('Not authenticated');
 
+      const idempotencyKey = `purchase-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       sessionStorage.setItem('pending_plan_id', plan.id);
+      sessionStorage.setItem('pending_idempotency_key', idempotencyKey);
+      console.log('[Pricing] Purchase initiated — idempotency key stored', {
+        planId: plan.id,
+        planName: plan.name,
+        idempotencyKey,
+        redirectUrl: `${window.location.origin}/generate?checkout=success`,
+      });
       const successUrl = `${window.location.origin}/generate?checkout=success`;
       const { checkout_url } = await createCheckoutSession(plan.id, token, successUrl);
       window.location.href = checkout_url;

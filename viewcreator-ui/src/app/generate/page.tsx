@@ -20,13 +20,16 @@ import { HistoryPanel } from '@/components/generate/history-panel';
 
 /**
  * Call the confirm-purchase endpoint to grant credits immediately.
- * Idempotent — safe to call multiple times.
+ * Uses a unique idempotency key per purchase flow to prevent double-grant
+ * on page refresh while still allowing repeat purchases of the same plan.
  */
-async function grantPurchaseCredits(planId: string, token: string) {
+async function grantPurchaseCredits(planId: string, token: string, idempotencyKey?: string) {
+  const body: Record<string, any> = { plan_id: planId };
+  if (idempotencyKey) body.idempotency_key = idempotencyKey;
   const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/payments/confirm-purchase`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-    body: JSON.stringify({ plan_id: planId }),
+    body: JSON.stringify(body),
   });
   const data = await res.json();
   console.log('[Purchase Confirm]', data);
@@ -114,16 +117,29 @@ function GenerateImagePageContent() {
       // Refresh balance in header
       window.dispatchEvent(new CustomEvent('payment-updated'));
 
+      console.log('[Purchase Flow] checkout=success detected, grantCredits starting', {
+        pendingPlanId: sessionStorage.getItem('pending_plan_id'),
+        pendingKey: sessionStorage.getItem('pending_idempotency_key'),
+        pendingGenerate: sessionStorage.getItem('pending_generate') ? 'present' : 'absent',
+      });
+
       // Step 1: Always grant credits (whether or not there's a pending generation)
       const grantCredits = async () => {
         const token = await getToken();
         if (!token) return;
         const storedPlanId = sessionStorage.getItem('pending_plan_id');
+        const storedKey = sessionStorage.getItem('pending_idempotency_key') || undefined;
+        console.log('[Purchase Flow] grantCredits executing', { storedPlanId, storedKey });
         if (storedPlanId) {
           try {
-            await grantPurchaseCredits(storedPlanId, token);
-          } catch { /* non-critical */ }
+            await grantPurchaseCredits(storedPlanId, token, storedKey);
+            console.log('[Purchase Flow] grantCredits completed successfully');
+          } catch (e) { console.error('[Purchase Flow] grantCredits failed', e); }
           sessionStorage.removeItem('pending_plan_id');
+          sessionStorage.removeItem('pending_idempotency_key');
+          console.log('[Purchase Flow] sessionStorage cleared after grantCredits');
+        } else {
+          console.log('[Purchase Flow] grantCredits: no pending_plan_id found, skipping');
         }
       };
       grantCredits();
@@ -137,20 +153,18 @@ function GenerateImagePageContent() {
 
       if (savedPending) {
         const pg = savedPending;
+        console.log('[Purchase Flow] savedPending found, resumeGeneration will start', {
+          type: pg.type,
+          prompt: (pg.params as any).prompt?.substring(0, 50),
+        });
 
         const resumeGeneration = async () => {
+          console.log('[Purchase Flow] resumeGeneration executing');
           try {
             const token = await getToken();
             if (!token) return;
 
-            // Step 1: Grant credits (idempotent — safe even if already granted above)
-            const storedPlanId = sessionStorage.getItem('pending_plan_id');
-            if (storedPlanId) {
-              await grantPurchaseCredits(storedPlanId, token);
-              sessionStorage.removeItem('pending_plan_id');
-            }
-
-            // Step 2: Check balance (credits should be there now)
+            // Step 1: Check balance (credits were already granted by grantCredits() above)
             const status = await getBalance(token);
             const balance = status.credits?.balance ?? 0;
             setUserBalance(balance);

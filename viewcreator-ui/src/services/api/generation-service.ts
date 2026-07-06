@@ -1,12 +1,35 @@
 import { request } from '../base/api-client';
 import type { GenerateParams, GenerateVideoParams, GenerateImagesResponse, GenerateVideoResponse, UserCreation } from '@/types';
 
+export interface EditImageParams {
+  referenceImage: string;
+  instruction: string;
+  aspectRatio?: string;
+}
+
+export interface EditImageResponse {
+  editedImageUrl: string;
+}
+
 /**
  * Triggers image generation or edits with the Gemini model using the Express backend API.
  * Returns the full response including s3Urls and creationId for persistence.
  */
 export async function generateImages(params: GenerateParams, token?: string): Promise<GenerateImagesResponse> {
   return request<GenerateImagesResponse>('/api/generate', {
+    method: 'POST',
+    body: params,
+    token,
+  });
+}
+
+/**
+ * Edit an existing image using Gemini AI — does NOT create a user_creation record.
+ * Deducts credits at the EDIT rate (1 credit). Result is stored in the local
+ * edit history timeline only.
+ */
+export async function editImage(params: EditImageParams, token?: string): Promise<EditImageResponse> {
+  return request<EditImageResponse>('/api/edit-image', {
     method: 'POST',
     body: params,
     token,

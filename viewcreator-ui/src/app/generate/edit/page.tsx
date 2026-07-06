@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { setImageEditorState, updateHistoryItemImages } from "@/store/slices/image-editor-slice";
-import { generateImages } from "@/services";
+import { editImage } from "@/services";
 import type { EditTimelineEntry } from "@/components/editor/editor-timeline";
 
 import { EditorHeader } from "@/components/editor/editor-header";
@@ -23,8 +23,6 @@ export default function EditImagePage() {
   const {
     imageUrls,
     selectedIndex,
-    basePrompt,
-    style,
     aspectRatio,
     previewUrl,
   } = editorState;
@@ -197,19 +195,13 @@ export default function EditImagePage() {
 
     try {
       const token = await getToken().catch(() => undefined) || undefined;
-      const imageResult = await generateImages({
-        prompt: `${basePrompt}. ${instruction}`,
-        style,
+      const result = await editImage({
+        referenceImage: currentImage,
+        instruction,
         aspectRatio,
-        numberOfImages: 1,
-        imageSize: "1K",
-        thinkingLevel: "high",
-        quality: "Premium",
-        referenceImages: [currentImage],
-        templateId: null
       }, token);
 
-      const updatedUrl = imageResult.imageUrls?.[0] ?? currentImage;
+      const updatedUrl = result.editedImageUrl;
       setPreviewImageUrl(updatedUrl);
       setInstruction("");
       pushToHistory(updatedUrl, "ai-edit", instruction);

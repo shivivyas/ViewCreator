@@ -854,6 +854,92 @@ app.put('/api/generations/:id/images', requireAuth(), syncUserMiddleware, async 
   }
 });
 
+/**
+ * Edit an existing image using Gemini AI — no user_creation record is created.
+ * This is distinct from /api/generate which always persists a new creation.
+ * Credits are deducted at the EDIT rate (1 credit per edit).
+ */
+app.post('/api/edit-image', requireAuth(), syncUserMiddleware, async (req: express.Request, res: express.Response): Promise<any> => {
+  try {
+    const { referenceImage, instruction, aspectRatio = '1:1' } = req.body;
+
+    if (!referenceImage) {
+      return res.status(400).json({ error: 'Reference image is required' });
+    }
+    if (!instruction || !instruction.trim()) {
+      return res.status(400).json({ error: 'Edit instruction is required' });
+    }
+
+    // ── Credit Check ───────────────────────────────────────────
+    const { userId } = getAuth(req);
+    const editCost = CREDIT_COSTS.EDIT;
+    const guard = await checkCredits(userId!, editCost);
+    if (!guard.allowed) {
+      return res.status(402).json({
+        error: 'Insufficient credits',
+        credits_balance: guard.credits_balance,
+        required: editCost,
+        upgrade_url: '/pricing',
+      });
+    }
+
+    const apiKey = process.env.GEMINI_NANO_BANANA_API_KEY;
+    if (!apiKey || apiKey === 'your_api_key_here') {
+      return res.status(500).json({
+        error: 'API key is not configured on the server. Please check the GEMINI_NANO_BANANA_API_KEY setting.'
+      });
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.1-flash-image",
+      contents: [
+        instruction,
+        {
+          inlineData: {
+            mimeType: 'image/png',
+            data: referenceImage.replace(/^data:image\/\w+;base64,/, ''),
+          },
+        },
+      ],
+      config: {
+        responseModalities: ['IMAGE'],
+        imageConfig: { aspectRatio } as any,
+        thinkingConfig: { thinkingLevel: 'high', includeThoughts: false },
+      } as any,
+    });
+
+    let editedImageUrl: string | null = null;
+    if (response.candidates && response.candidates[0]?.content?.parts) {
+      for (const part of response.candidates[0].content.parts) {
+        if (part.inlineData) {
+          const mimeType = part.inlineData.mimeType || 'image/png';
+          editedImageUrl = `data:${mimeType};base64,${part.inlineData.data}`;
+          break;
+        }
+      }
+    }
+
+    if (!editedImageUrl) {
+      throw new Error('Gemini API did not return an edited image.');
+    }
+
+    // Deduct credits after successful edit (no user_creation record created)
+    await deductForGeneration(
+      userId!,
+      editCost,
+      `AI edit: ${instruction.substring(0, 100)}`,
+      { edit_type: 'image-edit', aspect_ratio: aspectRatio }
+    );
+
+    return res.json({ editedImageUrl });
+  } catch (error: any) {
+    console.error('Error editing image:', error);
+    return res.status(500).json({ error: error.message || 'Internal Server Error' });
+  }
+});
+
 // Payment Routes
 app.use(paymentRoutes);
 

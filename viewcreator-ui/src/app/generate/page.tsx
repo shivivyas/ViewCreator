@@ -613,6 +613,7 @@ function GenerateImagePageContent() {
               imageSize={imageSize}
               setImageSize={setImageSize}
               referenceImages={referenceImages}
+              isSignedIn={!!isSignedIn}
               setReferenceImages={setReferenceImages}
               templates={templates}
               selectedTemplateId={selectedTemplateId}

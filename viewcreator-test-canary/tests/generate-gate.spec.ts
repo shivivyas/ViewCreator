@@ -21,44 +21,41 @@ import { setupPersona } from "./helpers";
 test.describe("Generate Page — Credit Gate — Contract Tests (mock API)", () => {
   // ── Guest ────────────────────────────────────────────────────
   //
-  // CURRENT behavior: proxy.ts protects /generate via auth.protect().
-  // Guests are redirected to Clerk's hosted sign-in page BEFORE reaching the
-  // generate page. They never see the generate form.
-  //
-  // Q2 (target, after app fix): Remove server-side protect for /generate.
-  // Instead, show the form UI with a disabled "Sign in to generate" button.
-  // The button click would trigger openSignUp().
-  //
-  // The test below verifies the CURRENT redirect-to-sign-in behavior.
+  // Q2: Guest sees the generate form UI with a disabled "Sign in to generate"
+  // button. The button uses aria-disabled for visual state while remaining
+  // clickable so handleGenerate can call openSignUp().
+  // proxy.ts no longer protects /generate (only /generate/edit).
+  // Clerk's openSignUp() is the secondary defense in handleGenerate.
 
-  test("guest is redirected to Clerk sign-in page", async ({ page }) => {
+  test("guest sees disabled Sign in to generate button", async ({ page }) => {
     await setupPersona(page, "GUEST");
     await page.goto("/generate");
     await page.waitForLoadState("networkidle");
 
-    // Guest should be on the Clerk sign-in page (not on the generate page)
+    // Guest should reach the generate page (not redirected to Clerk sign-in)
     const currentUrl = page.url();
-    expect(currentUrl).toContain("accounts.dev/sign-in");
+    expect(currentUrl).toContain("/generate");
+    expect(currentUrl).not.toContain("accounts.dev");
 
-    // The Clerk sign-in page should show sign-in elements
-    await expect(
-      page.getByRole("heading", { name: /sign in/i })
-    ).toBeVisible();
+    // The button should say "Sign in to generate" and be aria-disabled
+    const genButton = page.getByRole("button", { name: /sign in to generate/i });
+    await expect(genButton).toBeVisible();
+    // aria-disabled="true" makes Playwright's toBeDisabled() return true
+    await expect(genButton).toBeDisabled();
   });
 
-  // TODO: Activate after Q2 app fix — remove proxy.ts protection for /generate,
-  // then guest sees the generate UI with disabled "Sign in to generate" button.
-  // Changes needed:
-  //   1. Remove "/generate(.*)" from isProtectedRoute in proxy.ts
-  //   2. Show disabled button in generate-form.tsx when !isSignedIn
-  // test("guest sees disabled Sign in to generate button (target behavior)", async ({ page }) => {
-  //   await setupPersona(page, "GUEST");
-  //   await page.goto("/generate");
-  //   await page.waitForLoadState("networkidle");
-  //   const genButton = page.getByRole("button", { name: /sign in to generate/i });
-  //   await expect(genButton).toBeVisible();
-  //   await expect(genButton).toBeDisabled();
-  // });
+  test("guest can still see the generate form UI", async ({ page }) => {
+    await setupPersona(page, "GUEST");
+    await page.goto("/generate");
+    await page.waitForLoadState("networkidle");
+
+    // Guest should see the full form — prompt input, options, etc.
+    await expect(page.getByPlaceholder(/describe/i).first()).toBeVisible();
+    // And the "Sign in to generate" button
+    await expect(
+      page.getByRole("button", { name: /sign in to generate/i })
+    ).toBeVisible();
+  });
 
   // ── Signed-in Personas (FREE, LOW_CREDIT, CREDIT_USER) ──────
   //

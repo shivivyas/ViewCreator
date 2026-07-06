@@ -25,6 +25,7 @@ export interface GenerateFormProps {
   isLoadingTemplates: boolean;
   isLoading: boolean;
   mounted: boolean;
+  isSignedIn: boolean;
   error: string | null;
   handleGenerate: (e: React.FormEvent) => void;
   handleEnhancePrompt: () => void;
@@ -50,6 +51,7 @@ export function GenerateForm({
   isLoadingTemplates,
   isLoading,
   mounted,
+  isSignedIn,
   error,
   handleGenerate,
   handleEnhancePrompt,
@@ -411,16 +413,27 @@ export function GenerateForm({
         )}
 
         {/* ── Generate Button (inline, always visible) ─────── */}
+        {/* Q2: Guests see disabled 'Sign in to generate' button. */}
+        {/* The button looks disabled but stays clickable — onClick fires */}
+        {/* handleGenerate which calls openSignUp() for guest users. */}
         <Button
           type="submit"
           size="lg"
-          className="w-full h-11 rounded-xl font-semibold shadow-sm transition-all mt-1"
+          className={`w-full h-11 rounded-xl font-semibold shadow-sm transition-all mt-1 ${
+            !isSignedIn ? "opacity-50 cursor-not-allowed" : ""
+          }`}
           disabled={!mounted || isLoading || !prompt.trim()}
+          aria-disabled={!isSignedIn ? "true" : undefined}
         >
           {isLoading ? (
             <>
               <Loader2 className="size-4 mr-2 animate-spin" />
               Generating...
+            </>
+          ) : !isSignedIn ? (
+            <>
+              <Sparkles className="size-4 mr-2" />
+              Sign in to generate
             </>
           ) : (
             <>

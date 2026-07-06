@@ -350,10 +350,12 @@ function GenerateImagePageContent() {
           );
           const newItems = historyItems.filter((h) => !existingIds.has(h.creationId));
           if (newItems.length > 0) {
-            // Add them to the end (newest first from API, oldest creations at bottom)
-            newItems.forEach((item) => {
-              thunkDispatch(addGenerationToHistory(item));
-            });
+            // API returns newest-first. Since addGenerationToHistory prepends,
+            // iterate in reverse (oldest → newest) so prepend produces correct
+            // newest-first order matching freshly-generated items.
+            for (let i = newItems.length - 1; i >= 0; i--) {
+              thunkDispatch(addGenerationToHistory(newItems[i]));
+            }
           }
         });
       } catch (err) {

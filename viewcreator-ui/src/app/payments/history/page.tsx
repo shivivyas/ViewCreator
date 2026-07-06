@@ -28,9 +28,12 @@ export default function PaymentHistoryPage() {
     let cancelled = false;
 
     getToken()
-      .then((t) => t && getTransactions(t))
+      .then((t) => {
+        if (!t) return;
+        return getTransactions(t);
+      })
       .then((data) => {
-        if (!cancelled) setTransactions(data.transactions);
+        if (!cancelled && data) setTransactions(data.transactions);
       })
       .catch(() => {})
       .finally(() => {

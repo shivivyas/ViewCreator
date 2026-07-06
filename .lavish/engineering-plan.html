@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ViewCreator — Engineering Polish Plan</title>
+<style>
+  :root {
+    --bg: #0a0a0b;
+    --surface: #141416;
+    --surface2: #1a1a1e;
+    --border: #1f1f23;
+    --border2: #2a2a30;
+    --text: #e4e4e7;
+    --muted: #71717a;
+    --accent: #f59e0b;
+    --green: #22c55e;
+    --blue: #3b82f6;
+    --red: #ef4444;
+    --purple: #a855f7;
+    --amber: #f59e0b;
+    --emerald: #10b981;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', 'Inter', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    padding: 2rem;
+  }
+  .container { max-width: 960px; margin: 0 auto; }
+
+  h1 { font-size: 1.75rem; font-weight: 700; margin-bottom: 0.25rem; display: flex; align-items: center; gap: 0.75rem; }
+  .subtitle { color: var(--muted); font-size: 0.875rem; margin-bottom: 2rem; }
+
+  h2 {
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin: 2.5rem 0 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .priority-bar {
+    display: flex;
+    gap: 0.5rem;
+    margin: 1.5rem 0;
+    flex-wrap: wrap;
+  }
+  .priority-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    padding: 0.25rem 0.625rem;
+    border-radius: 999px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .p0 { background: #ef444420; color: var(--red); border: 1px solid #ef444440; }
+  .p1 { background: #f59e0b20; color: var(--amber); border: 1px solid #f59e0b40; }
+  .p2 { background: #3b82f620; color: var(--blue); border: 1px solid #3b82f640; }
+  .p3 { background: #71717a20; color: var(--muted); border: 1px solid #71717a40; }
+
+  .epic {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    transition: border-color 0.2s;
+  }
+  .epic:hover { border-color: var(--border2); }
+
+  .epic-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+  }
+  .epic-title {
+    font-size: 1rem;
+    font-weight: 600;
+  }
+  .epic-layer {
+    font-size: 0.6875rem;
+    font-weight: 500;
+    padding: 0.125rem 0.5rem;
+    border-radius: 999px;
+    white-space: nowrap;
+    background: var(--surface2);
+    color: var(--muted);
+    border: 1px solid var(--border);
+  }
+  .epic-desc {
+    font-size: 0.8125rem;
+    color: var(--muted);
+    margin-bottom: 1rem;
+    line-height: 1.6;
+  }
+
+  .task-list { list-style: none; }
+  .task-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.8125rem;
+  }
+  .task-item:last-child { border-bottom: none; }
+  .task-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    margin-top: 0.5rem;
+    flex-shrink: 0;
+  }
+  .dot-p0 { background: var(--red); }
+  .dot-p1 { background: var(--amber); }
+  .dot-p2 { background: var(--blue); }
+  .dot-p3 { background: var(--muted); }
+
+  .task-content { flex: 1; min-width: 0; }
+  .task-title {
+    font-weight: 500;
+    margin-bottom: 0.125rem;
+  }
+  .task-detail {
+    color: var(--muted);
+    font-size: 0.75rem;
+    line-height: 1.5;
+  }
+  .task-files {
+    margin-top: 0.25rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+  .task-file {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.625rem;
+    padding: 0.0625rem 0.375rem;
+    border-radius: 4px;
+    background: var(--surface2);
+    color: var(--muted);
+    border: 1px solid var(--border);
+  }
+
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0;
+  }
+  .summary-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem;
+    text-align: center;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .summary-card .number {
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1.15;
+    margin-bottom: 0.25rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .summary-card .label {
+    font-size: 0.6875rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .num-p0 { color: var(--red); }
+  .num-p1 { color: var(--amber); }
+  .num-p2 { color: var(--blue); }
+  .num-p3 { color: var(--muted); }
+  .num-total { color: var(--text); }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <h1>🔧 ViewCreator — Engineering Polish Plan</h1>
+  <p class="subtitle">Complete work breakdown for tightening every loose edge across all 4 layers</p>
+
+  <div class="summary-grid">
+    <div class="summary-card">
+      <div class="number num-p0">3</div>
+      <div class="label">P0 — Critical</div>
+    </div>
+    <div class="summary-card">
+      <div class="number num-p1">5</div>
+      <div class="label">P1 — Polish</div>
+    </div>
+    <div class="summary-card">
+      <div class="number num-p2">4</div>
+      <div class="label">P2 — Test</div>
+    </div>
+    <div class="summary-card">
+      <div class="number num-p3">4</div>
+      <div class="label">P3 — Invest</div>
+    </div>
+    <div class="summary-card">
+      <div class="number num-total">16</div>
+      <div class="label">Total Tasks</div>
+    </div>
+  </div>
+
+  <div class="priority-bar">
+    <span class="priority-tag p0">🔴 P0 — Broken UX / Data Loss Risk</span>
+    <span class="priority-tag p1">🟡 P1 — Rough Edges</span>
+    <span class="priority-tag p2">🔵 P2 — Test Coverage</span>
+    <span class="priority-tag p3">⚪ P3 — Invest When Ready</span>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- EPIC 1: Database Safety -->
+  <!-- ============================================================ -->
+  <h2>🗄️ Epic 1: Database Safety & Migrations</h2>
+
+  <div class="epic">
+    <div class="epic-header">
+      <span class="epic-title">1.1 Destructive schema.sql → versioned migrations</span>
+      <span class="epic-layer">viewcreator-database</span>
+    </div>
+    <div class="epic-desc">
+      <strong>Problem:</strong> <code>schema.sql</code> uses <code>DROP TABLE IF EXISTS</code> — every migration wipes all data. This is the #1 risk for any staging/prod deployment.
+    </div>
+    <ul class="task-list">
+      <li class="task-item">
+        <span class="task-dot dot-p0"></span>
+        <div class="task-content">
+          <div class="task-title">Replace schema.sql with node-pg-migrate</div>
+          <div class="task-detail">Each table gets its own timestamped up/down migration file. Current schema becomes <code>migrations/001-initial.sql</code> (CREATE IF NOT EXISTS — no DROP).</div>
+          <div class="task-files">
+            <span class="task-file">viewcreator-database/src/schema.sql</span>
+            <span class="task-file">viewcreator-database/src/migrate.ts</span>
+            <span class="task-file">viewcreator-database/package.json</span>
+          </div>
+        </div>
+        <span class="priority-tag p0">P0</span>
+      </li>
+      <li class="task-item">
+        <span class="task-dot dot-p0"></span>
+        <div class="task-content">
+          <div class="task-title">Add migration runner to npm scripts</div>
+          <div class="task-detail"><code>npm run db:migrate</code> runs pending migrations sequentially. <code>npm run db:rollback</code> reverts last. Seed stays independent.</div>
+          <div class="task-files">
+            <span class="task-file">viewcreator-database/package.json</span>
+          </div>
+        </div>
+        <span class="priority-tag p0">P0</span>
+      </li>
+    </ul>
+  </div>
+
+  <div class="epic">
+    <div class="epic-header">
+      <span class="epic-title">1.2 Add database indexes for query performance</span>
+      <span class="epic-layer">viewcreator-database</span>
+    </div>
+    <div class="epic-desc">
+      <strong>Problem:</strong> <code>credit_transactions</code> and <code>user_creations</code> already have composite indexes, but <code>users(email)</code> is the only single-column index. Add missing indexes for foreign key lookups.
+    </div>
+    <ul class="task-list">
+      <li class="task-item">
+        <span class="task-dot dot-p1"></span>
+        <div class="task-content">
+          <div class="task-title">Add FK indexes for all join columns</div>
+          <div class="task-detail">Index <code>user_subscriptions(user_id)</code>, <code>user_subscriptions(plan_id)</code>, <code>user_credits(user_id)</code>, <code>user_creations(user_id)</code> — some may already exist but verify.</div>
+          <div class="task-files">
+            <span class="task-file">viewcreator-database/src/schema.sql</span>
+          </div>
+        </div>
+        <span class="priority-tag p1">P1</span>
+      </li>
+    </ul>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- EPIC 2: Input Validation & Error Handling -->
+  <!-- ============================================================ -->
+  <h2>🛡️ Epic 2: Input Validation & Error Handling</h2>
+
+  <div class="epic">
+    <div class="epic-header">
+      <span class="epic-title">2.1 Add Zod for request body validation</span>
+      <span class="epic-layer">viewcreator-api</span>
+    </div>
+    <div class="epic-desc">
+      <strong>Problem:</strong> All 12+ API routes validate inputs manually (<code>if (!title)</code>, <code>if (!prompt)</code>). No type-safe schema enforcement. Error responses are inconsistent — some return <code>{ error }</code>, others <code>{ errors }</code>.
+    </div>
+    <ul class="task-list">
+      <li class="task-item">
+        <span class="task-dot dot-p1"></span>
+        <div class="task-content">
+          <div class="task-title">Install zod, create shared validation schemas</div>
+          <div class="task-detail">Schemas for: <code>generateSchema</code>, <code>editImageSchema</code>, <code>uploadTemplateSchema</code>, <code>createCheckoutSchema</code>. Place in <code>viewcreator-shared/src/validation/</code> or <code>viewcreator-api/src/validation/</code>.</div>
+          <div class="task-files">
+            <span class="task-file">viewcreator-api/package.json</span>
+            <span class="task-file">viewcreator-api/src/middleware/</span>
+          </div>
+        </div>
+        <span class="priority-tag p1">P1</span>
+      </li>
+      <li class="task-item">
+        <span class="task-dot dot-p1"></span>
+        <div class="task-content">
+          <div class="task-title">Create <code>validate(schema)</code> middleware</div>
+          <div class="task-detail">Express middleware that parses <code>req.body</code> against a Zod schema, returns 400 with <code>{ error, details }</code> on mismatch. Apply to all POST/PUT endpoints.</div>
+          <div class="task-files">
+            <span class="task-file">viewcreator-api/src/middleware/validate.ts</span>
+          </div>
+        </div>
+        <span class="priority-tag p1">P1</span>
+      </li>
+      <li class="task-item">
+        <span class="task-dot dot-p1"></span>
+        <div class="task-content">
+          <div class="task-title">Unify error response format</div>
+          <div class="task-detail">All endpoints return <code>{ error: string, details?: any }</code> on failure. <code>402</code> errors include <code>{ credits_balance, required, upgrade_url }</code> — keep this pattern, extend to all error paths.</div>
+          <div class="task-files">
+            <span class="task-file">viewcreator-api/src/index.ts</span>
+            <span class="task-file">viewcreator-api/src/routes/payments.ts</span>
+          </div>
+        </div>
+        <span class="priority-tag p1">P1</span>
+      </li>
+    </ul>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- EPIC 3: API Route Extraction -->
+  <!-- ============================================================ -->
+  <h2>🧩 Epic 3: API Route Extraction</h2>
+
+  <div class="epic">
+    <div class="epic-header">
+      <span class="epic-title">3.1 Extract inline routes into dedicated route files</span>
+      <span class="epic-layer">viewcreator-api</span>
+    </div>
+    <div class="epic-desc">
+      <strong>Problem:</strong> <code>index.ts</code> is 1000+ lines with 12 inline route handlers. Template routes, generation routes, and edit routes are all inlined. Only <code>payments.ts</code> and <code>admin.ts</code> are extracted.
+    </div>
+    <ul class="task-list">
+      <li class="task-item">
+        <span class="task-dot dot-p1"></span>
+        <div class="task-content">
+          <div class="task-title">Extract template routes → <code>routes/templates.ts</code></div>
+          <div class="task-detail">Move: <code>GET /api/templates</code>, <code>POST /api/templates/upload</code>, <code>DELETE /api/templates/:id</code>, <code>POST /api/templates/:id/vote</code></div>
+          <div class="task-files">
+            <span class="task-file">viewcreator-api/src/index.ts</span>
+            <span class="task-file">viewcreator-api/src/routes/templates.ts</span>
+          </div>
+        </div>
+        <span class="priority-tag p1">P1</span>
+      </li>
+      <li class="task-item">
+        <span class="task-dot dot-p1"></span>
+        <div class="task-content">
+          <div class="task-title">Extract generation routes → <code>routes/generations.ts</code></div>
+          <div class="task-detail">Move: <code>POST /api/generate</code>, <code>POST /api/generate/video</code>, <code>GET /api/generations</code>, <code>DELETE /api/generations/:id</code>, <code>DELETE /api/generations</code>, <code>PUT /api/generations/:id/images</code>, <code>POST /api/edit-image</code></div>
+          <div class="task-files">
+            <span class="task-file">viewcreator-api/src/index.ts</span>
+            <span class="task-file">viewcreator-api/src/routes/generations.ts</span>
+          </div>
+        </div>
+        <span class="priority-tag p1">P1</span>
+      </li>
+      <li class="task-item">
+        <span class="task-dot dot-p1"></span>
+        <div class="task-content">
+          <div class="task-title">Extract S3 helpers → <code>services/s3-service.ts</code></div>
+          <div class="task-detail">Move <code>uploadToS3()</code> and <code>fetchS3ImageAsBase64()</code> into a shared service. Both generation and template routes need them.</div>
+          <div class="task-files">
+            <span class="task-file">viewcreator-api/src/services/s3-service.ts</span>
+          </div>
+        </div>
+        <span class="priority-tag p1">P1</span>
+      </li>
+    </ul>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- EPIC 4: Frontend Splitting -->
+  <!-- ============================================================ -->
+  <h2>📦 Epic 4: Frontend Component Splitting</h2>
+
+  <div class="epic">
+    <div class="epic-header">
+      <span class="epic-title">4.1 Split <code>generate/page.tsx</code> (900+ lines)</span>
+      <span class="epic-layer">viewcreator-ui</span>
+    </div>
+    <div class="epic-desc">
+      <strong>Problem:</strong> The generate page is a monolith handling: form state, template selection, credit gate modal, purchase flow, generation orchestration, post-purchase resume, history loading — all in one file.
+    </div>
+    <ul class="task-list">
+      <li class="task-item">
+        <span class="task-dot dot-p1"></span>
+        <div class="task-content">
+          <div class="task-title">Extract <code>useCreditGate()</code> hook</div>
+          <div class="task-detail">Encapsulates: balance check, credit modal state, pending generation save/restore, purchase flow. Returns <code>{ showCreditModal, creditPacks, userBalance, checkCredits }</code>.</div>
+          <div class="task-files">
+            <span class="task-file">viewcreator-ui/src/hooks/use-credit-gate.ts</span>
+            <span class="task-file">viewcreator-ui/src/app/generate/page.tsx</span>
+          </div>
+        </div>
+        <span class="priority-tag p1">P1</span>
+      </li>
+      <li class="task-item">
+        <span class="task-dot dot-p1"></span>
+        <div class="task-content">
+          <div class="task-title">Extract <code>CreditGateModal</code> component</div>
+          <div class="task-detail">Reusable credit purchase modal used in both <code>/generate</code> and <code>/templates</code>. Props: <code>{ creditPacks, userBalance, requiredCredits, onClose }</code>.</div>
+          <div class="task-files">
+            <span class="task-file">viewcreator-ui/src/components/shared/credit-gate-modal.tsx</span>
+            <span class="task-file">viewcreator-ui/src/app/generate/page.tsx</span>
+            <span class="task-file">viewcreator-ui/src/app/templates/page.tsx</span>
+          </div>
+        </div>
+        <span class="priority-tag p1">P1</span>
+      </li>
+    </ul>
+  </div>
+
+  <div class="epic">
+    <div class="epic-header">
+      <span class="epic-title">4.2 Add loading & error boundaries</span>
+      <span class="epic-layer">viewcreator-ui</span>
+    </div>
+    <div class="epic-desc">
+      <strong>Problem:</strong> No <code>loading.tsx</code> or <code>error.tsx</code> files for any route. On slow connections, users see blank pages or flash-of-nothing.
+    </div>
+    <ul class="task-list">
+      <li class="task-item">
+        <span class="task-dot dot-p1"></span>
+        <div class="task-content">
+          <div class="task-title">Add <code>loading.tsx</code> for each page route</div>
+          <div class="task-detail">Skeleton loaders for <code>/generate</code>, <code>/generate/edit</code>, <code>/templates</code>, <code>/pricing</code>, <code>/payments/history</code>. Consistent with existing <code>LoadingSkeleton</code> pattern in HistoryPanel.</div>
+          <div class="task-files">
+            <span class="task-file">viewcreator-ui/src/app/generate/loading.tsx</span>
+            <span class="task-file">viewcreator-ui/src/app/generate/edit/loading.tsx</span>
+            <span class="task-file">viewcreator-ui/src/app/templates/loading.tsx</span>
+            <span class="task-file">viewcreator-ui/src/app/pricing/loading.tsx</span>
+          </div>
+        </div>
+        <span class="priority-tag p1">P1</span>
+      </li>
+      <li class="task-item">
+        <span class="task-dot dot-p1"></span>
+        <div class="task-content">
+          <div class="task-title">Add <code>error.tsx</code> for each page route</div>
+          <div class="task-detail">Friendly error pages with "Try Again" button. Consistent with the app's design system.</div>
+          <div class="task-files">
+            <span class="task-file">viewcreator-ui/src/app/generate/error.tsx</span>
+            <span class="task-file">viewcreator-ui/src/app/templates/error.tsx</span>
+            <span class="task-file">viewcreator-ui/src/app/pricing/error.tsx</span>
+          </div>
+        </div>
+        <span class="priority-tag p1">P1</span>
+      </li>
+    </ul>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- EPIC 5: Dependency Hygiene -->
+  <!-- ============================================================ -->
+  <h2>📦 Epic 5: Dependency Hygiene</h2>
+
+  <div class="epic">
+    <div class="epic-header">
+      <span class="epic-title">5.1 Fix runtime deps in devDependencies</span>
+      <span class="epic-layer">viewcreator-api</span>
+    </div>
+    <div class="epic-desc">
+      <strong>Problem:</strong> <code>dodopayments</code> SDK and <code>express-rate-limit</code> are in <code>devDependencies</code> but used at runtime. Works in monorepo due to hoisting, but would fail in a production-only install.
+    </div>
+    <ul class="task-list">
+      <li class="task-item">
+        <span class="task-dot dot-p0"></span>
+        <div class="task-content">
+          <div class="task-title">Move to <code>dependencies</code></div>
+          <div class="task-detail"><code>dodopayments</code> and <code>express-rate-limit</code> → <code>dependencies</code></div>
+          <div class="task-files">
+            <span class="task-file">viewcreator-api/package.json</span>
+          </div>
+        </div>
+        <span class="priority-tag p0">P0</span>
+      </li>
+    </ul>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- EPIC 6: UX Papercuts -->
+  <!-- ============================================================ -->
+  <h2>🎯 Epic 6: UX Papercuts</h2>
+
+  <div class="epic">
+    <div class="epic-header">
+      <span class="epic-title">6.1 Fix pre-existing TS errors</span>
+      <span class="epic-layer">viewcreator-ui</span>
+    </div>
+    <div class="epic-desc">
+      <strong>Problem:</strong> <code>payments/history/page.tsx</code> has 3 TypeScript errors (lines 31, 33). The page compiles but has broken runtime behavior for the transaction history feature.
+    </div>
+    <ul class="task-list">
+      <li class="task-item">
+        <span class="task-dot dot-p0"></span>
+        <div class="task-content">
+          <div class="task-title">Fix transaction history page</div>
+          <div class="task-detail">The <code>getTransactions().then()</code> callback has an incorrect type signature returning <code>""</code> instead of the expected type. Fix the promise chain.</div>
+          <div class="task-files">
+            <span class="task-file">viewcreator-ui/src/app/payments/history/page.tsx</span>
+          </div>
+        </div>
+        <span class="priority-tag p0">P0</span>
+      </li>
+    </ul>
+  </div>
+
+  <div class="epic">
+    <div class="epic-header">
+      <span class="epic-title">6.2 Auth proxy covers all protected routes</span>
+      <span class="epic-layer">viewcreator-ui</span>
+    </div>
+    <div class="epic-desc">
+      <strong>Problem:</strong> <code>proxy.ts</code> only protects <code>/generate/edit</code>. But <code>/generate</code>, <code>/templates</code> (upload), and <code>/payments/*</code> also require auth for key features. Currently, auth is checked client-side per-action, which means unauthenticated users can reach the page before being blocked.
+    </div>
+    <ul class="task-list">
+      <li class="task-item">
+        <span class="task-dot dot-p1"></span>
+        <div class="task-content">
+          <div class="task-title">Extend proxy.ts route matcher</div>
+          <div class="task-detail">Protect <code>/generate(.*)</code>, <code>/payments(.*)</code> at the proxy level. Keep <code>/templates</code> public (browsing is OK, upload requires auth).</div>
+          <div class="task-files">
+            <span class="task-file">viewcreator-ui/src/proxy.ts</span>
+          </div>
+        </div>
+        <span class="priority-tag p1">P1</span>
+      </li>
+    </ul>
+  </div>
+
+  <div class="epic">
+    <div class="epic-header">
+      <span class="epic-title">6.3 Templates cache invalidation on upload</span>
+      <span class="epic-layer">viewcreator-ui</span>
+    </div>
+    <div class="epic-desc">
+      <strong>Problem:</strong> Template list is cached in-memory with a 30s TTL. After upload, the cache is cleared and refetch is forced — but the 30s <code>Cache-Control</code> header on the API response means the browser/CDN may serve stale data within that window.
+    </div>
+    <ul class="task-list">
+      <li class="task-item">
+        <span class="task-dot dot-p1"></span>
+        <div class="task-content">
+          <div class="task-title">Bypass browser cache on mutation</div>
+          <div class="task-detail">After upload/delete/vote, call <code>fetchTemplates(true)</code> with a cache-busting query param (<code>?_t=Date.now()</code>) to bypass the 30s Cache-Control.</div>
+          <div class="task-files">
+            <span class="task-file">viewcreator-ui/src/services/api/template-service.ts</span>
+            <span class="task-file">viewcreator-ui/src/app/templates/page.tsx</span>
+          </div>
+        </div>
+        <span class="priority-tag p1">P1</span>
+      </li>
+    </ul>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- EPIC 7: Test Coverage -->
+  <!-- ============================================================ -->
+  <h2>🧪 Epic 7: Test Coverage</h2>
+
+  <div class="epic">
+    <div class="epic-header">
+      <span class="epic-title">7.1 Add missing test coverage</span>
+      <span class="epic-layer">viewcreator-test-canary</span>
+    </div>
+    <div class="epic-desc">
+      <strong>Problem:</strong> 3 critical features have zero test coverage: template upload credit gate, edit-image endpoint, and editor E2E flow.
+    </div>
+    <ul class="task-list">
+      <li class="task-item">
+        <span class="task-dot dot-p2"></span>
+        <div class="task-content">
+          <div class="task-title">Template upload credit gate tests</div>
+          <div class="task-detail">Contract tests: mock credit balance, verify 402 on insufficient credits, verify upload succeeds with sufficient credits. Use existing persona setup from <code>helpers.ts</code>.</div>
+          <div class="task-files">
+            <span class="task-file">viewcreator-test-canary/tests/template-upload-gate.spec.ts</span>
+          </div>
+        </div>
+        <span class="priority-tag p2">P2</span>
+      </li>
+      <li class="task-item">
+        <span class="task-dot dot-p2"></span>
+        <div class="task-content">
+          <div class="task-title">Edit-image endpoint tests</div>
+          <div class="task-detail">API tests: verify 400 on missing params, verify 402 on insufficient credits, verify 200 with mock Gemini response. Use admin key for direct API calls.</div>
+          <div class="task-files">
+            <span class="task-file">viewcreator-test-canary/tests/edit-image.spec.ts</span>
+          </div>
+        </div>
+        <span class="priority-tag p2">P2</span>
+      </li>
+      <li class="task-item">
+        <span class="task-dot dot-p2"></span>
+        <div class="task-content">
+          <div class="task-title">Editor E2E tests</div>
+          <div class="task-detail">Navigate to /generate/edit, verify timeline renders, apply crop, undo/redo, save changes, verify thumbnail updates on return to /generate.</div>
+          <div class="task-files">
+            <span class="task-file">viewcreator-test-canary/tests/editor.spec.ts</span>
+          </div>
+        </div>
+        <span class="priority-tag p2">P2</span>
+      </li>
+      <li class="task-item">
+        <span class="task-dot dot-p2"></span>
+        <div class="task-content">
+          <div class="task-title">Credit deduction idempotency tests</div>
+          <div class="task-detail">Verify <code>confirm-purchase</code> idempotency key prevents double-spend. Verify atomic deduct prevents concurrent over-draft.</div>
+          <div class="task-files">
+            <span class="task-file">viewcreator-test-canary/tests/credit-deduction.spec.ts</span>
+          </div>
+        </div>
+        <span class="priority-tag p2">P2</span>
+      </li>
+    </ul>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- EPIC 8: Longer-term Investment -->
+  <!-- ============================================================ -->
+  <h2>🔮 Epic 8: Investment (Longer-term)</h2>
+
+  <div class="epic">
+    <div class="epic-header">
+      <span class="epic-title">8.1 Invest when ready</span>
+      <span class="epic-layer">All layers</span>
+    </div>
+    <div class="epic-desc">
+      Items that improve DX, maintainability, and observability but aren't blocking polish.
+    </div>
+    <ul class="task-list">
+      <li class="task-item">
+        <span class="task-dot dot-p3"></span>
+        <div class="task-content">
+          <div class="task-title">Add OpenAPI/Swagger doc generation</div>
+          <div class="task-detail">Generate OpenAPI 3.0 spec from Zod schemas or use <code>swagger-jsdoc</code>. Serve via <code>swagger-ui-express</code> at <code>/api-docs</code>.</div>
+          <div class="task-files">
+            <span class="task-file">viewcreator-api/src/</span>
+          </div>
+        </div>
+        <span class="priority-tag p3">P3</span>
+      </li>
+      <li class="task-item">
+        <span class="task-dot dot-p3"></span>
+        <div class="task-content">
+          <div class="task-title">Add structured logging (pino)</div>
+          <div class="task-detail">Replace <code>console.log()</code>/<code>console.error()</code> with structured JSON logging. Include request IDs, timestamps, and severity levels.</div>
+          <div class="task-files">
+            <span class="task-file">viewcreator-api/src/</span>
+          </div>
+        </div>
+        <span class="priority-tag p3">P3</span>
+      </li>
+      <li class="task-item">
+        <span class="task-dot dot-p3"></span>
+        <div class="task-content">
+          <div class="task-title">Add health check with DB + Gemini + S3 probes</div>
+          <div class="task-detail">Current <code>/health</code> returns static OK. Upgrade to verify DB connectivity, Gemini API key validity, and S3 bucket accessibility.</div>
+          <div class="task-files">
+            <span class="task-file">viewcreator-api/src/index.ts</span>
+          </div>
+        </div>
+        <span class="priority-tag p3">P3</span>
+      </li>
+      <li class="task-item">
+        <span class="task-dot dot-p3"></span>
+        <div class="task-content">
+          <div class="task-title">Repository unit tests</div>
+          <div class="task-detail">Test <code>credit-repository.ts</code> atomic operations and <code>webhook-repository.ts</code> idempotency with a test database or mocks.</div>
+          <div class="task-files">
+            <span class="task-file">viewcreator-database/src/__tests__/</span>
+          </div>
+        </div>
+        <span class="priority-tag p3">P3</span>
+      </li>
+    </ul>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- EXECUTION ORDER -->
+  <!-- ============================================================ -->
+  <h2>📋 Execution Order</h2>
+
+  <div class="epic" style="border-left: 3px solid var(--red);">
+    <div class="epic-desc">
+      <strong>Phase 1 — Critical (do first, ship fast):</strong><br>
+      1.1 Destructive schema migration → versioned<br>
+      5.1 Fix runtime deps in devDependencies<br>
+      6.1 Fix pre-existing TS errors<br>
+      <br>
+      <strong>Phase 2 — Polish (next session):</strong><br>
+      2.1 Add Zod validation + error unification<br>
+      3.1 Extract API routes from index.ts<br>
+      4.1 Split generate/page.tsx<br>
+      6.2 Extend auth proxy coverage<br>
+      6.3 Template cache busting<br>
+      <br>
+      <strong>Phase 3 — Test (after polish):</strong><br>
+      7.1 All 4 test files<br>
+      <br>
+      <strong>Phase 4 — Invest (when ready):</strong><br>
+      8.1 All items<br>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

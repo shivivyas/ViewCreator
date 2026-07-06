@@ -2,7 +2,6 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Users Table
-DROP TABLE IF EXISTS users CASCADE;
 CREATE TABLE IF NOT EXISTS users (
     id VARCHAR(255) PRIMARY KEY,
     email VARCHAR(255) UNIQUE NOT NULL,
@@ -15,7 +14,6 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 
 -- Templates Table
-DROP TABLE IF EXISTS templates CASCADE;
 CREATE TABLE IF NOT EXISTS templates (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     title VARCHAR(255) NOT NULL,
@@ -60,7 +58,6 @@ CREATE TRIGGER update_templates_timestamp
     EXECUTE FUNCTION update_timestamp();
 
 -- Template Upvotes Table
-DROP TABLE IF EXISTS template_upvotes CASCADE;
 CREATE TABLE IF NOT EXISTS template_upvotes (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     template_id UUID NOT NULL REFERENCES templates(id) ON DELETE CASCADE,
@@ -277,7 +274,6 @@ $$;
 
 -- Stores all user-generated content (images and videos) for persistence across sessions.
 -- Each row represents one generation request with its output stored in S3.
-DROP TABLE IF EXISTS user_creations CASCADE;
 CREATE TABLE IF NOT EXISTS user_creations (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,

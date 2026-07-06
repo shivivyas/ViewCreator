@@ -328,6 +328,68 @@ test.describe("Clerk: Post-Purchase UI — Form Restoration", () => {
   });
 });
 
+// ── Confirm Purchase Idempotency ────────────────────────────────────────────
+
+test.describe("Clerk: Confirm Purchase Idempotency", () => {
+  const clerkUserIds: string[] = [];
+
+  test.afterEach(async () => {
+    for (const id of clerkUserIds) {
+      await deleteClerkUser(id);
+    }
+    clerkUserIds.length = 0;
+  });
+
+  test("same idempotency key does not double-grant credits", async ({ page, request }) => {
+    // Sign in a fresh user (0 credits)
+    const { userId } = await signInUser(page);
+    clerkUserIds.push(userId);
+
+    // Get a valid plan ID from the Express API (public endpoint, no auth needed)
+    const plansRes = await request.get(`${API_BASE}/api/payments/plans`);
+    const plans = await plansRes.json();
+    const fiveCreditPlan = plans.creditPacks?.find((p: any) => p.credits === 5);
+    expect(fiveCreditPlan).toBeDefined();
+    console.log(`[Idempotency Test] Using plan: ${fiveCreditPlan.name} (${fiveCreditPlan.id})`);
+
+    // Get a Clerk JWT from the browser context after sign-in.
+    // Clerk stores the session JWT in the __session cookie on localhost:3000.
+    const cookies = await page.context().cookies();
+    const clerkCookie = cookies.find(c => c.name === '__session');
+    expect(clerkCookie).toBeDefined();
+    const clerkJwt = clerkCookie!.value;
+    console.log(`[Idempotency Test] Got Clerk JWT from cookie (len=${clerkJwt.length})`);
+
+    // Make two confirm-purchase calls with the same idempotency key
+    const idempotencyKey = `test-idem-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    console.log(`[Idempotency Test] Key: ${idempotencyKey}`);
+
+    const opts = {
+      headers: { Authorization: `Bearer ${clerkJwt}` },
+      data: { plan_id: fiveCreditPlan.id, idempotency_key: idempotencyKey },
+    };
+
+    const r1 = await request.post(`${API_BASE}/api/payments/confirm-purchase`, opts);
+    const b1 = await r1.json();
+    console.log(`[Idempotency Test] Call 1:`, JSON.stringify(b1));
+
+    const r2 = await request.post(`${API_BASE}/api/payments/confirm-purchase`, opts);
+    const b2 = await r2.json();
+    console.log(`[Idempotency Test] Call 2:`, JSON.stringify(b2));
+
+    const balRes = await request.get(`${API_BASE}/api/payments/balance`, {
+      headers: { Authorization: `Bearer ${clerkJwt}` },
+    });
+    const bal = await balRes.json();
+    console.log(`[Idempotency Test] Balance:`, JSON.stringify(bal));
+
+    expect(b1.granted).toBe(true);
+    expect(b2.already_granted).toBe(true);
+    expect(bal.credits?.balance).toBe(5);
+    expect(bal.credits?.lifetime_credits).toBe(5);
+  });
+});
+
 // ── Skipped — feature not yet implemented ───────────────────────────────────
 
 test.describe("Clerk: Future behaviors (skipped until app fix)", () => {

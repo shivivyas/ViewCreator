@@ -2,7 +2,7 @@
 
 **Status**: 🟢 Active
 **Started**: 2026-07-05
-**Updated**: 2026-07-05
+**Updated**: 2026-07-06
 
 ## Work Model
 
@@ -29,21 +29,38 @@ This project now uses **firstmate** (vendored at `firstmate/`) as the agent orch
 
 ## Current Feature Cycle
 
-**Feature**: User creations persistence (database-backed generation history)
-**Step**: 🟢 Complete
+**Feature**: Documentation consolidation & reorganization
+**Step**: ✅ Complete
 **Started**: 2026-07-06
 **Completed**: 2026-07-06
 
 ### Scope
-1. Add `user_creations` DB table with all generation params + S3 URLs + metadata
-2. Create `CreationRepository` (CRUD)
-3. Modify generate endpoints to upload to S3 and auto-save creation records
-4. Add `GET/DELETE /api/generations` routes
-5. Update frontend types, services, generate page, history panel
-6. Clean up local Postgres references, connect only to Supabase
-7. Fix: S3 guard clause preventing DB writes
-8. Fix: VARCHAR(1024) too short for data URIs
-9. Fix: dotenv loading order picking wrong database URL
+1. Audit all 38 project context files across 8 locations
+2. Map hot vs cold files (what gets loaded every session vs on-demand)
+3. Move 6 root-level docs into organized `docs/` subdirectories
+4. Merge overlapping files (Gemini features: 2 files → 1)
+5. Archive stale file (payment dual-model design)
+6. Create `docs/README.md` master index
+7. Update all cross-references across AGENTS.md, agency README, root README
+
+## Documentation Structure (Post-Reorg)
+
+```
+docs/
+├── README.md                    ← Master index
+├── product/PRD.md               ← Product vision & requirements
+├── ui/design-system.md          ← Tailwind + shadcn/ui tokens
+├── development/
+│   ├── gemini-features.md       ← AI generation (params, workflows, benchmarks)
+│   └── api-guide.md             ← API endpoint reference
+├── architecture/
+│   └── project-architecture.md  ← Codebase overview
+├── archive/
+│   └── payment-system-arch.md   ← Stale (dual-model)
+├── agency/                      ← Agent KB (hot zone)
+├── learnings/                   ← Learning logs
+└── intent/                      ← Intent specs
+```
 
 ## Progress
 
@@ -62,5 +79,6 @@ This project now uses **firstmate** (vendored at `firstmate/`) as the agent orch
 | Admin Grant Endpoint | ✅ | 2026-07-06 |
 | Clerk-Authenticated E2E Tests | ✅ | 2026-07-06 |
 | Development (credit badge, gate modal) | ✅ | Already existed |
+| Documentation Consolidation | ✅ | 2026-07-06 |
 | Code Review | ❌ | — |
 | Retrospective | ❌ | — |

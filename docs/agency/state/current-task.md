@@ -1,26 +1,41 @@
 # Current Task
 
 **Agent**: Director (First Mate)
-**Status**: ✅ Complete — Payment system E2E tested and deduction API implemented
+**Status**: ✅ Complete — Documentation consolidated & KB updated
 
 ## What Was Done
 
-### Test Infrastructure
-- 34 E2E tests across 7 spec files — all passing
-- Hybrid architecture: mock API contract tests + real Clerk-authenticated tests
-- Clerk Backend API integration for real session injection
-- Two-project Playwright config: `chromium` (contract) + `chromium-auth` (auth tests)
+### Documentation Audit & Reorganization
+- Audited all 38 project context files across 8 locations
+- Mapped hot vs cold: 11 files loaded every session, ~25 on-demand, 3 frozen/stale
+- Moved 6 root docs into `docs/product/`, `docs/ui/`, `docs/development/`, `docs/architecture/`, `docs/archive/`
+- Merged Gemini AI docs (2 → 1 comprehensive reference)
+- Archived stale payment dual-model design
+- Created `docs/README.md` master index
+- Updated all cross-references in AGENTS.md, agency README, root README
 
-### API Implementation
-- `POST /api/payments/deduct` — Atomic deduction with idempotency key, admin auth
-- `POST /api/admin/payments/grant-credits` — Admin credit grant for testing
-- `deductWithIdempotency()` — Repository method using row-level locking
-- `deduct_credits()` — PostgreSQL function in schema.sql
+### KB Updates
+- Session log appended with full doc reorg entry
+- Phase.md updated with doc structure + completed feature cycle
+- Current task updated (this file)
+- All cross-references verified
 
-### UI (already existed)
-- CreditBadge inline component in site-header.tsx
-- Credit gate modal in generate/page.tsx
-- Dodo checkout flow with post-purchase credit grant
+## Documentation Structure (Current)
+
+```
+docs/
+├── README.md                    ← Master index — start here
+├── product/PRD.md
+├── ui/design-system.md
+├── development/
+│   ├── gemini-features.md       ← AI generation (params + workflows + benchmarks)
+│   └── api-guide.md
+├── architecture/project-architecture.md
+├── archive/payment-system-architecture.md
+├── agency/                      ← Hot zone (read every session)
+├── learnings/                   ← Learning logs
+└── intent/
+```
 
 ## Next
 

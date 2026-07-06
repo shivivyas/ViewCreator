@@ -66,6 +66,27 @@ Director (First Mate), Builder (test creation), Reviewer (test verification)
 
 ---
 
+## 2026-07-06: Documentation structure & agent context optimization
+
+### Context
+Project documentation was fragmented across 8 locations — root-level .md files, docs/knowledge-base/, docs/architecture/, docs/agency/, docs/learnings/. Agents either loaded 11 mandated files every session or had to guess which file held what information. 4 separate files described the project architecture with varying degrees of accuracy.
+
+### The Pattern
+- **docs/README.md** is the master index — one file that maps everything. Every agent session starts by reading `docs/README.md` to find relevant docs.
+- **Root stays minimal**: only `AGENTS.md`, `CLAUDE.md`, `README.md`. Everything else lives under `docs/`.
+- **Organize by domain**: `product/` (PRD), `ui/` (design system), `development/` (guides), `architecture/` (overview), `archive/` (stale).
+- **Hot zone preserved**: `docs/agency/` and `docs/learnings/` are the session-read hot zone — never reorganized without captain approval.
+- **Merge, don't split**: when overlapping files cover the same topic, merge them into one canonical reference. Two Gemini docs → one `gemini-features.md`.
+- **Archive, don't delete**: stale files go to `docs/archive/` with a note explaining why.
+
+### Evidence
+Root went from 7 .md files to 3. All cross-references verified. No information lost — 2 files merged, 1 archived, remainder organized.
+
+### Applied By
+Director (First Mate). All agents should use `docs/README.md` as their first read when exploring documentation.
+
+---
+
 ## 2026-07-06: Credit deduction endpoint design
 
 ### Context

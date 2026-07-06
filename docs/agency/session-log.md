@@ -177,3 +177,44 @@ none
 
 ### State At End
 User creations persist across login/logout. Local Postgres references removed. S3 bucket still needs configuration for real S3 storage (currently uses data URI fallback). Ready for next feature.
+
+---
+
+## 2026-07-06 — Documentation consolidation & reorganization
+
+### Agent
+Director (First Mate)
+
+### Skill
+none
+
+### Summary
+- Audited all 38 project context files across 8 locations — identified 4 overlapping sources of project architecture, 2 stale files, and 11 hot files loaded every session
+- Mapped hot vs cold: which files are automatically loaded by Copilot, which are mandated by Director constitution, which are read on-demand
+- Moved 6 root-level doc files into organized `docs/` subdirectories: `product/`, `ui/`, `development/`, `architecture/`, `archive/`
+- Merged `ENHANCED_FEATURES_QUICK_REFERENCE.md` + `IMPLEMENTATION_SUMMARY.md` into `docs/development/gemini-features.md` — single cohesive Gemini AI generation reference
+- Archived stale `payment-system-architecture.md` (dual-model: subs+credits) since project is pure-credit
+- Created `docs/README.md` as master documentation index
+- Updated all cross-references in `AGENTS.md`, `docs/agency/README.md`, and `README.md`
+- Root reduced from 7 .md files to 3 (`AGENTS.md`, `CLAUDE.md`, `README.md`)
+
+### Decisions Made
+- `docs/` subdirectory organization: `product/`, `ui/`, `development/`, `architecture/`, `archive/`, `agency/`, `learnings/`, `intent/`
+- Merged Gemini docs into one file — implementation details + user workflow in one reference
+- Archived rather than deleted stale files — preserves history without cluttering active docs
+- `docs/agency/` and `docs/learnings/` left untouched (captain's directive)
+
+### Artifacts Produced
+- `docs/README.md` — Master index
+- `docs/product/PRD.md` — Moved from root
+- `docs/ui/design-system.md` — Moved from root `UI_STYLE_DOCUMENTATION.md`
+- `docs/development/api-guide.md` — Moved from root `API_ENHANCEMENTS_GUIDE.md`
+- `docs/development/gemini-features.md` — Merged from 2 files
+- `docs/architecture/project-architecture.md` — Moved from `docs/knowledge-base/`
+- `docs/archive/payment-system-architecture.md` — Archived stale payment doc
+- `docs/agency/README.md` — Updated path references + stats
+- `AGENTS.md` — Updated UI doc reference
+- `README.md` — Added docs/ pointer
+
+### State At End
+Documentation consolidated: 38 files → clearer structure with master index. Hot zone (11 files loaded every session) untouched. Root clean at 3 .md files. Ready for next feature.

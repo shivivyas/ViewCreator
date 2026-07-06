@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Credit Module Architecture — ViewCreator</title>
+<style>
+  :root {
+    --bg: #0a0a0b;
+    --surface: #141416;
+    --border: #1f1f23;
+    --text: #e4e4e7;
+    --muted: #71717a;
+    --accent: #f59e0b;
+    --green: #22c55e;
+    --blue: #3b82f6;
+    --red: #ef4444;
+    --amber: #f59e0b;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', 'Inter', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    padding: 2rem;
+  }
+  .container { max-width: 960px; margin: 0 auto; }
+
+  h1 { font-size: 1.75rem; font-weight: 700; margin-bottom: 0.25rem; }
+  .subtitle { color: var(--muted); font-size: 0.875rem; margin-bottom: 2rem; }
+
+  h2 {
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin: 2rem 0 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  h2 .badge {
+    font-size: 0.625rem;
+    font-weight: 500;
+    padding: 0.125rem 0.5rem;
+    border-radius: 999px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .badge-new { background: #22c55e20; color: var(--green); border: 1px solid #22c55e40; }
+  .badge-modified { background: #3b82f620; color: var(--blue); border: 1px solid #3b82f640; }
+  .badge-removed { background: #ef444420; color: var(--red); border: 1px solid #ef444440; }
+
+  .file-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 0.75rem;
+    transition: border-color 0.2s;
+  }
+  .file-card:hover { border-color: #3f3f46; }
+
+  .file-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+  .file-path {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--text);
+    word-break: break-all;
+  }
+  .file-status {
+    font-size: 0.6875rem;
+    font-weight: 500;
+    padding: 0.125rem 0.5rem;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .status-new { background: #22c55e20; color: var(--green); border: 1px solid #22c55e40; }
+  .status-modified { background: #3b82f620; color: var(--blue); border: 1px solid #3b82f640; }
+  .status-unchanged { background: #71717a20; color: var(--muted); border: 1px solid #71717a40; }
+
+  .file-desc {
+    font-size: 0.8125rem;
+    color: var(--muted);
+    margin-top: 0.375rem;
+  }
+
+  .diagram-container {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin: 1rem 0;
+    overflow-x: auto;
+  }
+
+  .flow-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1rem;
+    margin: 1rem 0;
+  }
+  .flow-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.25rem;
+  }
+  .flow-card h3 {
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+  }
+  .flow-card p, .flow-card li {
+    font-size: 0.8125rem;
+    color: var(--muted);
+  }
+  .flow-card ul { padding-left: 1.25rem; }
+  .flow-card li { margin-bottom: 0.25rem; }
+
+  .cost-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+    font-size: 0.8125rem;
+  }
+  .cost-table th {
+    text-align: left;
+    padding: 0.625rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+    color: var(--muted);
+    font-weight: 500;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .cost-table td {
+    padding: 0.625rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .cost-table tr:last-child td { border-bottom: none; }
+  .cost-table .constant { font-family: monospace; font-size: 0.75rem; color: var(--accent); }
+  .cost-table .value { font-weight: 600; }
+
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.6875rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: 999px;
+    font-weight: 500;
+  }
+  .tag-api { background: #3b82f620; color: var(--blue); border: 1px solid #3b82f640; }
+  .tag-ui { background: #a855f720; color: #a855f7; border: 1px solid #a855f740; }
+  .tag-shared { background: #22c55e20; color: var(--green); border: 1px solid #22c55e40; }
+
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0;
+  }
+  .summary-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem 0.75rem;
+    text-align: center;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .summary-card .number {
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1.15;
+    margin-bottom: 0.25rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .summary-card .label {
+    font-size: 0.6875rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .num-new { color: var(--green); }
+  .num-modified { color: var(--blue); }
+  .num-total { color: var(--text); }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <h1>🧩 Credit Module Architecture</h1>
+  <p class="subtitle">Refactored credit system into a dedicated <code style="color:var(--accent)">viewcreator-shared</code> package + added credit gate to template upload modal</p>
+
+  <!-- Summary -->
+  <div class="summary-grid">
+    <div class="summary-card">
+      <div class="number num-new">前后</div>
+      <div class="label">New Files</div>
+    </div>
+    <div class="summary-card">
+      <div class="number num-modified">7</div>
+      <div class="label">Modified Files</div>
+    </div>
+    <div class="summary-card">
+      <div class="number num-total">0</div>
+      <div class="label">Breaking Changes</div>
+    </div>
+    <div class="summary-card">
+      <div class="number num-total">1</div>
+      <div class="label">Credit Cost Added</div>
+    </div>
+  </div>
+
+  <!-- Files changed -->
+  <h2>📁 Files Changed</h2>
+
+  <div class="file-card">
+    <div class="file-header">
+      <span class="file-path">viewcreator-shared/src/credit/constants.ts</span>
+      <span class="file-status status-new">NEW</span>
+    </div>
+    <div class="file-desc">Single source of truth for <code>CREDIT_COSTS</code>. Includes <code>TEMPLATE_UPLOAD = 1</code>.</div>
+  </div>
+
+  <div class="file-card">
+    <div class="file-header">
+      <span class="file-path">viewcreator-shared/src/credit/calculate.ts</span>
+      <span class="file-status status-new">NEW</span>
+    </div>
+    <div class="file-desc"><code>calculateGenerationCost()</code>, <code>calculateVideoCost()</code>, <code>calculateTemplateUploadCost()</code>, <code>calculateEditCost()</code> — all return <code>{ total, perUnit, label }</code>.</div>
+  </div>
+
+  <div class="file-card">
+    <div class="file-header">
+      <span class="file-path">viewcreator-shared/src/credit/types.ts</span>
+      <span class="file-status status-new">NEW</span>
+    </div>
+    <div class="file-desc">Shared type definitions: <code>CreditGuardResult</code>, <code>UserCredits</code>, <code>CreditDeductionResult</code>.</div>
+  </div>
+
+  <div class="file-card">
+    <div class="file-header">
+      <span class="file-path">viewcreator-api/src/services/credit-service.ts</span>
+      <span class="file-status status-new">NEW</span>
+    </div>
+    <div class="file-desc"><code>checkCredits()</code> + <code>deductCredits()</code> — extracted from middleware. Clean service with subscription bypass and atomic row-level locking.</div>
+  </div>
+
+  <div class="file-card">
+    <div class="file-header">
+      <span class="file-path">viewcreator-api/src/middleware/credit-guard.ts</span>
+      <span class="file-status status-modified">MODIFIED</span>
+    </div>
+    <div class="file-desc">Now a thin re-export wrapper. All logic lives in <code>credit-service.ts</code>, constants in <code>viewcreator-shared</code>.</div>
+  </div>
+
+  <div class="file-card">
+    <div class="file-header">
+      <span class="file-path">viewcreator-api/src/index.ts</span>
+      <span class="file-status status-modified">MODIFIED</span>
+    </div>
+    <div class="file-desc">
+      <strong>Image gen:</strong> inline cost calc → <code>calculateGenerationCost()</code><br>
+      <strong>Video gen:</strong> raw <code>CREDIT_COSTS.VIDEO</code> → <code>calculateVideoCost()</code><br>
+      <strong>Template upload:</strong> 🆕 added credit check (402) + deduction after success
+    </div>
+  </div>
+
+  <div class="file-card">
+    <div class="file-header">
+      <span class="file-path">viewcreator-ui/src/app/generate/page.tsx</span>
+      <span class="file-status status-modified">MODIFIED</span>
+    </div>
+    <div class="file-desc">Inline <code>1 * Math.min(Math.max(1, numberOfImages), 4)</code> and hardcoded <code>5</code> → shared calculator functions.</div>
+  </div>
+
+  <div class="file-card">
+    <div class="file-header">
+      <span class="file-path">viewcreator-ui/src/app/templates/page.tsx</span>
+      <span class="file-status status-modified">MODIFIED</span>
+    </div>
+    <div class="file-desc">🆕 Credit gate on upload: balance check before upload, cost indicator in modal, full purchase modal with credit packs, auto-resume after purchase.</div>
+  </div>
+
+  <div class="file-card">
+    <div class="file-header">
+      <span class="file-path">package.json (root)</span>
+      <span class="file-status status-modified">MODIFIED</span>
+    </div>
+    <div class="file-desc">Added <code>viewcreator-shared</code> to npm workspaces.</div>
+  </div>
+
+  <!-- Credit Costs -->
+  <h2>💰 Credit Cost Table</h2>
+  <div class="diagram-container">
+    <table class="cost-table">
+      <thead>
+        <tr>
+          <th>Constant</th>
+          <th>Value</th>
+          <th>Used By</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code class="constant">IMAGE_STANDARD</code></td>
+          <td class="value">1</td>
+          <td><span class="tag tag-api">API</span> <span class="tag tag-ui">UI</span></td>
+          <td>Standard quality image generation</td>
+        </tr>
+        <tr>
+          <td><code class="constant">IMAGE_PREMIUM</code></td>
+          <td class="value">2</td>
+          <td><span class="tag tag-api">API</span></td>
+          <td>Premium quality image generation</td>
+        </tr>
+        <tr>
+          <td><code class="constant">VIDEO</code></td>
+          <td class="value">5</td>
+          <td><span class="tag tag-api">API</span> <span class="tag tag-ui">UI</span></td>
+          <td>Video generation</td>
+        </tr>
+        <tr>
+          <td><code class="constant">EDIT</code></td>
+          <td class="value">1</td>
+          <td><span class="tag tag-shared">Shared</span></td>
+          <td>Image edit operation (reserved)</td>
+        </tr>
+        <tr>
+          <td><code class="constant" style="color: var(--green)">TEMPLATE_UPLOAD</code></td>
+          <td class="value" style="color: var(--green)">1</td>
+          <td><span class="tag tag-api">API</span> <span class="tag tag-ui">UI</span></td>
+          <td>🆕 Template upload to community library</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Architecture Diagram -->
+  <h2>🏗️ Architecture Flow</h2>
+  <div class="diagram-container">
+    <pre class="mermaid" style="font-family: monospace; font-size: 0.8125rem; line-height: 1.6; color: var(--muted);">
+┌─────────────────────────────────────────────────────────────────────┐
+│                    viewcreator-shared (NEW)                          │
+│                                                                     │
+│  constants.ts     calculate.ts      types.ts                        │
+│  ┌──────────┐    ┌──────────────┐  ┌───────────────┐                │
+│  │CREDIT_   │    │• calculateGen│  │• CreditGuard   │                │
+│  │COSTS     │───▶│  erationCost │  │  Result        │                │
+│  │          │    │• calculateVi │  │• UserCredits   │                │
+│  │TEMPLATE_ │    │  deoCost     │  │• CreditDeducti │                │
+│  │UPLOAD: 1 │    │• calculateTm │  │  onResult      │                │
+│  └──────────┘    │  plateUpldCst│  └───────────────┘                │
+│                  └──────────────┘                                   │
+└────────────────────────┬────────────────────────────────────────────┘
+                         │ imports
+          ┌──────────────┼──────────────────┐
+          ▼              ▼                   ▼
+┌─────────────────┐  ┌──────────────────┐  ┌──────────────────┐
+│ viewcreator-api  │  │ viewcreator-ui   │  │ viewcreator-db   │
+│                  │  │                  │  │                  │
+│ credit-service.ts│  │ generate/page.tsx│  │ credit-repos.    │
+│  ┌────────────┐  │  │  templates/page  │  │  (unchanged)     │
+│  │checkCredits│  │  │  .tsx            │  │                  │
+│  │deductCredit│  │  │                  │  │                  │
+│  │    s       │  │  │ Credit Gate Modal│  │                  │
+│  └────────────┘  │  │ + Purchase flow  │  │                  │
+│        │         │  └──────────────────┘  └──────────────────┘
+│        ▼         │
+│ credit-guard.ts  │
+│  (thin reexport) │
+└──────────────────┘
+    </pre>
+  </div>
+
+  <!-- Template Upload Flow -->
+  <h2>🔄 Template Upload Credit Flow</h2>
+  <div class="diagram-container">
+    <pre class="mermaid" style="font-family: monospace; font-size: 0.8125rem; line-height: 1.6; color: var(--muted);">
+User clicks "Upload"
+       │
+       ▼
+┌──────────────────┐
+│ Fill form +      │
+│ select file      │
+└────────┬─────────┘
+         │ "Save Template"
+         ▼
+┌──────────────────┐     ┌─────────────────────┐
+│ checkCredits(1)  │────▶│ Insufficient?        │
+│ via getBalance() │     │                      │
+└──────────────────┘     │ Show Credit Gate     │
+         │ (sufficient)  │ Modal with buy CTAs  │
+         ▼               └──────────┬──────────┘
+┌──────────────────┐               │ user buys
+│ POST /api/temp-  │               ▼
+│ lates/upload     │        ┌──────────────────────┐
+│                   │        │ Dodo Checkout       │
+│ Server:           │        │ → purchase credits  │
+│  checkCredits(1)  │        │ → return with       │
+│  upload to S3     │        │   checkout=success  │
+│  save to DB       │        └──────────┬───────────┘
+│  deductCredits(1) │                   │
+│  return template  │                   ▼
+└────────┬──────────┘        ┌─────────────────────────┐
+         │ success            │ confirm-purchase API    │
+         ▼                    │ restore form state from │
+  toast("Uploaded!")          │ sessionStorage          │
+         │                    │ re-open upload modal    │
+         ▼                    └─────────────────────────┘
+  payment-updated event
+  (refreshes header badge)
+    </pre>
+  </div>
+
+  <!-- Key Decisions -->
+  <h2>⚡ Key Decisions</h2>
+  <div class="flow-grid">
+    <div class="flow-card">
+      <h3>🌀 Check → Operate → Deduct</h3>
+      <p>Credit check happens <em>before</em> S3 upload to fail fast. Deduction happens <em>after</em> successful persistence. The atomic <code>checkAndDeductAtomic</code> uses row-level locking to prevent concurrent over-draft.</p>
+    </div>
+    <div class="flow-card">
+      <h3>📦 Shared Package over Duplication</h3>
+      <p><code>CREDIT_COSTS</code> and calculation functions live in <code>viewcreator-shared</code>. Both API and UI import from the same source — no more inline <code>1 * Math.min(...)</code>.</p>
+    </div>
+    <div class="flow-card">
+      <h3>🧾 Template Upload = 1 Credit</h3>
+      <p>Adding a template costs 1 credit, same as a standard image generation. The <code>TEMPLATE_UPLOAD</code> constant is defined alongside other costs for consistency.</p>
+    </div>
+    <div class="flow-card">
+      <h3>🔄 Session-Resume After Purchase</h3>
+      <p>Form state (title, description, tags, preview) is saved to <code>sessionStorage</code> before redirecting to Dodo checkout. After return, the modal re-opens with state restored.</p>
+    </div>
+  </div>
+
+  <!-- Next Steps -->
+  <h2>📋 Next Steps</h2>
+  <div class="file-card" style="border-left: 3px solid var(--accent);">
+    <div class="file-desc">
+      <strong>1.</strong> Run <code>npm install</code> to link the new workspace package<br>
+      <strong>2.</strong> Verify the templates page loads and the upload modal shows the credit indicator<br>
+      <strong>3.</strong> Verify the generate page still works with the shared calculator<br>
+      <strong>4.</strong> Run the test canary to ensure no regressions
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

@@ -13,6 +13,7 @@ import type { Template, GenerationHistoryItem, GenerateParams, GenerateVideoPara
 import { getTemplates, generateImages as apiGenerateImages, generateVideo as apiGenerateVideo, getUserCreations } from '@/services';
 import { Wand2, Video, Image as ImageIcon, Loader2, Zap, X } from 'lucide-react';
 import { getBalance, createCheckoutSession, getPlans } from '@/services/api/payment-service';
+import { calculateGenerationCost, calculateVideoCost } from 'viewcreator-shared';
 import { Button } from '@/components/ui/button';
 
 import { GenerateForm } from '@/components/generate/generate-form';
@@ -190,8 +191,9 @@ function GenerateImagePageContent() {
               setMediaType('video');
             }
 
-            const cost = pg.type === 'video' ? 5
-              : 1 * Math.min(Math.max(1, (pg.params as GenerateParams).numberOfImages), 4);
+            const cost = pg.type === 'video'
+              ? calculateVideoCost().total
+              : calculateGenerationCost('Standard', (pg.params as GenerateParams).numberOfImages).total;
 
             if (balance >= cost) {
               toast.success('Credits confirmed. Starting generation...');
@@ -559,7 +561,7 @@ function GenerateImagePageContent() {
 
     // ── Credit Check ───────────────────────────────────────
     if (mediaType === 'image') {
-      const cost = 1 * Math.min(Math.max(1, numberOfImages), 4); // 1 credit per standard image
+      const { total: cost } = calculateGenerationCost('Standard', numberOfImages);
       const hasCredits = await checkCreditsBeforeGenerate(cost);
       if (!hasCredits) {
         // Save form state for resume after purchase
@@ -582,7 +584,8 @@ function GenerateImagePageContent() {
         return;
       }
     } else {
-      const hasCredits = await checkCreditsBeforeGenerate(5); // 5 credits per video
+      const { total: cost } = calculateVideoCost();
+      const hasCredits = await checkCreditsBeforeGenerate(cost);
       if (!hasCredits) {
         const pending = {
           type: 'video' as const,

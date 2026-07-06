@@ -6,6 +6,7 @@
   "workspaces": [
     "viewcreator-api",
     "viewcreator-database",
+    "viewcreator-shared",
     "viewcreator-ui"
   ]
 }

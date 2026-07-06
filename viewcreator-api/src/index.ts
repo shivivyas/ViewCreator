@@ -11,6 +11,7 @@ import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import paymentRoutes from './routes/payments.js';
 import adminRoutes from './routes/admin.js';
 import { checkCredits, deductForGeneration, CREDIT_COSTS } from './middleware/credit-guard.js';
+import { calculateGenerationCost, calculateVideoCost, calculateTemplateUploadCost } from 'viewcreator-shared';
 import { generationRateLimiter, videoGenerationRateLimiter } from './middleware/rate-limiter.js';
 
 const app = express();
@@ -232,6 +233,18 @@ app.post('/api/templates/upload', requireAuth(), syncUserMiddleware, async (req:
       return res.status(400).json({ error: 'base64Video content is required for video templates' });
     }
 
+    // ── Credit Check ─────────────────────────────────────────
+    const { total: uploadCreditCost } = calculateTemplateUploadCost();
+    const guard = await checkCredits(userId!, uploadCreditCost);
+    if (!guard.allowed) {
+      return res.status(402).json({
+        error: 'Insufficient credits',
+        credits_balance: guard.credits_balance,
+        required: uploadCreditCost,
+        upgrade_url: '/pricing',
+      });
+    }
+
     const bucketName = process.env.AWS_S3_BUCKET;
     if (!bucketName) {
       return res.status(500).json({ error: 'S3 bucket name is not configured on the server. Please check the AWS_S3_BUCKET setting.' });
@@ -295,6 +308,15 @@ app.post('/api/templates/upload', requireAuth(), syncUserMiddleware, async (req:
     });
 
     console.log(`[S3 Upload] Successfully recorded template ${template.id} in Postgres.`);
+
+    // Deduct credits after successful upload
+    await deductForGeneration(
+      userId!,
+      uploadCreditCost,
+      `Uploaded template: ${title}`,
+      { template_id: template.id, media_type: mediaType, is_public: isPublic }
+    );
+
     res.json({ template });
   } catch (error: any) {
     console.error('Error uploading template to S3:', error);
@@ -324,8 +346,7 @@ app.post('/api/generate', generationRateLimiter, requireAuth(), syncUserMiddlewa
 
     // ── Credit Check ───────────────────────────────────────────
     const { userId } = getAuth(req);
-    const costPerImage = quality === 'Premium' ? CREDIT_COSTS.IMAGE_PREMIUM : CREDIT_COSTS.IMAGE_STANDARD;
-    const totalCost = costPerImage * Math.min(Math.max(1, numberOfImages), 4);
+    const { total: totalCost } = calculateGenerationCost(quality, numberOfImages);
 
     const guard = await checkCredits(userId!, totalCost);
     if (!guard.allowed) {
@@ -543,12 +564,13 @@ app.post('/api/generate/video', videoGenerationRateLimiter, requireAuth(), syncU
 
     // ── Credit Check ───────────────────────────────────────────
     const { userId } = getAuth(req);
-    const guard = await checkCredits(userId!, CREDIT_COSTS.VIDEO);
+    const { total: videoCost } = calculateVideoCost();
+    const guard = await checkCredits(userId!, videoCost);
     if (!guard.allowed) {
       return res.status(402).json({
         error: 'Insufficient credits',
         credits_balance: guard.credits_balance,
-        required: CREDIT_COSTS.VIDEO,
+        required: videoCost,
         upgrade_url: '/pricing',
       });
     }
@@ -674,9 +696,10 @@ app.post('/api/generate/video', videoGenerationRateLimiter, requireAuth(), syncU
       }
 
       // Deduct credits after successful generation
+      const { total: deductedVideoCost } = calculateVideoCost();
       await deductForGeneration(
         userId!,
-        CREDIT_COSTS.VIDEO,
+        deductedVideoCost,
         'Generated video',
         { prompt_preview: prompt.substring(0, 100), quality, creation_id: creationId }
       );

@@ -43,7 +43,25 @@ export type PersonaKey = keyof typeof PERSONAS;
 
 export const MOCK_CREDIT_PACKS = [
   {
-    id: "plan-credits-uuid",
+    id: "plan-credits-5",
+    name: "5 Credits",
+    type: "credit_pack",
+    credits: 5,
+    price_cents: 5,
+    currency: "USD",
+    display_price: "$0.05",
+    display_per_unit: "$0.01/credit",
+    features: [
+      "Generate up to 5 images or 1 video",
+      "All aspect ratios & sizes",
+      "Standard quality output",
+    ],
+    dodo_product_id: "pdt_0NiZQ6jp5QSl7ZLZVlZ77",
+    is_active: true,
+    sort_order: 0,
+  },
+  {
+    id: "plan-credits-100",
     name: "100 Credits",
     type: "credit_pack",
     credits: 100,

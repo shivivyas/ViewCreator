@@ -19,9 +19,9 @@ import type { SubscriptionPlan } from "@/types";
 export default function PricingPage() {
   const { isSignedIn } = useUser();
   const { getToken } = useAuth();
-  const [plan, setPlan] = useState<SubscriptionPlan | null>(null);
+  const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const [loading, setLoading] = useState(true);
-  const [purchasing, setPurchasing] = useState(false);
+  const [purchasingId, setPurchasingId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -29,9 +29,9 @@ export default function PricingPage() {
     getPlans()
       .then((data) => {
         if (cancelled) return;
-        // Show the first active credit pack with a Dodo product ID
-        const creditPlan = data.creditPacks.find((p) => p.dodo_product_id) ?? null;
-        setPlan(creditPlan);
+        // Show all active credit packs with a Dodo product ID
+        const creditPlans = data.creditPacks.filter((p) => p.dodo_product_id);
+        setPlans(creditPlans);
       })
       .catch(() => {})
       .finally(() => {
@@ -41,15 +41,14 @@ export default function PricingPage() {
     return () => { cancelled = true; };
   }, []);
 
-  const handlePurchase = useCallback(async () => {
+  const handlePurchase = useCallback(async (plan: SubscriptionPlan) => {
     if (!plan || !plan.dodo_product_id) return;
 
     if (!isSignedIn) {
-      // The SignUpButton will handle this via the modal
       return;
     }
 
-    setPurchasing(true);
+    setPurchasingId(plan.id);
     try {
       const token = await getToken();
       if (!token) throw new Error('Not authenticated');
@@ -62,9 +61,9 @@ export default function PricingPage() {
       console.error('Purchase failed:', err);
       alert(err instanceof Error ? err.message : 'Failed to start checkout');
     } finally {
-      setPurchasing(false);
+      setPurchasingId(null);
     }
-  }, [plan, isSignedIn, getToken]);
+  }, [isSignedIn, getToken]);
 
   if (loading) {
     return (
@@ -92,63 +91,67 @@ export default function PricingPage() {
         </div>
       </section>
 
-      {/* Single Product Card */}
+      {/* Product Cards */}
       <section className="border-b border-border/50">
         <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
-          {plan ? (
-            <div className="mx-auto max-w-md">
-              <Card className="relative border-primary/30 shadow-lg shadow-primary/5">
-                <CardHeader className="pt-8 pb-4 text-center">
-                  <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-2xl bg-primary/10">
-                    <Zap className="size-6 text-primary" />
-                  </div>
-                  <CardTitle className="text-2xl">{plan.name}</CardTitle>
-                </CardHeader>
-
-                <CardContent className="pb-6">
-                  <div className="mb-6 text-center">
-                    <span className="text-5xl font-bold tracking-tight">{plan.display_price}</span>
-                    {plan.display_per_unit && (
-                      <div className="mt-1 text-sm text-muted-foreground">
-                        {plan.display_per_unit}
+          {plans.length > 0 ? (
+            <div className="mx-auto flex max-w-3xl flex-col gap-6 sm:flex-row sm:items-stretch">
+              {plans.map((p) => (
+                <div key={p.id} className="flex-1">
+                  <Card className="relative h-full border-primary/30 shadow-lg shadow-primary/5">
+                    <CardHeader className="pt-8 pb-4 text-center">
+                      <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-2xl bg-primary/10">
+                        <Zap className="size-6 text-primary" />
                       </div>
-                    )}
-                  </div>
+                      <CardTitle className="text-2xl">{p.name}</CardTitle>
+                    </CardHeader>
 
-                  <ul className="space-y-3">
-                    {plan.features.map((feature) => (
-                      <li key={feature} className="flex items-start gap-3 text-sm">
-                        <Check className="mt-0.5 size-4 shrink-0 text-primary" />
-                        <span className="text-muted-foreground">{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
+                    <CardContent className="pb-6">
+                      <div className="mb-6 text-center">
+                        <span className="text-5xl font-bold tracking-tight">{p.display_price}</span>
+                        {p.display_per_unit && (
+                          <div className="mt-1 text-sm text-muted-foreground">
+                            {p.display_per_unit}
+                          </div>
+                        )}
+                      </div>
 
-                <CardFooter className="pt-0">
-                  {isSignedIn ? (
-                    <Button
-                      size="lg"
-                      className="w-full rounded-xl text-base"
-                      onClick={handlePurchase}
-                      disabled={purchasing}
-                    >
-                      {purchasing ? (
-                        <><Loader2 className="mr-2 size-4 animate-spin" /> Opening checkout...</>
+                      <ul className="space-y-3">
+                        {p.features.map((feature) => (
+                          <li key={feature} className="flex items-start gap-3 text-sm">
+                            <Check className="mt-0.5 size-4 shrink-0 text-primary" />
+                            <span className="text-muted-foreground">{feature}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </CardContent>
+
+                    <CardFooter className="pt-0">
+                      {isSignedIn ? (
+                        <Button
+                          size="lg"
+                          className="w-full rounded-xl text-base"
+                          onClick={() => handlePurchase(p)}
+                          disabled={purchasingId === p.id}
+                        >
+                          {purchasingId === p.id ? (
+                            <><Loader2 className="mr-2 size-4 animate-spin" /> Opening checkout...</>
+                          ) : (
+                            `Buy ${p.name}`
+                          )}
+                        </Button>
                       ) : (
-                        `Buy ${plan.name}`
+                        <SignUpButton mode="modal" forceRedirectUrl="/pricing">
+                          <Button size="lg" className="w-full rounded-xl text-base">
+                            <LogIn className="mr-2 size-4" />
+                            Sign up to buy
+                          </Button>
+                        </SignUpButton>
                       )}
-                    </Button>
-                  ) : (
-                    <SignUpButton mode="modal" forceRedirectUrl="/pricing">
-                      <Button size="lg" className="w-full rounded-xl text-base">
-                        <LogIn className="mr-2 size-4" />
-                        Sign up to buy
-                      </Button>
-                    </SignUpButton>
-                  )}
-                </CardFooter>
-              </Card>
+                    </CardFooter>
+                  </Card>
+                </div>
+              ))}
             </div>
           ) : (
             <div className="text-center">
@@ -204,20 +207,20 @@ export default function PricingPage() {
             Ready to create?
           </h2>
           <p className="mt-2 text-muted-foreground">
-            Start with 100 credits for just $9. No subscription required.
+            Pick a credit pack that fits your needs. No subscription required.
           </p>
           <div className="mt-8 flex items-center justify-center gap-4">
             {isSignedIn ? (
               <Button
                 size="lg"
                 className="rounded-xl text-base"
-                onClick={handlePurchase}
-                disabled={purchasing}
+                onClick={() => plans[0] && handlePurchase(plans[0])}
+                disabled={purchasingId !== null}
               >
-                {purchasing ? (
+                {purchasingId !== null ? (
                   <><Loader2 className="mr-2 size-4 animate-spin" /> Opening checkout...</>
                 ) : (
-                  'Buy 100 Credits'
+                  'Buy Credits'
                 )}
               </Button>
             ) : (

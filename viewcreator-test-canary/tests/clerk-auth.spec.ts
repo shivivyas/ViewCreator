@@ -255,7 +255,7 @@ test.describe("Clerk: Post-Purchase UI — Form Restoration", () => {
 
     // Also set a pending_plan_id so the grant credits step works
     await page.evaluate(() => {
-      sessionStorage.setItem("pending_plan_id", "plan-credits-uuid");
+      sessionStorage.setItem("pending_plan_id", "plan-credits-100");
     });
 
     // Navigate to /generate?checkout=success to trigger the post-purchase flow

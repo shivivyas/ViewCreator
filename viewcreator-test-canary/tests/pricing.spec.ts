@@ -36,10 +36,12 @@ test.describe("Pricing Page — Contract Tests (mock API)", () => {
   });
 
   test("shows the credit feature list", async ({ page }) => {
+    // Features are split across two plan cards (5 credits + 100 credits)
     await expect(
       page.getByText("Generate up to 100 images or 20 videos")
     ).toBeVisible();
-    await expect(page.getByText("All aspect ratios & sizes")).toBeVisible();
+    // "All aspect ratios & sizes" appears in both cards — use first()
+    await expect(page.getByText("All aspect ratios & sizes").first()).toBeVisible();
     await expect(page.getByText("Never expires")).toBeVisible();
   });
 
@@ -67,7 +69,8 @@ test.describe("Pricing Page — Contract Tests (mock API)", () => {
   // Click behavior requires Clerk auth context — tested in clerk-auth.spec.ts.
 
   test("guest sees Sign up to buy button", async ({ page }) => {
-    const buyButton = page.getByRole("button", { name: /sign up to buy/i });
+    // Two plan cards each have a "Sign up to buy" button — use first()
+    const buyButton = page.getByRole("button", { name: /sign up to buy/i }).first();
     await expect(buyButton).toBeVisible();
   });
 

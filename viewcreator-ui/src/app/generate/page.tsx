@@ -706,43 +706,50 @@ function GenerateImagePageContent() {
               )}
             </p>
             <p className="mt-1 text-center text-xs text-muted-foreground">
-              Purchase credits to start creating. 100 credits for $9.
+              Purchase credits to start creating.
             </p>
 
-            {/* CTA */}
+            {/* CTA — show all available credit packs */}
             <div className="mt-6 space-y-3">
-              <Button
-                size="lg"
-                className="w-full rounded-xl text-base"
-                disabled={creditModalLoading}
-                onClick={async () => {
-                  setCreditModalLoading(true);
-                  try {
-                    const token = await getToken();
-                    if (!token) throw new Error('Not authenticated');
+              {(() => {
+                const [first, second] = [
+                  { credits: 100, price: "$9", id: "pdt_0NiWo2CjaeJBzhplGXxWT" },
+                  { credits: 5, price: "$0.05", id: "pdt_0NiZQ6jp5QSl7ZLZVlZ77" },
+                ];
+                return [first, second].map((pack) => (
+                  <Button
+                    key={pack.id}
+                    size="lg"
+                    className="w-full rounded-xl text-base"
+                    disabled={creditModalLoading}
+                    onClick={async () => {
+                      setCreditModalLoading(true);
+                      try {
+                        const token = await getToken();
+                        if (!token) throw new Error('Not authenticated');
 
-                    // Find the credit plan ID
-                    const plans = await getPlans();
-                    const creditPlan = plans.creditPacks.find(p => p.dodo_product_id);
-                    if (!creditPlan) throw new Error('No credit plan available');
+                        const plans = await getPlans();
+                        const creditPlan = plans.creditPacks.find(p => p.dodo_product_id === pack.id);
+                        if (!creditPlan) throw new Error('No credit plan available');
 
-                    // Store plan ID so post-purchase can grant credits immediately
-                    sessionStorage.setItem('pending_plan_id', creditPlan.id);
-                    const successUrl = `${window.location.origin}/generate?checkout=success`;
-                    const { checkout_url } = await createCheckoutSession(creditPlan.id, token, successUrl);
-                    window.location.href = checkout_url;
-                  } catch (err) {
-                    toast.error(err instanceof Error ? err.message : 'Failed to start checkout');
-                    setCreditModalLoading(false);
-                  }
-                }}
-              >
-                {creditModalLoading ? (
-                  <><Loader2 className="mr-2 size-4 animate-spin" /> Opening checkout...</>
-                ) : (
-                  'Buy 100 Credits — $9'
-                )}
-              </Button>
+                        sessionStorage.setItem('pending_plan_id', creditPlan.id);
+                        const successUrl = `${window.location.origin}/generate?checkout=success`;
+                        const { checkout_url } = await createCheckoutSession(creditPlan.id, token, successUrl);
+                        window.location.href = checkout_url;
+                      } catch (err) {
+                        toast.error(err instanceof Error ? err.message : 'Failed to start checkout');
+                        setCreditModalLoading(false);
+                      }
+                    }}
+                  >
+                    {creditModalLoading ? (
+                      <><Loader2 className="mr-2 size-4 animate-spin" /> Opening checkout...</>
+                    ) : (
+                      `Buy ${pack.credits} Credits — ${pack.price}`
+                    )}
+                  </Button>
+                ));
+              })()}
               <Button
                 size="sm"
                 variant="ghost"

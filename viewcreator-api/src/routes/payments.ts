@@ -504,8 +504,11 @@ function formatPlan(plan: {
   features: any;
   dodo_product_id: string | null;
 }) {
-  const price = (plan.price_cents / 100).toFixed(0);
-  const display_price = `$${price}`;
+  const dollars = plan.price_cents / 100;
+  // Show 2 decimal places for amounts < $1, whole dollars otherwise
+  const display_price = dollars < 1
+    ? `$${dollars.toFixed(2)}`
+    : `$${dollars.toFixed(0)}`;
   const features = typeof plan.features === 'string'
     ? JSON.parse(plan.features)
     : Array.isArray(plan.features)

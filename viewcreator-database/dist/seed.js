@@ -5,11 +5,26 @@ const user_repository_js_1 = require("./repositories/user-repository.js");
 const credit_repository_js_1 = require("./repositories/credit-repository.js");
 const db_js_1 = require("./db.js");
 /**
- * Single product: 100 Credits for $9.
- * All subscription and multi-tier credit plans removed.
- * Dodo product ID: pdt_0NiWo2CjaeJBzhplGXxWT
+ * Two credit packs:
+ *   5 Credits for $0.05  — trial/starter
+ *   100 Credits for $9   — standard
+ * No subscription plans.
  */
 const SEED_PLANS = [
+    {
+        name: '5 Credits',
+        type: 'credits',
+        credits: 5,
+        price_cents: 5,
+        interval: null,
+        features: [
+            'Generate up to 5 images or 1 video',
+            'All aspect ratios & sizes',
+            'Standard quality output',
+        ],
+        sort_order: 0,
+        dodo_product_id: 'pdt_0NiZQ6jp5QSl7ZLZVlZ77',
+    },
     {
         name: '100 Credits',
         type: 'credits',

@@ -99,7 +99,7 @@ none
 
 ### Artifacts Produced
 - `viewcreator-test-canary/tests/global.setup.ts` — Clerk testing token setup
-- `viewcreator-test-canary/tests/clerk-auth.spec.ts` — Real Clerk-authenticated persona tests
+- `viewcreator-test-canary/tests/clerk-auth.spec.ts` — Real Clerk-authenticated persona tests (rewritten with `@clerk/testing` UI sign-in)
 - `viewcreator-test-canary/tests/credit-deduction.spec.ts` — Deduction API tests (8 tests)
 - `viewcreator-test-canary/tests/generate-gate.spec.ts` — Generate gate contract tests
 - `viewcreator-test-canary/tests/helpers.ts` — Added LOW_CREDIT persona
@@ -108,6 +108,29 @@ none
 - `viewcreator-database/src/repositories/credit-repository.ts` — Added deductWithIdempotency()
 - `viewcreator-database/src/schema.sql` — Added deduct_credits() SQL function
 - `viewcreator-test-canary/playwright.config.ts` — Two-project setup (chromium + chromium-auth)
+- `.lavish/behavioral-test-spec.html` — Behavioral spec artifact with 24 decision cards
+
+### Tests Updated (second pass, 2026-07-06)
+- `pricing.spec.ts` — Added behavioral decision comments (Q1, Q5, Q11)
+- `generate-gate.spec.ts` — Updated guest test to verify Clerk redirect; documented Q2 target behavior
+- `header-status.spec.ts` — Added Q16/Q17 behavioral refs; moved signed-in tests to clerk-auth
+- `clerk-auth.spec.ts` — **Major rewrite**: switched from cookie injection to `@clerk/testing`'s `clerk.signIn({ page, emailAddress })` for reliable Clerk UI sign-in. 8 active tests across Free + Credit User personas. Added `signInUser()` helper with credit granting + API mocks.
+
+### Test Results (final)
+**39 passed · 4 skipped · 0 failures**
+- 18 contract tests (mock API) — all passing
+- 15 API tests (admin, credit-deduction, debug-auth) — all passing
+- 8 clerk-auth tests (real Clerk) — all passing
+- 4 skipped (future features: Q7 graying, Q8 exhaustion, Q10 cost indicator, Q17 dropdown)
+
+### Behavioral Decisions Locked (from Lavish session)
+17 decisions resolved via `.lavish/behavioral-test-spec.html`. Key decisions:
+- Q2: Guest /generate → disabled "Sign in to generate" button (needs proxy.ts change)
+- Q3: Gate on Generate click ✅ matches current app
+- Q4: Modal text "Buy Credits" / "Purchase credits..." (needs text change)
+- Q11: Pricing different for signed-in with balance (needs balance display)
+- Q16: Free user header "0 credits — Buy" (needs text change)
+- Q17: Badge dropdown with balance + "Buy more" (not implemented)
 
 ### State At End
-34/34 tests passing. Deduction API fully implemented with idempotency. Clerk-authenticated tests running with real sessions. Credit gate modal and badge already exist in UI. Ready for next feature work.
+39 tests passing, 4 skipped. Full behavioral spec locked. Ready for Phase 2: app behavior fixes to match decisions.

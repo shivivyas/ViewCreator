@@ -53,9 +53,12 @@ When testing credit payment flows, mock-based persona tests can't simulate Clerk
 **Tier 3 — API-only tests**: Direct HTTP calls with admin keys. No Clerk needed. Good for: credit deduction, admin endpoints, idempotency.
 
 ### Evidence
-- Clerk's UI sign-up modal requires trusted browser events — doesn't work in headless Playwright
-- Clerk Backend API (`POST /v1/users`, `POST /v1/sessions`, `POST /v1/sessions/:id/tokens`) creates real sessions
-- Session cookies (`__session`, `__clerk_db_jwt`, `__client_uat`) make `useUser()` return real signed-in state
+- Cookie injection (`addCookies`) passes server-side `auth.protect()` but often leaves client-side `useUser().isSignedIn` as `null` because Clerk's React SDK validates sessions asynchronously
+- The reliable approach uses `@clerk/testing`: `setupClerkTestingToken({ page })` → navigate → `clerk.signIn({ page, emailAddress })` → `clerk.loaded({ page })`
+- Clerk Backend API (`POST /v1/users`) creates the test user, and `clerk.signIn()` handles the UI sign-in flow using a ticket-based token, properly hydrating Clerk's React state
+- Contract tests (`--project=chromium`) use `page.route()` mocks and don't need Clerk — fast (~2s/test)
+- Clerk-auth tests (`--project=chromium-auth`) use `@clerk/testing` — slower (~10s/test due to Clerk UI flow) but fully reliable for signed-in state
+- `setupClerkTestingToken` intercepts Clerk Frontend API requests to bypass bot detection — required for headless
 - The `+clerk_test` email pattern with OTP code `424242` bypasses email verification in dev mode
 
 ### Applied By
@@ -83,3 +86,26 @@ All 8 deduction tests pass. The `deductWithIdempotency()` method in `credit-repo
 
 ### Applied By
 Builder (implementation), Reviewer (test verification)
+
+---
+
+## 2026-07-06: Behavioral spec battles via Lavish interactive artifacts
+
+### Context
+When the captain needs to make behavioral decisions before implementation (gate timing, modal text, badge behavior, race condition handling), listing options in chat is inefficient and doesn't allow per-card annotation.
+
+### The Pattern
+Use lavish-axi to create an interactive HTML artifact with decision cards:
+1. Create `.lavish/<topic>.html` with persona cards + decision forms (radio buttons/checkboxes/text inputs)
+2. Follow the **input playbook**: native controls for reversible selection, per-question Queue buttons that call `window.lavish.queuePrompt()`, and a final Send button that batches all queued answers
+3. Run `npx -y lavish-axi .lavish/<topic>.html` to open
+4. Run `npx -y lavish-axi poll .lavish/<topic>.html` to long-poll for feedback
+5. Apply decisions to the artifact, then poll with `--agent-reply "summary"` to show results in-editor
+6. Iterate until all decisions are locked, then translate into tests
+
+### Evidence
+24 behavioral questions across 4 personas + edge cases were resolved in 3 poll cycles. The artifact is reusable as a test reference document. Pattern from the `lavish` skill's input playbook.
+
+### Applied By
+Director, Builder (test implementation), Communicator (spec documentation)  
+Relevant skill: `.agents/skills/lavish/SKILL.md`

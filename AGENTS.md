@@ -193,7 +193,7 @@ When implementing code for ViewCreator:
 - **API routes** use the `viewcreator-api/` Express server (not embedded in Next.js)
 - **Database changes** must go through the `viewcreator-database/` package with a migration
 - **shadcn/ui components** are preferred over custom-styled elements
-- Refer to `UI_STYLE_DOCUMENTATION.md` and `ENHANCED_FEATURES_QUICK_REFERENCE.md` for UI patterns
+- Refer to `docs/ui/design-system.md` and `docs/development/gemini-features.md` for UI patterns and AI generation
 
 ### Reviewer (ViewCreator Edition)
 When reviewing ViewCreator code, additionally check:

@@ -2,6 +2,8 @@
 
 AI-powered social content generation platform. Generate high-volume marketing images and videos using Google Gemini, with a library of viral templates, upvoting, and Clerk authentication.
 
+> 📚 **Full documentation:** [`docs/`](docs/) — master index at [`docs/README.md`](docs/README.md). Includes product PRD, architecture, AI generation features, design system, and knowledge base.
+
 ---
 
 ## 🏗️ Architecture

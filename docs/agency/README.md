@@ -27,31 +27,34 @@ See `phase.md` for details.
 | `state/current-task.md` | Active task state for resume (overwritten per session) |
 | `state/context.md` | Current session context/metadata (overwritten per session) |
 
-## Existing Project Documentation
+## Project Documentation
 
 | File | What it contains |
 |------|-----------------|
-| `PRD.md` | Full product requirements document |
-| `IMPLEMENTATION_SUMMARY.md` | API enhancement implementation notes |
-| `UI_STYLE_DESIGN_SYSTEM.md` | Tailwind + shadcn/ui design system |
-| `ENHANCED_FEATURES_QUICK_REFERENCE.md` | Feature reference for AI generation |
-| `API_ENHANCEMENTS_GUIDE.md` | API usage guide |
 | `AGENTS.md` | Project-level agent definitions & conventions |
+| `docs/product/PRD.md` | Full product requirements document |
+| `docs/architecture/project-architecture.md` | Codebase architecture overview |
+| `docs/development/gemini-features.md` | Gemini AI generation features, workflows, benchmarks |
+| `docs/development/api-guide.md` | API endpoint reference |
+| `docs/ui/design-system.md` | Tailwind + shadcn/ui design system |
+| `docs/archive/payment-system-architecture.md` | ⚠️ Stale payment design (dual-model) |
+
+> **Master index:** `docs/README.md`
 
 ## Project Structure
 
 ```
-viewcreator-ui/          → Next.js 16 frontend + API routes (port 3000)
-viewcreator-api/         → Express standalone API server (port 3001)
-viewcreator-database/    → PostgreSQL database package
-viewcreator-test-canary/ → Playwright E2E test canary
+viewcreator-ui/           → Next.js 16 frontend + API routes (port 3000)
+viewcreator-api/          → Express standalone API server (port 3001)
+viewcreator-database/     → PostgreSQL database package
+viewcreator-test-canary/  → Playwright E2E test canary
 ```
 
 ## Quick Stats
 
-- Sessions: 1
-- Decisions: 3
-- Project Learnings: 0
+- Sessions: 4
+- Decisions: 9
+- Project Learnings: 4
 
 ---
 

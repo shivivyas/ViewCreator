@@ -19,11 +19,17 @@ if (!databaseUrl) {
     throw new Error('DATABASE_URL is not set. Configure it in viewcreator-database/.env or viewcreator-api/.env\n' +
         'Example: DATABASE_URL=postgresql://postgres:password@db.example.supabase.co:5432/postgres');
 }
+// Supabase requires SSL. If the host is a Supabase instance, force SSL on.
+// Also respect DB_SSL env var for explicit override.
+const isSupabase = databaseUrl.includes('supabase.co');
+const sslMode = process.env.DB_SSL;
+const ssl = sslMode === 'true' || sslMode === '1' || (isSupabase && sslMode !== 'false') || false;
 const poolConfig = {
     connectionString: databaseUrl,
     max: parseInt(process.env.DB_MAX_CONNECTIONS || '10', 10),
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 5000,
+    ssl: ssl ? { rejectUnauthorized: false } : false,
 };
 exports.pool = new pg_1.Pool(poolConfig);
 // Handle pool errors gracefully

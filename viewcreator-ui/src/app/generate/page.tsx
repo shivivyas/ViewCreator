@@ -11,13 +11,20 @@ import {
 } from '@/store/slices/image-editor-slice';
 import type { Template, GenerationHistoryItem, GenerateParams, GenerateVideoParams, MediaType } from '@/types';
 import { getTemplates, generateImages as apiGenerateImages, generateVideo as apiGenerateVideo, getUserCreations } from '@/services';
-import { Wand2, Video, Image as ImageIcon, Loader2, Zap, X } from 'lucide-react';
+import { Wand2, Video, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { getBalance, createCheckoutSession, getPlans } from '@/services/api/payment-service';
 import { calculateGenerationCost, calculateVideoCost } from 'viewcreator-shared';
 import { Button } from '@/components/ui/button';
+import { CreditGateModal, type CreditPack } from '@/components/shared/credit-gate-modal';
 
 import { GenerateForm } from '@/components/generate/generate-form';
 import { HistoryPanel } from '@/components/generate/history-panel';
+
+/** Credit packs shown in the credit-gate modal. */
+const CREDIT_PACKS: CreditPack[] = [
+  { credits: 100, price: "$9",   id: "pdt_0NiWo2CjaeJBzhplGXxWT" },
+  { credits: 5,   price: "$0.05", id: "pdt_0NiZQ6jp5QSl7ZLZVlZ77" },
+];
 
 /**
  * Call the confirm-purchase endpoint to grant credits immediately.
@@ -760,102 +767,37 @@ function GenerateImagePageContent() {
       </div>
 
       {/* ── Credit Gate Modal ────────────────────────────────── */}
-      {showCreditModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="relative w-full max-w-md rounded-2xl border border-border/50 bg-card p-6 shadow-xl mx-4">
-            {/* Close */}
-            <button
-              onClick={() => {
-                setShowCreditModal(false);
-                setPendingGenerate(null);
-                sessionStorage.removeItem('pending_generate');
-              }}
-              className="absolute right-4 top-4 text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <X className="size-5" />
-            </button>
+      <CreditGateModal
+        open={showCreditModal}
+        loading={creditModalLoading}
+        userBalance={userBalance}
+        requiredCredits={requiredCredits}
+        creditPacks={CREDIT_PACKS}
+        onBuy={async (packId) => {
+          setCreditModalLoading(true);
+          try {
+            const token = await getToken();
+            if (!token) throw new Error('Not authenticated');
 
-            {/* Icon */}
-            <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-2xl bg-amber-50 dark:bg-amber-950">
-              <Zap className="size-6 text-amber-500" />
-            </div>
+            const plans = await getPlans();
+            const creditPlan = plans.creditPacks.find(p => p.dodo_product_id === packId);
+            if (!creditPlan) throw new Error('No credit plan available');
 
-            {/* Title */}
-            <h3 className="text-center text-lg font-semibold">
-              Buy Credits
-            </h3>
-            <p className="mt-2 text-center text-sm text-muted-foreground">
-              {userBalance !== null && userBalance > 0 ? (
-                <>You have <strong>{userBalance.toLocaleString()}</strong> credits but need <strong>{requiredCredits}</strong> for this generation.</>
-              ) : (
-                <>You don&apos;t have enough credits to generate content.</>
-              )}
-            </p>
-            <p className="mt-1 text-center text-xs text-muted-foreground">
-              Purchase credits to start creating.
-            </p>
-
-            {/* CTA — show all available credit packs */}
-            <div className="mt-6 space-y-3">
-              {(() => {
-                const [first, second] = [
-                  { credits: 100, price: "$9", id: "pdt_0NiWo2CjaeJBzhplGXxWT" },
-                  { credits: 5, price: "$0.05", id: "pdt_0NiZQ6jp5QSl7ZLZVlZ77" },
-                ];
-                return [first, second].map((pack) => (
-                  <Button
-                    key={pack.id}
-                    size="lg"
-                    className="w-full rounded-xl text-base"
-                    disabled={creditModalLoading}
-                    onClick={async () => {
-                      setCreditModalLoading(true);
-                      try {
-                        const token = await getToken();
-                        if (!token) throw new Error('Not authenticated');
-
-                        const plans = await getPlans();
-                        const creditPlan = plans.creditPacks.find(p => p.dodo_product_id === pack.id);
-                        if (!creditPlan) throw new Error('No credit plan available');
-
-                        sessionStorage.setItem('pending_plan_id', creditPlan.id);
-                        const successUrl = `${window.location.origin}/generate?checkout=success`;
-                        const { checkout_url } = await createCheckoutSession(creditPlan.id, token, successUrl);
-                        window.location.href = checkout_url;
-                      } catch (err) {
-                        toast.error(err instanceof Error ? err.message : 'Failed to start checkout');
-                        setCreditModalLoading(false);
-                      }
-                    }}
-                  >
-                    {creditModalLoading ? (
-                      <><Loader2 className="mr-2 size-4 animate-spin" /> Opening checkout...</>
-                    ) : (
-                      `Buy ${pack.credits} Credits — ${pack.price}`
-                    )}
-                  </Button>
-                ));
-              })()}
-              <Button
-                size="sm"
-                variant="ghost"
-                className="w-full text-sm text-muted-foreground"
-                onClick={() => {
-                  setShowCreditModal(false);
-                  setPendingGenerate(null);
-                  sessionStorage.removeItem('pending_generate');
-                }}
-              >
-                Cancel
-              </Button>
-            </div>
-
-            <p className="mt-4 text-center text-xs text-muted-foreground">
-              After purchase, your generation will start automatically.
-            </p>
-          </div>
-        </div>
-      )}
+            sessionStorage.setItem('pending_plan_id', creditPlan.id);
+            const successUrl = `${window.location.origin}/generate?checkout=success`;
+            const { checkout_url } = await createCheckoutSession(creditPlan.id, token, successUrl);
+            window.location.href = checkout_url;
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'Failed to start checkout');
+            setCreditModalLoading(false);
+          }
+        }}
+        onClose={() => {
+          setShowCreditModal(false);
+          setPendingGenerate(null);
+          sessionStorage.removeItem('pending_generate');
+        }}
+      />
     </div>
   );
 }

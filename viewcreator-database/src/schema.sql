@@ -31,6 +31,9 @@ CREATE TABLE IF NOT EXISTS templates (
 -- Index for fast sorting by creation date (primary listing order)
 CREATE INDEX IF NOT EXISTS idx_templates_created_at ON templates (created_at DESC);
 
+-- Index for searching templates by uploader
+CREATE INDEX IF NOT EXISTS idx_templates_user_id ON templates(user_id);
+
 -- Index for searching metadata configuration keys quickly
 CREATE INDEX IF NOT EXISTS idx_templates_config ON templates USING gin (config);
 
@@ -134,6 +137,7 @@ CREATE TABLE IF NOT EXISTS user_subscriptions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_user_subscriptions_user ON user_subscriptions(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_subscriptions_plan ON user_subscriptions(plan_id);
 CREATE INDEX IF NOT EXISTS idx_user_subscriptions_dodo ON user_subscriptions(dodo_subscription_id);
 
 -- Apply update_timestamp trigger to new tables

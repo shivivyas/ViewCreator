@@ -9,10 +9,12 @@ import { Button } from "@/components/ui/button";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { setImageEditorState, updateHistoryItemImages } from "@/store/slices/image-editor-slice";
 import { generateImages } from "@/services";
+import type { EditTimelineEntry } from "@/components/editor/editor-timeline";
 
 import { EditorHeader } from "@/components/editor/editor-header";
 import { EditorSidebar } from "@/components/editor/editor-sidebar";
 import { EditorCanvas } from "@/components/editor/editor-canvas";
+import { EditorTimeline } from "@/components/editor/editor-timeline";
 
 export default function EditImagePage() {
   const router = useRouter();
@@ -40,12 +42,16 @@ export default function EditImagePage() {
   // Save / Unsaved change state
   const [lastSavedUrl, setLastSavedUrl] = useState<string | null>(previewUrl || selectedImage || null);
   const [isSaved, setIsSaved] = useState(true);
+  const [savedIndex, setSavedIndex] = useState(0);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
-  // Undo/Redo Edit Session History Stack
-  const [history, setHistory] = useState<string[]>(() => {
+  // ── Edit Timeline History ─────────────────────────────────
+  // Tracks every edit as a rich entry with type, description, and timestamp.
+  const [history, setHistory] = useState<EditTimelineEntry[]>(() => {
     const initialImg = previewUrl || selectedImage;
-    return initialImg ? [initialImg] : [];
+    return initialImg
+      ? [{ url: initialImg, type: "original", description: "Original image", timestamp: Date.now() }]
+      : [];
   });
   const [historyIndex, setHistoryIndex] = useState(() => {
     const initialImg = previewUrl || selectedImage;
@@ -64,9 +70,14 @@ export default function EditImagePage() {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [isSaved]);
 
-  const pushToHistory = (newUrl: string) => {
+  const pushToHistory = (
+    newUrl: string,
+    type: EditTimelineEntry["type"] = "ai-edit",
+    description?: string
+  ) => {
     const newHistory = history.slice(0, historyIndex + 1);
-    setHistory([...newHistory, newUrl]);
+    const desc = description ?? TYPE_LABELS[type];
+    setHistory([...newHistory, { url: newUrl, type, description: desc, timestamp: Date.now() }]);
     setHistoryIndex(newHistory.length);
     setIsSaved(newUrl === lastSavedUrl);
   };
@@ -74,7 +85,7 @@ export default function EditImagePage() {
   const handleUndo = () => {
     if (historyIndex > 0) {
       const prevIndex = historyIndex - 1;
-      const url = history[prevIndex];
+      const url = history[prevIndex].url;
       setHistoryIndex(prevIndex);
       setPreviewImageUrl(url);
       setIsSaved(url === lastSavedUrl);
@@ -84,11 +95,21 @@ export default function EditImagePage() {
   const handleRedo = () => {
     if (historyIndex < history.length - 1) {
       const nextIndex = historyIndex + 1;
-      const url = history[nextIndex];
+      const url = history[nextIndex].url;
       setHistoryIndex(nextIndex);
       setPreviewImageUrl(url);
       setIsSaved(url === lastSavedUrl);
     }
+  };
+
+  /** Jump to a specific point in the edit timeline */
+  const handleJumpToEntry = (index: number) => {
+    if (index < 0 || index >= history.length) return;
+    const url = history[index].url;
+    setHistoryIndex(index);
+    setPreviewImageUrl(url);
+    setIsSaved(url === lastSavedUrl);
+    setIsCropMode(false);
   };
 
   const handleSave = () => {
@@ -112,6 +133,15 @@ export default function EditImagePage() {
 
     setLastSavedUrl(previewImageUrl);
     setIsSaved(true);
+    setSavedIndex(historyIndex);
+  };
+
+  const TYPE_LABELS: Record<EditTimelineEntry["type"], string> = {
+    original: "Original image",
+    "ai-edit": "AI-powered edit applied",
+    crop: "Canvas cropped",
+    reset: "Reset to original",
+    adjustment: "Visual adjustments applied",
   };
 
   const canUndo = historyIndex > 0;
@@ -182,7 +212,7 @@ export default function EditImagePage() {
       const updatedUrl = imageResult.imageUrls?.[0] ?? currentImage;
       setPreviewImageUrl(updatedUrl);
       setInstruction("");
-      pushToHistory(updatedUrl);
+      pushToHistory(updatedUrl, "ai-edit", instruction);
       toast.success("AI edits applied successfully!");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Something went wrong applying your edits.";
@@ -316,7 +346,11 @@ export default function EditImagePage() {
         const croppedDataUrl = canvas.toDataURL("image/png");
         setPreviewImageUrl(croppedDataUrl);
         setIsCropMode(false);
-        pushToHistory(croppedDataUrl);
+        pushToHistory(
+          croppedDataUrl,
+          "crop",
+          `Cropped to ${Math.round(crop.width)}% × ${Math.round(crop.height)}%`
+        );
       } catch (e) {
         console.error("Canvas export failed:", e);
         setError("Cross-origin security block: Try running backend in local proxy mode.");
@@ -329,13 +363,13 @@ export default function EditImagePage() {
   };
 
   const handleReset = () => {
-    const originalImage = history[0];
+    const originalImage = history[0]?.url;
     if (originalImage && previewImageUrl !== originalImage) {
       setPreviewImageUrl(originalImage);
       setCrop({ x: 10, y: 10, width: 80, height: 80 });
       setIsCropMode(false);
       setError(null);
-      pushToHistory(originalImage);
+      pushToHistory(originalImage, "reset");
     }
   };
 
@@ -410,6 +444,14 @@ export default function EditImagePage() {
           handleHandlePointerDown={handleHandlePointerDown}
           handleHandlePointerMove={handleHandlePointerMove}
           handleHandlePointerUp={handleHandlePointerUp}
+        />
+
+        {/* Edit Timeline — right panel showing every edit as a timeline */}
+        <EditorTimeline
+          entries={history}
+          currentIndex={historyIndex}
+          savedIndex={savedIndex}
+          onJumpToEntry={handleJumpToEntry}
         />
       </main>
 

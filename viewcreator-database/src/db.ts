@@ -26,6 +26,8 @@ const poolConfig: PoolConfig = {
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 5000,
   ssl: ssl ? { rejectUnauthorized: false } : false,
+  // Force IPv4 — avoids EHOSTUNREACH errors when macOS DNS resolves Supabase to IPv6
+  family: 4,
 };
 
 export const pool = new Pool(poolConfig);

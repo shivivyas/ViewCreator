@@ -31,8 +31,13 @@ Three independent bugs:
 **Lesson**: Always document in the migration script or README that `db:seed` must be run after `db:migrate`. Consider making `db:migrate` automatically call `db:seed` via a `postmigrate` script, or splitting idempotent `CREATE TABLE IF NOT EXISTS` additions (like `user_creations`) into separate migration files that don't drop existing data.
 **One-off**: The data-loss cost of re-seeding is low (demo users + templates + plans), so this is acceptable. If production data existed, this pattern would be catastrophic.
 
+#### 5. Node-Postgres IPv6 `EHOSTUNREACH` with Supabase
+**What**: Intermittent `EHOSTUNREACH` errors when connecting to Supabase from macOS. Node's DNS resolves Supabase's hostname to both IPv4 and IPv6 addresses. The IPv6 route sometimes fails (`read EHOSTUNREACH`), causing pool connections to error out. The pool recovers on retry, but each failure logs a noisy error and delays a request.
+**Lesson**: Add `family: 4` to the `PoolConfig` to force the `pg` driver to connect via IPv4 only. This is a well-known macOS + Supabase issue and the fix is one line. The error signature is `connect EHOSTUNREACH <ipv6-address>:5432` or `read EHOSTUNREACH` on idle clients.
+**Trigger**: If `EHOSTUNREACH` errors appear in logs with an IPv6 address (`2406:...`), add `family: 4` to the pool config.
+
 ### Applied To
 - `viewcreator-api/src/index.ts` — Removed `s3Urls.length > 0` guard, added data URI fallback + ✅/⚠️/❌ logging
 - `viewcreator-database/src/schema.sql` — Changed `thumbnail_url` from `VARCHAR(1024)` to `TEXT`
-- `viewcreator-database/src/db.ts` — Simplified to only use `DATABASE_URL`, removed local Postgres fallback defaults
+- `viewcreator-database/src/db.ts` — Simplified to only use `DATABASE_URL`, removed local Postgres fallback defaults, added `family: 4` for IPv4-only Supabase connections
 - `.env` (root) — Removed local Postgres `DATABASE_URL`, `DB_USER`, `DB_PASSWORD`, etc.

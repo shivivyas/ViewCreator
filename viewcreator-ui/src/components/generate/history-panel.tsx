@@ -165,10 +165,12 @@ function HistoryItem({
     dispatch(deleteGenerationFromHistory(item.id));
   };
 
-  // Determine display URLs: prefer s3Urls, fall back to imageUrls (data URIs)
-  const displayUrls = item.s3Urls && item.s3Urls.length > 0
-    ? item.s3Urls
-    : item.imageUrls;
+  // Determine display URLs: prefer imageUrls (mutable — updated when edits are
+  // saved via updateHistoryItemImages). Fall back to s3Urls (immutable original
+  // generation URLs) for unedited creations without imageUrls.
+  const displayUrls: string[] = item.imageUrls && item.imageUrls.length > 0
+    ? item.imageUrls
+    : item.s3Urls ?? [];
 
   return (
     <div className="rounded-2xl border border-border/50 bg-card overflow-hidden">

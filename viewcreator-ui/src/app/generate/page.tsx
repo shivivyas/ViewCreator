@@ -475,6 +475,7 @@ function GenerateImagePageContent() {
         };
         dispatch(addGenerationToHistory(historyItem));
         toast.success(`Successfully generated ${generatedUrls.length} image(s)!`);
+        window.dispatchEvent(new CustomEvent('payment-updated'));
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Something went wrong';
@@ -516,6 +517,7 @@ function GenerateImagePageContent() {
         };
         dispatch(addGenerationToHistory(historyItem));
         toast.success("Video generated successfully!");
+        window.dispatchEvent(new CustomEvent('payment-updated'));
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Something went wrong';

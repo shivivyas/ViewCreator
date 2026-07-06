@@ -310,14 +310,18 @@ app.post('/api/templates/upload', requireAuth(), syncUserMiddleware, async (req:
     console.log(`[S3 Upload] Successfully recorded template ${template.id} in Postgres.`);
 
     // Deduct credits after successful upload
-    await deductForGeneration(
+    const deductResult = await deductForGeneration(
       userId!,
       uploadCreditCost,
       `Uploaded template: ${title}`,
       { template_id: template.id, media_type: mediaType, is_public: isPublic }
     );
 
-    res.json({ template });
+    if (!deductResult.success) {
+      console.error(`[Credit] Template upload deduction FAILED for user ${userId}:`, deductResult);
+    }
+
+    res.json({ template, credit_deducted: deductResult.success });
   } catch (error: any) {
     console.error('Error uploading template to S3:', error);
     res.status(500).json({ error: error.message || 'Failed to upload template' });
@@ -532,14 +536,18 @@ app.post('/api/generate', generationRateLimiter, requireAuth(), syncUserMiddlewa
 
     // Deduct credits after successful generation
     const promptPreview = prompt.substring(0, 100);
-    await deductForGeneration(
+    const deductResult = await deductForGeneration(
       userId!,
       totalCost,
       `Generated ${imageUrls.length} image(s)`,
       { prompt_preview: promptPreview, quality, count: imageUrls.length, creation_id: creationId }
     );
 
-    return res.json({ imageUrls, s3Urls, creationId });
+    if (!deductResult.success) {
+      console.error(`[Credit] Image generation deduction FAILED for user ${userId}:`, deductResult);
+    }
+
+    return res.json({ imageUrls, s3Urls, creationId, credit_deducted: deductResult.success });
   } catch (error: any) {
     console.error('Error generating image:', error);
     return res.status(500).json({ error: error.message || 'Internal Server Error' });
@@ -697,14 +705,18 @@ app.post('/api/generate/video', videoGenerationRateLimiter, requireAuth(), syncU
 
       // Deduct credits after successful generation
       const { total: deductedVideoCost } = calculateVideoCost();
-      await deductForGeneration(
+      const deductResult = await deductForGeneration(
         userId!,
         deductedVideoCost,
         'Generated video',
         { prompt_preview: prompt.substring(0, 100), quality, creation_id: creationId }
       );
 
-      return res.json({ videoUrls, duration, s3Urls, creationId });
+      if (!deductResult.success) {
+        console.error(`[Credit] Video generation deduction FAILED for user ${userId}:`, deductResult);
+      }
+
+      return res.json({ videoUrls, duration, s3Urls, creationId, credit_deducted: deductResult.success });
     } catch (genError: any) {
       console.error('[Generate Video API] Generation failed:', genError);
       return res.status(500).json({ error: `Video generation failed: ${genError.message}` });
@@ -926,14 +938,18 @@ app.post('/api/edit-image', requireAuth(), syncUserMiddleware, async (req: expre
     }
 
     // Deduct credits after successful edit (no user_creation record created)
-    await deductForGeneration(
+    const deductResult = await deductForGeneration(
       userId!,
       editCost,
       `AI edit: ${instruction.substring(0, 100)}`,
       { edit_type: 'image-edit', aspect_ratio: aspectRatio }
     );
 
-    return res.json({ editedImageUrl });
+    if (!deductResult.success) {
+      console.error(`[Credit] Image edit deduction FAILED for user ${userId}:`, deductResult);
+    }
+
+    return res.json({ editedImageUrl, credit_deducted: deductResult.success });
   } catch (error: any) {
     console.error('Error editing image:', error);
     return res.status(500).json({ error: error.message || 'Internal Server Error' });

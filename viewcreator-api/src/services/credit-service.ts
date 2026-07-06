@@ -20,7 +20,8 @@ export async function checkCredits(
   }
 
   // 2. Check credit balance (read-only, no lock)
-  const credits = await CreditRepository.findByUserId(userId);
+  // Use ensureUser to auto-create the row if missing (consistent with GET /api/payments/balance)
+  const credits = await CreditRepository.ensureUser(userId);
   const balance = credits?.balance ?? 0;
 
   if (balance < cost) {
@@ -63,5 +64,16 @@ export async function deductCredits(
   }
 
   // Use atomic check-and-deduct with row-level locking
-  return await CreditRepository.checkAndDeductAtomic(userId, cost, description, metadata);
+  const result = await CreditRepository.checkAndDeductAtomic(userId, cost, description, metadata);
+  
+  if (!result.success) {
+    console.warn(`[Credit] Deduction failed for user ${userId}:`, {
+      reason: result.reason,
+      cost,
+      remaining: result.remaining,
+      description,
+    });
+  }
+
+  return result;
 }

@@ -24,12 +24,17 @@ if (!databaseUrl) {
 const isSupabase = databaseUrl.includes('supabase.co');
 const sslMode = process.env.DB_SSL;
 const ssl = sslMode === 'true' || sslMode === '1' || (isSupabase && sslMode !== 'false') || false;
+// `family: 4` forces IPv4-only DNS resolution in pg, avoiding EHOSTUNREACH
+// when macOS DNS resolves Supabase to an unreachable IPv6 address.
+// PoolConfig doesn't declare `family` in its type, but pg passes it through
+// to Node's net.connect() at runtime.
 const poolConfig = {
     connectionString: databaseUrl,
     max: parseInt(process.env.DB_MAX_CONNECTIONS || '10', 10),
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 5000,
     ssl: ssl ? { rejectUnauthorized: false } : false,
+    family: 4,
 };
 exports.pool = new pg_1.Pool(poolConfig);
 // Handle pool errors gracefully

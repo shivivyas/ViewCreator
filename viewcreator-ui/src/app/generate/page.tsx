@@ -155,6 +155,27 @@ function GenerateImagePageContent() {
             const balance = status.credits?.balance ?? 0;
             setUserBalance(balance);
 
+            // Restore form fields from saved pending generation so the UI
+            // shows the prompt/settings and HistoryPanel shows loading skeleton.
+            setIsLoading(true);
+            if (pg.type === 'image') {
+              const ip = pg.params as GenerateParams;
+              setPrompt(ip.prompt);
+              setAspectRatio(ip.aspectRatio);
+              setNumberOfImages(ip.numberOfImages);
+              setImageSize(ip.imageSize);
+              setReferenceImages(ip.referenceImages || []);
+              if (ip.templateId) setSelectedTemplateId(ip.templateId);
+              setMediaType('image');
+            } else {
+              const vp = pg.params as GenerateVideoParams;
+              setPrompt(vp.prompt);
+              setAspectRatio(vp.aspectRatio);
+              setDuration(vp.duration);
+              if (vp.templateId) setSelectedTemplateId(vp.templateId);
+              setMediaType('video');
+            }
+
             const cost = pg.type === 'video' ? 5
               : 1 * Math.min(Math.max(1, (pg.params as GenerateParams).numberOfImages), 4);
 
@@ -184,6 +205,7 @@ function GenerateImagePageContent() {
                   setVideoUrls(result.videoUrls);
                   toast.success('Video generated successfully!');
                 }
+                setIsLoading(false);
               } else {
                 const ip = pg.params as GenerateParams;
                 const urls = await apiGenerateImages(ip, await getToken() || undefined);
@@ -207,6 +229,7 @@ function GenerateImagePageContent() {
                   setImageUrls(urls);
                   toast.success(`Successfully generated ${urls.length} image(s)!`);
                 }
+                setIsLoading(false);
               }
               setPendingGenerate(null);
               sessionStorage.removeItem('pending_generate');
@@ -219,6 +242,7 @@ function GenerateImagePageContent() {
                 if (retries >= 10) {
                   setRequiredCredits(cost);
                   setShowCreditModal(true);
+                  setIsLoading(false);
                   return;
                 }
                 retries++;
@@ -227,6 +251,7 @@ function GenerateImagePageContent() {
                   setUserBalance(recheck.credits?.balance ?? 0);
                   setShowCreditModal(false);
                   setPendingGenerate(null);
+                  setIsLoading(false);
                   sessionStorage.removeItem('pending_generate');
                   toast.success('Credits confirmed! Try generating again.');
                 } else {
@@ -237,6 +262,7 @@ function GenerateImagePageContent() {
             }
           } catch {
             // Silently fail — modal will show again
+            setIsLoading(false);
           }
         };
 
@@ -670,7 +696,7 @@ function GenerateImagePageContent() {
 
             {/* Title */}
             <h3 className="text-center text-lg font-semibold">
-              You need more credits
+              Buy Credits
             </h3>
             <p className="mt-2 text-center text-sm text-muted-foreground">
               {userBalance !== null && userBalance > 0 ? (
@@ -678,6 +704,9 @@ function GenerateImagePageContent() {
               ) : (
                 <>You don&apos;t have enough credits to generate content.</>
               )}
+            </p>
+            <p className="mt-1 text-center text-xs text-muted-foreground">
+              Purchase credits to start creating. 100 credits for $9.
             </p>
 
             {/* CTA */}

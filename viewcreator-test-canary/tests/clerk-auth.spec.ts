@@ -161,7 +161,7 @@ test.describe("Clerk: Fresh User (0 credits)", () => {
     await page.getByRole("button", { name: /generate/i }).click();
     await page.waitForTimeout(3000);
 
-    await expect(page.getByText(/need more credits/i)).toBeVisible();
+    await expect(page.getByRole("heading", { name: /buy credits/i })).toBeVisible();
   });
 
   // ── Q4: Credit gate modal shows purchase CTA ────────────────
@@ -218,6 +218,59 @@ test.describe("Clerk: Credit User (100 credits)", () => {
     // Try multiple patterns the badge could use
     const creditDisplay = headerRegion.getByText(/credits?/i).first();
     await expect(creditDisplay).toBeVisible({ timeout: 20000 });
+  });
+});
+
+// ── Post-Purchase Flow (Q6 enhancement) ────────────────────────────────────
+
+test.describe("Clerk: Post-Purchase UI — Form Restoration", () => {
+  test("restores form fields and shows loading after returning from checkout", async ({ page }) => {
+    // Create a credit user with balance so the resume flow doesn't hit the gate
+    await signInUser(page, { grantCredits: 100 });
+
+    // Set up pending_generate in sessionStorage to simulate returning from Dodo
+    const pendingData = {
+      type: "image",
+      params: {
+        prompt: "A serene mountain landscape at sunset",
+        style: "None",
+        aspectRatio: "16:9",
+        numberOfImages: 2,
+        imageSize: "1K",
+        thinkingLevel: "minimal",
+        quality: "Standard",
+        referenceImages: [],
+        templateId: null,
+      },
+    };
+
+    // Navigate to generate, set sessionStorage, then re-navigate with checkout=success
+    await page.goto("/generate");
+    await page.waitForLoadState("networkidle");
+
+    // Inject the pending generation data
+    await page.evaluate((data) => {
+      sessionStorage.setItem("pending_generate", JSON.stringify(data));
+    }, pendingData);
+
+    // Also set a pending_plan_id so the grant credits step works
+    await page.evaluate(() => {
+      sessionStorage.setItem("pending_plan_id", "plan-credits-uuid");
+    });
+
+    // Navigate to /generate?checkout=success to trigger the post-purchase flow
+    await page.goto("/generate?checkout=success");
+    await page.waitForLoadState("networkidle");
+    await page.waitForTimeout(3000);
+
+    // The form should have the restored prompt
+    const promptInput = page.getByPlaceholder(/describe/i).first();
+    const promptValue = await promptInput.inputValue();
+    expect(promptValue).toContain("mountain landscape");
+
+    // The aspect ratio should be restored
+    const aspectRatioOption = page.getByText("16:9").first();
+    await expect(aspectRatioOption).toBeVisible();
   });
 });
 

@@ -48,7 +48,11 @@ This project now uses **firstmate** (vendored at `firstmate/`) as the agent orch
 | Step | Status | Completed |
 |------|--------|-----------|
 | Requirements (grill) | ✅ | 2026-07-05 |
-| Development | ⏳ | — |
 | FirstMate Integration | ✅ | 2026-07-05 |
+| Test Architecture Design & Implementation | ✅ | 2026-07-06 |
+| Deduction API Implementation | ✅ | 2026-07-06 |
+| Admin Grant Endpoint | ✅ | 2026-07-06 |
+| Clerk-Authenticated E2E Tests | ✅ | 2026-07-06 |
+| Development (credit badge, gate modal) | ✅ | Already existed |
 | Code Review | ❌ | — |
 | Retrospective | ❌ | — |

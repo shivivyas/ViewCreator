@@ -196,4 +196,95 @@ export class CreditRepository {
     );
     return result.rows[0] || null;
   }
+
+  /**
+   * Atomic deduction with idempotency key.
+   * Same key = same result (no double-deduct).
+   *
+   * Uses the webhook_events table as an idempotency store.
+   * If the idempotency_key has already been processed, returns the cached result.
+   * Otherwise, performs the deduction atomically and records the key.
+   */
+  static async deductWithIdempotency(
+    userId: string,
+    amount: number,
+    idempotencyKey: string,
+    description: string = 'Credit deduction',
+    metadata: Record<string, any> = {}
+  ): Promise<{ success: boolean; remaining?: number; reason?: string; deducted?: number }> {
+    if (amount <= 0) {
+      return { success: false, reason: 'invalid_amount' };
+    }
+
+    // 1. Check idempotency — if already processed, return cached result
+    const existing = await query(
+      'SELECT 1 FROM webhook_events WHERE event_id = $1',
+      [idempotencyKey]
+    );
+    if (existing.rows.length > 0) {
+      // Look up the resulting transaction to get balance after
+      const txResult = await query<CreditTransaction>(
+        `SELECT * FROM credit_transactions
+         WHERE user_id = $1
+           AND type = 'usage'
+           AND amount = $2
+           AND created_at > NOW() - INTERVAL '5 minutes'
+         ORDER BY created_at DESC
+         LIMIT 1`,
+        [userId, -amount]
+      );
+      return {
+        success: true,
+        remaining: txResult.rows[0]?.balance_after ?? 0,
+        deducted: amount,
+      };
+    }
+
+    // 2. Perform the atomic deduction within a transaction
+    return await transaction(async (client) => {
+      // Row-level lock — prevents concurrent deductions
+      const lockResult = await client.query(
+        'SELECT balance FROM user_credits WHERE user_id = $1 FOR UPDATE',
+        [userId]
+      );
+
+      const currentBalance = lockResult.rows[0]?.balance ?? 0;
+
+      if (currentBalance < amount) {
+        return { success: false, reason: 'insufficient', remaining: currentBalance };
+      }
+
+      // Atomic deduct
+      const updateResult = await client.query(
+        `UPDATE user_credits
+         SET balance = balance - $2, updated_at = CURRENT_TIMESTAMP
+         WHERE user_id = $1 AND balance >= $2
+         RETURNING balance`,
+        [userId, amount]
+      );
+
+      if (updateResult.rows.length === 0) {
+        return { success: false, reason: 'race_lost', remaining: currentBalance };
+      }
+
+      const balanceAfter = updateResult.rows[0].balance;
+
+      // Log the credit transaction in the same transaction
+      await client.query(
+        `INSERT INTO credit_transactions (user_id, type, amount, balance_after, description, metadata)
+         VALUES ($1, 'usage', $2, $3, $4, $5)`,
+        [userId, -amount, balanceAfter, description, JSON.stringify(metadata)]
+      );
+
+      // Record idempotency key in webhook_events table
+      await client.query(
+        `INSERT INTO webhook_events (event_id, event_type)
+         VALUES ($1, 'credit_deduction')
+         ON CONFLICT (event_id) DO NOTHING`,
+        [idempotencyKey]
+      );
+
+      return { success: true, remaining: balanceAfter, deducted: amount };
+    });
+  }
 }

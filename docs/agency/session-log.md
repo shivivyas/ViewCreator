@@ -64,3 +64,50 @@ none
 
 ### State At End
 FirstMate integrated into all agent files. Director is now First Mate. All specialist agents understand they may operate as firstmate crewmates with worktree isolation, brief-driven tasks, and sparse status reporting. FirstMate infrastructure at `firstmate/` is configured and ready. Awaiting next feature request or task.
+
+---
+
+## 2026-07-06 — Credit payment system: E2E testing, deduction API, test architecture
+
+### Agent
+Director (First Mate)
+
+### Skill
+none
+
+### Summary
+- Ran E2E tests for all 4 personas (Guest, Free, Low Credit, Credit User) — found 19/26 tests failing due to stale subscription-model tests
+- Updated all test files (`pricing.spec.ts`, `header-status.spec.ts`, `helpers.ts`) from subscription model to credit-only model — 20/20 passing
+- Installed `@clerk/testing` and built hybrid test architecture: mock-based "contract tests" + real Clerk-authenticated tests
+- Created `global.setup.ts` — calls `clerkSetup()` to obtain Clerk testing token
+- Created `clerk-auth.spec.ts` — uses Clerk Backend API to create real users and inject session cookies (bypasses UI sign-up modal which doesn't work in headless Playwright)
+- Created `generate-gate.spec.ts` — tests access control per persona
+- Created `credit-deduction.spec.ts` — tests atomic deduction, idempotency, auth, boundaries
+- Implemented `POST /api/payments/deduct` endpoint with idempotency key in `routes/payments.ts`
+- Implemented `deductWithIdempotency()` method in `credit-repository.ts`
+- Implemented `deduct_credits()` SQL function in `schema.sql`
+- Implemented `POST /api/admin/payments/grant-credits` admin endpoint in `routes/admin.ts`
+- Added LOW_CREDIT persona (1 credit boundary) to test helpers
+- Discovered that credit gate modal and CreditBadge already existed in the UI — tests were just using wrong locators for Clerk-gated state
+
+### Decisions Made
+- Hybrid test architecture: mock API for contract tests, Clerk Backend API for auth tests
+- Clerk Backend API + session cookie injection (not UI sign-up flow which requires trusted events)
+- Deduct endpoint uses admin-key auth pattern (x-admin-key header)
+- Idempotency via webhook_events table (reuses existing idempotency infrastructure)
+- Grant endpoint for tests (POST /api/admin/payments/grant-credits)
+
+### Artifacts Produced
+- `viewcreator-test-canary/tests/global.setup.ts` — Clerk testing token setup
+- `viewcreator-test-canary/tests/clerk-auth.spec.ts` — Real Clerk-authenticated persona tests
+- `viewcreator-test-canary/tests/credit-deduction.spec.ts` — Deduction API tests (8 tests)
+- `viewcreator-test-canary/tests/generate-gate.spec.ts` — Generate gate contract tests
+- `viewcreator-test-canary/tests/helpers.ts` — Added LOW_CREDIT persona
+- `viewcreator-api/src/routes/payments.ts` — Added POST /api/payments/deduct
+- `viewcreator-api/src/routes/admin.ts` — Added POST /api/admin/payments/grant-credits
+- `viewcreator-database/src/repositories/credit-repository.ts` — Added deductWithIdempotency()
+- `viewcreator-database/src/schema.sql` — Added deduct_credits() SQL function
+- `viewcreator-test-canary/playwright.config.ts` — Two-project setup (chromium + chromium-auth)
+
+### State At End
+34/34 tests passing. Deduction API fully implemented with idempotency. Clerk-authenticated tests running with real sessions. Credit gate modal and badge already exist in UI. Ready for next feature work.

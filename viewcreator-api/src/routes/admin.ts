@@ -107,4 +107,35 @@ router.get('/api/admin/payments/webhook-events', requireAdmin, async (req, res) 
   }
 });
 
+/**
+ * POST /api/admin/payments/grant-credits
+ *
+ * Grants credits to a user for testing purposes.
+ * Protected by x-admin-key header.
+ *
+ * Body: { user_id, amount, description? }
+ */
+router.post('/api/admin/payments/grant-credits', requireAdmin, async (req, res) => {
+  try {
+    const { user_id, amount, description } = req.body;
+    if (!user_id || !amount || amount <= 0) {
+      return res.status(400).json({ error: 'user_id and positive amount are required' });
+    }
+
+    const credits = await CreditRepository.addCredits(
+      user_id,
+      amount,
+      'grant',
+      description || 'Admin grant',
+      { granted_by: 'admin_api', timestamp: new Date().toISOString() }
+    );
+
+    console.log(`[Admin API] Granted ${amount} credits to user ${user_id} — balance: ${credits.balance}`);
+    return res.json({ granted: true, balance: credits.balance, lifetime_credits: credits.lifetime_credits });
+  } catch (error: any) {
+    console.error('[Admin API] Grant credits error:', error);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;

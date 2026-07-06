@@ -167,3 +167,108 @@ CREATE TABLE IF NOT EXISTS webhook_events (
 );
 
 CREATE INDEX IF NOT EXISTS idx_webhook_events_created_at ON webhook_events(created_at);
+
+-- ── Credit Deduction Function (with Idempotency) ─────────────────────────────────────
+
+-- Atomic credit deduction with idempotency support.
+-- Used by the API for admin-triggered deductions.
+-- Returns JSONB: { success: boolean, remaining?: number, deducted?: number, reason?: string }
+CREATE OR REPLACE FUNCTION deduct_credits(
+    p_user_id VARCHAR(255),
+    p_amount INT,
+    p_idempotency_key TEXT DEFAULT NULL,
+    p_description TEXT DEFAULT 'Credit deduction',
+    p_metadata JSONB DEFAULT '{}'
+) RETURNS JSONB
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_current_balance INT;
+    v_new_balance INT;
+    v_already_processed BOOLEAN;
+BEGIN
+    -- Validate amount
+    IF p_amount <= 0 THEN
+        RETURN jsonb_build_object('success', false, 'reason', 'invalid_amount');
+    END IF;
+
+    -- Idempotency check: if key provided and already processed, return cached result
+    IF p_idempotency_key IS NOT NULL THEN
+        SELECT EXISTS(
+            SELECT 1 FROM webhook_events WHERE event_id = p_idempotency_key
+        ) INTO v_already_processed;
+
+        IF v_already_processed THEN
+            -- Find the resulting transaction to get balance_after
+            SELECT balance_after INTO v_new_balance
+            FROM credit_transactions
+            WHERE user_id = p_user_id
+              AND type = 'usage'
+              AND amount = -p_amount
+              AND created_at > NOW() - INTERVAL '5 minutes'
+            ORDER BY created_at DESC
+            LIMIT 1;
+
+            IF v_new_balance IS NOT NULL THEN
+                RETURN jsonb_build_object(
+                    'success', true,
+                    'remaining', v_new_balance,
+                    'deducted', p_amount
+                );
+            END IF;
+
+            -- Fallback: read current balance
+            SELECT balance INTO v_new_balance FROM user_credits WHERE user_id = p_user_id;
+            RETURN jsonb_build_object(
+                'success', true,
+                'remaining', COALESCE(v_new_balance, 0),
+                'deducted', p_amount
+            );
+        END IF;
+    END IF;
+
+    -- Lock the user's credit row
+    SELECT balance INTO v_current_balance
+    FROM user_credits
+    WHERE user_id = p_user_id
+    FOR UPDATE;
+
+    -- If no row exists, user has no credits
+    IF v_current_balance IS NULL THEN
+        RETURN jsonb_build_object('success', false, 'reason', 'insufficient', 'remaining', 0);
+    END IF;
+
+    -- Check sufficient balance
+    IF v_current_balance < p_amount THEN
+        RETURN jsonb_build_object('success', false, 'reason', 'insufficient', 'remaining', v_current_balance);
+    END IF;
+
+    -- Perform atomic deduction
+    UPDATE user_credits
+    SET balance = balance - p_amount,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE user_id = p_user_id AND balance >= p_amount
+    RETURNING balance INTO v_new_balance;
+
+    IF v_new_balance IS NULL THEN
+        RETURN jsonb_build_object('success', false, 'reason', 'race_lost', 'remaining', v_current_balance);
+    END IF;
+
+    -- Log the transaction
+    INSERT INTO credit_transactions (user_id, type, amount, balance_after, description, metadata)
+    VALUES (p_user_id, 'usage', -p_amount, v_new_balance, p_description, p_metadata);
+
+    -- Record idempotency key
+    IF p_idempotency_key IS NOT NULL THEN
+        INSERT INTO webhook_events (event_id, event_type)
+        VALUES (p_idempotency_key, 'credit_deduction')
+        ON CONFLICT (event_id) DO NOTHING;
+    END IF;
+
+    RETURN jsonb_build_object(
+        'success', true,
+        'remaining', v_new_balance,
+        'deducted', p_amount
+    );
+END;
+$$;

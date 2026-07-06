@@ -239,6 +239,76 @@ router.post('/api/payments/confirm-purchase', async (req, res) => {
   }
 });
 
+// ── Deduct Route ────────────────────────────────────────────────────────────
+
+/**
+ * POST /api/payments/deduct
+ *
+ * Admin endpoint to deduct credits from a user.
+ * Protected by x-admin-key header.
+ * Idempotent when idempotency_key is provided — safe to retry.
+ *
+ * Headers:
+ *   x-admin-key: Admin API key
+ *   x-user-id:  Target user ID
+ *
+ * Body:
+ *   amount:         number (required, must be > 0)
+ *   description?:   string
+ *   idempotency_key?: string
+ */
+const ADMIN_KEY = process.env.ADMIN_API_KEY || 'dev-admin-key';
+
+function requireAdmin(req: any, res: any, next: any) {
+  const key = req.headers['x-admin-key'];
+  if (!key || key !== ADMIN_KEY) {
+    return res.status(401).json({ error: 'Unauthorized. Set x-admin-key header.' });
+  }
+  next();
+}
+
+router.post('/api/payments/deduct', requireAdmin, async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'] as string;
+    if (!userId) {
+      return res.status(401).json({ error: 'Missing x-user-id header' });
+    }
+
+    const { amount, description, idempotency_key } = req.body;
+
+    if (!amount || typeof amount !== 'number' || amount <= 0) {
+      return res.status(400).json({ error: 'Invalid amount' });
+    }
+
+    const result = await CreditRepository.deductWithIdempotency(
+      userId,
+      amount,
+      idempotency_key || `manual-deduct-${userId}-${amount}-${Date.now()}`,
+      description || 'Admin credit deduction',
+      { deducted_by: 'admin', idempotency_key: idempotency_key || undefined }
+    );
+
+    if (!result.success) {
+      if (result.reason === 'insufficient') {
+        return res.status(402).json({
+          error: 'Insufficient credits',
+          credits_balance: result.remaining ?? 0,
+          required: amount,
+        });
+      }
+      return res.status(400).json({ error: result.reason || 'Deduction failed' });
+    }
+
+    return res.json({
+      deducted: result.deducted ?? amount,
+      balance_after: result.remaining ?? 0,
+    });
+  } catch (error: any) {
+    console.error('[Payments API] Deduct error:', error);
+    return res.status(500).json({ error: 'Failed to deduct credits' });
+  }
+});
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 /**

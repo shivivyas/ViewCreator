@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, Suspense, useCallback } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth, useUser, useClerk } from '@clerk/nextjs';
 import { toast } from 'sonner';
@@ -12,10 +12,11 @@ import {
 import type { Template, GenerationHistoryItem, GenerateParams, GenerateVideoParams, MediaType } from '@/types';
 import { getTemplates, generateImages as apiGenerateImages, generateVideo as apiGenerateVideo, getUserCreations } from '@/services';
 import { Wand2, Video, Image as ImageIcon, Loader2 } from 'lucide-react';
-import { getBalance, createCheckoutSession, getPlans } from '@/services/api/payment-service';
+import { getBalance } from '@/services/api/payment-service';
 import { calculateGenerationCost, calculateVideoCost } from 'viewcreator-shared';
 import { Button } from '@/components/ui/button';
 import { CreditGateModal, type CreditPack } from '@/components/shared/credit-gate-modal';
+import { useCreditGate } from '@/hooks/use-credit-gate';
 
 import { GenerateForm } from '@/components/generate/generate-form';
 import { HistoryPanel } from '@/components/generate/history-panel';
@@ -54,18 +55,10 @@ function GenerateImagePageContent() {
 
   const [mounted, setMounted] = useState(false);
 
-  // ── Credit Gate State ───────────────────────────────────────
-  const [showCreditModal, setShowCreditModal] = useState(false);
-  const [creditModalLoading, setCreditModalLoading] = useState(false);
-  const [pendingGenerate, setPendingGenerate] = useState<{
-    type: 'image';
-    params: GenerateParams;
-  } | {
-    type: 'video';
-    params: GenerateVideoParams;
-  } | null>(null);
-  const [userBalance, setUserBalance] = useState<number | null>(null);
-  const [requiredCredits, setRequiredCredits] = useState(0);
+  const { getToken } = useAuth();
+
+  // ── Credit Gate Hook ────────────────────────────────────────
+  const credit = useCreditGate(getToken);
 
   // Shared params
   const [prompt, setPrompt] = useState(editorState.basePrompt || '');
@@ -92,7 +85,6 @@ function GenerateImagePageContent() {
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
 
   const initialSelectionDone = useRef(false);
-  const { getToken } = useAuth();
 
   const getSelectedTemplateStyle = () => {
     const activeTemplate = templates.find((t) => t.id === selectedTemplateId);
@@ -175,7 +167,7 @@ function GenerateImagePageContent() {
             // Step 1: Check balance (credits were already granted by grantCredits() above)
             const status = await getBalance(token);
             const balance = status.credits?.balance ?? 0;
-            setUserBalance(balance);
+            credit.setUserBalance(balance);
 
             // Restore form fields from saved pending generation so the UI
             // shows the prompt/settings and HistoryPanel shows loading skeleton.
@@ -259,26 +251,26 @@ function GenerateImagePageContent() {
                 }
                 setIsLoading(false);
               }
-              setPendingGenerate(null);
+              credit.setPendingGenerate(null);
               sessionStorage.removeItem('pending_generate');
-              setShowCreditModal(false);
+              credit.setShowCreditModal(false);
             } else {
               // Poll a few more times as fallback (webhook race)
               toast.info('Waiting for credit confirmation...');
               let retries = 0;
               const poll = async () => {
                 if (retries >= 10) {
-                  setRequiredCredits(cost);
-                  setShowCreditModal(true);
+                  credit.setRequiredCredits(cost);
+                  credit.setShowCreditModal(true);
                   setIsLoading(false);
                   return;
                 }
                 retries++;
                 const recheck = await getBalance(token);
                 if ((recheck.credits?.balance ?? 0) >= cost) {
-                  setUserBalance(recheck.credits?.balance ?? 0);
-                  setShowCreditModal(false);
-                  setPendingGenerate(null);
+                  credit.setUserBalance(recheck.credits?.balance ?? 0);
+                  credit.setShowCreditModal(false);
+                  credit.setPendingGenerate(null);
                   setIsLoading(false);
                   sessionStorage.removeItem('pending_generate');
                   toast.success('Credits confirmed! Try generating again.');
@@ -297,7 +289,7 @@ function GenerateImagePageContent() {
         resumeGeneration();
       }
     }
-  }, [searchParams, pendingGenerate, getToken, dispatch]);
+  }, [searchParams, credit.pendingGenerate, getToken, dispatch]);
 
   useEffect(() => {
     const fetchTemplates = async () => {
@@ -535,31 +527,6 @@ function GenerateImagePageContent() {
     }
   };
 
-  /**
-   * Check credit balance before generation.
-   * Returns true if the user has enough credits (or is subscribed — legacy).
-   */
-  const checkCreditsBeforeGenerate = useCallback(async (cost: number): Promise<boolean> => {
-    try {
-      const token = await getToken();
-      if (!token) return false;
-      const status = await getBalance(token);
-      const balance = status.credits?.balance ?? 0;
-      setUserBalance(balance);
-
-      if (balance < cost) {
-        setRequiredCredits(cost);
-        setShowCreditModal(true);
-        return false;
-      }
-
-      return true;
-    } catch {
-      // If balance check fails, allow generation to proceed
-      return true;
-    }
-  }, [getToken]);
-
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!prompt.trim()) return;
@@ -573,7 +540,7 @@ function GenerateImagePageContent() {
     // ── Credit Check ───────────────────────────────────────
     if (mediaType === 'image') {
       const { total: cost } = calculateGenerationCost('Standard', numberOfImages);
-      const hasCredits = await checkCreditsBeforeGenerate(cost);
+      const hasCredits = await credit.checkCredits(cost);
       if (!hasCredits) {
         // Save form state for resume after purchase
         const pending = {
@@ -590,13 +557,13 @@ function GenerateImagePageContent() {
             templateId: selectedTemplateId,
           },
         };
-        setPendingGenerate(pending);
+        credit.setPendingGenerate(pending);
         sessionStorage.setItem('pending_generate', JSON.stringify(pending));
         return;
       }
     } else {
       const { total: cost } = calculateVideoCost();
-      const hasCredits = await checkCreditsBeforeGenerate(cost);
+      const hasCredits = await credit.checkCredits(cost);
       if (!hasCredits) {
         const pending = {
           type: 'video' as const,
@@ -609,7 +576,7 @@ function GenerateImagePageContent() {
             templateId: selectedTemplateId,
           },
         };
-        setPendingGenerate(pending);
+        credit.setPendingGenerate(pending);
         sessionStorage.setItem('pending_generate', JSON.stringify(pending));
         return;
       }
@@ -768,35 +735,13 @@ function GenerateImagePageContent() {
 
       {/* ── Credit Gate Modal ────────────────────────────────── */}
       <CreditGateModal
-        open={showCreditModal}
-        loading={creditModalLoading}
-        userBalance={userBalance}
-        requiredCredits={requiredCredits}
+        open={credit.showCreditModal}
+        loading={credit.creditModalLoading}
+        userBalance={credit.userBalance}
+        requiredCredits={credit.requiredCredits}
         creditPacks={CREDIT_PACKS}
-        onBuy={async (packId) => {
-          setCreditModalLoading(true);
-          try {
-            const token = await getToken();
-            if (!token) throw new Error('Not authenticated');
-
-            const plans = await getPlans();
-            const creditPlan = plans.creditPacks.find(p => p.dodo_product_id === packId);
-            if (!creditPlan) throw new Error('No credit plan available');
-
-            sessionStorage.setItem('pending_plan_id', creditPlan.id);
-            const successUrl = `${window.location.origin}/generate?checkout=success`;
-            const { checkout_url } = await createCheckoutSession(creditPlan.id, token, successUrl);
-            window.location.href = checkout_url;
-          } catch (err) {
-            toast.error(err instanceof Error ? err.message : 'Failed to start checkout');
-            setCreditModalLoading(false);
-          }
-        }}
-        onClose={() => {
-          setShowCreditModal(false);
-          setPendingGenerate(null);
-          sessionStorage.removeItem('pending_generate');
-        }}
+        onBuy={credit.buyCredits}
+        onClose={credit.dismissCreditGate}
       />
     </div>
   );

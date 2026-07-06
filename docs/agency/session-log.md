@@ -180,6 +180,42 @@ User creations persist across login/logout. Local Postgres references removed. S
 
 ---
 
+## 2026-07-06 — Behavioral grilling: comprehensive test plan for test canary
+
+### Agent
+Director (First Mate)
+
+### Skill
+grill-me
+
+### Summary
+- Ran extensive grilling session covering 12 behavioral domains of the ViewCreator app
+- Analyzed all 39 existing tests across 9 spec files
+- Identified major coverage gaps: zero tests for templates, full generate flow, edit/workspace, navigation, error states, mobile
+- Grilled captain on all untested domains — captured behavioral decisions for templates, generate, edit, navigation, pricing/purchase, errors, header badge, admin API, and mobile
+
+### Decisions Captured
+- **Templates**: Guest browse unrestricted; upload/upvote/use-template gated behind auth; upload is FREE; voting is toggle; file types: images + videos; search/filter state in URL
+- **Generate**: Prefill from template ID; 1 credit per image; Standard only (no Premium); button disables during generation; results in history panel; auth-guard on anything consuming credits
+- **Navigation**: Guest: Logo + Templates + Features + How It Works + Platforms + Pricing + Sign In/Up; Signed-in: Logo + Templates + AI Studio + My Creations + Pricing + Credit Badge + UserButton
+- **Purchase**: Same-tab checkout; return to origin page; auto-resume generation after purchase with brief overlay
+- **Errors**: Global banner for total API outage; inline errors per-page; 45s timeout warning; UI disable + API 429 for rate limiting; network offline → retry
+- **Creations**: Every generation persisted; user can delete/rename/organize; generation requires auth
+
+### Reminders for Future
+- R1: History panel pagination for 500+ creations
+- R2: Marketing-focused landing page brainstorm
+- R3: Remove Premium quality tier (only Standard, 1 credit/image)
+- R4: Remove upload credit cost (upload should be free)
+
+### Artifacts Produced
+- `viewcreator-test-canary/TEST_PLAN.md` — Comprehensive 76+ test plan across 9 phases with priorities
+
+### State At End
+Behavioral decisions locked across all domains. 76+ tests spec'd in TEST_PLAN.md awaiting implementation dispatch. Ready to dispatch Builder crewmates.
+
+---
+
 ## 2026-07-06 — Documentation consolidation & reorganization
 
 ### Agent

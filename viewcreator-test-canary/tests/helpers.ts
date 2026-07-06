@@ -136,3 +136,109 @@ export async function setupPersona(
     await mockBalanceForPersona(page, personaKey);
   }
 }
+
+// ── Template Mock Data ────────────────────────────────────────────────────────
+
+export interface Template {
+  id: string;
+  title: string;
+  description: string;
+  s3_link: string;
+  media_type?: string;
+  user_id?: string | null;
+  created_at?: string;
+  upvotes?: number;
+  user_upvoted?: boolean;
+  config?: {
+    category?: string;
+    tags?: string[];
+    stylePreset?: string;
+    aspectRatio?: string;
+    recommendedPrompts?: string[];
+  };
+}
+
+export const MOCK_TEMPLATES: Template[] = [
+  {
+    id: "tmpl-1",
+    title: "Summer Sale",
+    description: "Bold summer promotion template",
+    media_type: "image",
+    s3_link: "https://placehold.co/400x500?text=Summer+Sale",
+    upvotes: 12,
+    user_upvoted: false,
+    user_id: "user-1",
+    created_at: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
+    config: {
+      stylePreset: "Modern",
+      aspectRatio: "1:1",
+      category: "Promotions",
+      tags: ["sale", "summer", "promotion"],
+      recommendedPrompts: [
+        "50% off summer collection",
+        "Limited time summer deal",
+      ],
+    },
+  },
+  {
+    id: "tmpl-2",
+    title: "Product Launch",
+    description: "Sleek product reveal layout",
+    media_type: "image",
+    s3_link: "https://placehold.co/400x500?text=Product+Launch",
+    upvotes: 8,
+    user_upvoted: true,
+    user_id: "user-2",
+    created_at: new Date(Date.now() - 172800000).toISOString(), // 2 days ago
+    config: {
+      stylePreset: "Minimal",
+      aspectRatio: "4:5",
+      category: "Product",
+      tags: ["product", "launch", "minimal"],
+      recommendedPrompts: [
+        "New product announcement",
+        "Feature highlights",
+      ],
+    },
+  },
+  {
+    id: "tmpl-3",
+    title: "Social Media Kit",
+    description: "Versatile social media template pack",
+    media_type: "video",
+    s3_link: "https://placehold.co/400x500?text=Social+Kit",
+    upvotes: 5,
+    user_upvoted: false,
+    user_id: "user-3",
+    created_at: new Date(Date.now() - 259200000).toISOString(), // 3 days ago
+    config: {
+      stylePreset: "Bold",
+      aspectRatio: "1:1",
+      category: "Social",
+      tags: ["social", "media", "kit"],
+      recommendedPrompts: [
+        "Instagram story promotion",
+        "Facebook cover design",
+      ],
+    },
+  },
+];
+
+/**
+ * Mock the GET /api/templates endpoint to return template data.
+ * Only intercepts GET requests; other methods pass through.
+ */
+export async function mockTemplatesEndpoint(page: Page, templates?: Template[]) {
+  const data = templates || MOCK_TEMPLATES;
+  await page.route(/\/api\/templates(\?.*)?$/, async (route: Route) => {
+    if (route.request().method() === "GET") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ templates: data }),
+      });
+    } else {
+      await route.continue();
+    }
+  });
+}

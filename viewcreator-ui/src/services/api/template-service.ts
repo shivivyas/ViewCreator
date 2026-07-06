@@ -7,9 +7,11 @@ export interface GetTemplatesResponse {
 
 /**
  * Fetches all viral image generation templates from the backend.
+ * @param query Optional query string to append (e.g. "_t=123456" for cache busting).
  */
-export async function getTemplates(token?: string): Promise<Template[]> {
-  const data = await request<GetTemplatesResponse>('/api/templates', {
+export async function getTemplates(token?: string, query?: string): Promise<Template[]> {
+  const url = query ? `/api/templates?${query}` : '/api/templates';
+  const data = await request<GetTemplatesResponse>(url, {
     method: 'GET',
     token,
   });

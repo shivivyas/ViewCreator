@@ -307,7 +307,11 @@ export default function TemplatesPage() {
 
       setLoading(true);
       try {
-        const loaded = await getTemplates(token);
+        // When force=true, add a cache-busting query param to bypass
+        // the 30s Cache-Control: public on the API response.
+        const loaded = await (force
+          ? getTemplates(token, `_t=${Date.now()}`)
+          : getTemplates(token));
         cacheRef.current = { key: cacheKey, data: loaded, expiry: Date.now() + CACHE_TTL };
         setTemplates(loaded);
       } catch (err) {

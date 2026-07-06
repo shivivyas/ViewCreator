@@ -34,6 +34,26 @@ const CLERK_SECRET_KEY = process.env.CLERK_SECRET_KEY || "";
 const API_BASE = "http://localhost:3001";
 const ADMIN_KEY = "dev-admin-key";
 
+// ── Cleanup ─────────────────────────────────────────────────────────────────
+
+/**
+ * Delete a Clerk user by ID. Called in afterEach to prevent hitting the
+ * 100-user dev instance quota.
+ */
+async function deleteClerkUser(userId: string) {
+  try {
+    const res = await fetch(`https://api.clerk.com/v1/users/${userId}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${CLERK_SECRET_KEY}` },
+    });
+    if (!res.ok) {
+      console.warn(`[Cleanup] Failed to delete user ${userId}: ${res.status}`);
+    }
+  } catch (err) {
+    console.warn(`[Cleanup] Error deleting user ${userId}:`, err);
+  }
+}
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 /**
@@ -136,6 +156,15 @@ async function signInUser(
 // ── Fresh User (0 credits) — signed in via Clerk UI ─────────────────────────
 
 test.describe("Clerk: Fresh User (0 credits)", () => {
+  const clerkUserIds: string[] = [];
+
+  test.afterEach(async () => {
+    for (const id of clerkUserIds) {
+      await deleteClerkUser(id);
+    }
+    clerkUserIds.length = 0;
+  });
+
   test("sees pricing page after sign-in", async ({ page }) => {
     await signInUser(page);
     // signInUser lands on /pricing with mocks in place
@@ -145,14 +174,16 @@ test.describe("Clerk: Fresh User (0 credits)", () => {
   });
 
   test("page loads without redirect to sign-in", async ({ page }) => {
-    await signInUser(page);
+    const { userId } = await signInUser(page);
+    clerkUserIds.push(userId);
     expect(page.url()).toContain("/pricing");
   });
 
   // ── Q3: Gate triggers on Generate click ──────────────────────
 
   test("Q3: clicking Generate with 0 credits opens credit gate modal", async ({ page }) => {
-    await signInUser(page);
+    const { userId } = await signInUser(page);
+    clerkUserIds.push(userId);
     await page.goto("/generate");
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(2000);
@@ -167,7 +198,8 @@ test.describe("Clerk: Fresh User (0 credits)", () => {
   // ── Q4: Credit gate modal shows purchase CTA ────────────────
 
   test("Q4: credit gate modal shows credit purchase CTA", async ({ page }) => {
-    await signInUser(page);
+    const { userId } = await signInUser(page);
+    clerkUserIds.push(userId);
     await page.goto("/generate");
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(2000);
@@ -182,7 +214,8 @@ test.describe("Clerk: Fresh User (0 credits)", () => {
   // ── Q16: Free user header shows credit CTA ──────────────────
 
   test("Q16: free user sees credit CTA in header", async ({ page }) => {
-    await signInUser(page);
+    const { userId } = await signInUser(page);
+    clerkUserIds.push(userId);
     // signInUser already waits for balance mock to resolve on /pricing
     // The CreditBadge renders as a link showing "0 credits — Buy"
     const creditCta = page.getByRole("link", { name: /0.*credits.*buy/i });
@@ -192,7 +225,8 @@ test.describe("Clerk: Fresh User (0 credits)", () => {
   // ── Q11: Signed-in pricing CTA ──────────────────────────────
 
   test("Q11: signed-in user sees purchase CTA (not Sign up to buy)", async ({ page }) => {
-    await signInUser(page);
+    const { userId } = await signInUser(page);
+    clerkUserIds.push(userId);
 
     // On /pricing as signed-in user, the buy button should not say "Sign up"
     const buyButton = page.getByRole("button", { name: /buy|credits/i }).first();
@@ -207,10 +241,20 @@ test.describe("Clerk: Fresh User (0 credits)", () => {
 // ── Credit User (100 credits) ───────────────────────────────────────────────
 
 test.describe("Clerk: Credit User (100 credits)", () => {
+  const clerkUserIds: string[] = [];
+
+  test.afterEach(async () => {
+    for (const id of clerkUserIds) {
+      await deleteClerkUser(id);
+    }
+    clerkUserIds.length = 0;
+  });
+
   // ── Q17: Badge shows credit count in header ────────────────
 
   test("Q17: credit user sees credit balance in header", async ({ page }) => {
-    await signInUser(page, { grantCredits: 100 });
+    const { userId } = await signInUser(page, { grantCredits: 100 });
+    clerkUserIds.push(userId);
     // signInUser lands on /pricing with mocks + credit grant done
     // The CreditBadge displays as a styled pill: "⚡ 100 credits 💳"
     // It's found inside the header/banner region
@@ -224,9 +268,19 @@ test.describe("Clerk: Credit User (100 credits)", () => {
 // ── Post-Purchase Flow (Q6 enhancement) ────────────────────────────────────
 
 test.describe("Clerk: Post-Purchase UI — Form Restoration", () => {
+  const clerkUserIds: string[] = [];
+
+  test.afterEach(async () => {
+    for (const id of clerkUserIds) {
+      await deleteClerkUser(id);
+    }
+    clerkUserIds.length = 0;
+  });
+
   test("restores form fields and shows loading after returning from checkout", async ({ page }) => {
     // Create a credit user with balance so the resume flow doesn't hit the gate
-    await signInUser(page, { grantCredits: 100 });
+    const { userId } = await signInUser(page, { grantCredits: 100 });
+    clerkUserIds.push(userId);
 
     // Set up pending_generate in sessionStorage to simulate returning from Dodo
     const pendingData = {

@@ -134,3 +134,46 @@ none
 
 ### State At End
 39 tests passing, 4 skipped. Full behavioral spec locked. Ready for Phase 2: app behavior fixes to match decisions.
+
+---
+
+## 2026-07-06 — User creations persistence (database-backed generation history)
+
+### Agent
+Director (First Mate)
+
+### Skill
+none
+
+### Summary
+- Designed user creations persistence via lavish spec review (`user-creations-design.html`)
+- Added `user_creations` table to `schema.sql` with all generation params + S3 URLs + metadata + edit snapshot support
+- Created `CreationRepository` (CRUD: findByUserId, create, updateImages, delete)
+- Modified image/video generate endpoints to upload to S3 and auto-save creation records
+- Added `GET /api/generations`, `DELETE /api/generations/:id`, `DELETE /api/generations`, `PUT /api/generations/:id/images` endpoints
+- Updated frontend: types, service layer, generate page (on-mount fetch + merge), history panel (API-backed delete)
+- Cleaned up local Postgres references from config and db.ts — now only connects to Supabase via DATABASE_URL
+- Fixed three bugs: (1) S3 guard clause prevented DB writes, (2) VARCHAR(1024) too short for data URIs, (3) dotenv loading order
+- Captured 4 learnings in `docs/learnings/2026-07-06-user-creations-persistence.md`
+
+### Decisions Made
+- S3 key prefix: `generations/{userId}/{mediaType}/{timestamp}-{random}.{ext}`
+- Editor snapshots stored in `metadata.previousImages` (JSONB)
+- On-mount loading: merge approach (API data prepended, dedup by creationId)
+- Data URI fallback when S3 unavailable (always persist to DB)
+
+### Artifacts Produced
+- `viewcreator-database/src/schema.sql` — Added `user_creations` table
+- `viewcreator-database/src/repositories/creation-repository.ts` — New file
+- `viewcreator-database/src/index.ts` — Export CreationRepository
+- `viewcreator-api/src/index.ts` — Modified generate endpoints, added /api/generations routes
+- `viewcreator-ui/src/types/index.ts` — Added creationId, s3Urls, UserCreation, GenerateImagesResponse
+- `viewcreator-ui/src/services/api/generation-service.ts` — Added getUserCreations, deleteCreation, clearCreations, updateCreationImages
+- `viewcreator-ui/src/app/generate/page.tsx` — On-mount fetch + merge, store creationId on success
+- `viewcreator-ui/src/components/generate/history-panel.tsx` — API-backed delete, s3Urls display
+- `docs/learnings/2026-07-06-user-creations-persistence.md` — 4 learnings captured
+- `.lavish/user-creations-design.html` — Design spec artifact
+- Root `.env` — Removed local Postgres config
+
+### State At End
+User creations persist across login/logout. Local Postgres references removed. S3 bucket still needs configuration for real S3 storage (currently uses data URI fallback). Ready for next feature.

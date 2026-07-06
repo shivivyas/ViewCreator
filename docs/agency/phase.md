@@ -29,25 +29,33 @@ This project now uses **firstmate** (vendored at `firstmate/`) as the agent orch
 
 ## Current Feature Cycle
 
-**Feature**: Pure credit payment system — single product "100 credits for $9"
-**Step**: Requirements complete. Ready for Development.
-**Started**: 2026-07-05
+**Feature**: User creations persistence (database-backed generation history)
+**Step**: 🟢 Complete
+**Started**: 2026-07-06
+**Completed**: 2026-07-06
 
 ### Scope
-1. Strip subscription plans from seed data (Monthly + Annual removed)
-2. Update seed script with Dodo product ID (`pdt_0NiWo2CjaeJBzhplGXxWT`)
-3. Add credit balance badge to site header
-4. Add "insufficient credits" modal on generate page with inline Dodo checkout
-5. Wire payment webhook → credit grant flow
-6. Ensure idempotent generation + atomic credit deduction
-7. Update pricing page for single product
-8. Guest gate on generate page (Clerk modal → check credits → generate)
+1. Add `user_creations` DB table with all generation params + S3 URLs + metadata
+2. Create `CreationRepository` (CRUD)
+3. Modify generate endpoints to upload to S3 and auto-save creation records
+4. Add `GET/DELETE /api/generations` routes
+5. Update frontend types, services, generate page, history panel
+6. Clean up local Postgres references, connect only to Supabase
+7. Fix: S3 guard clause preventing DB writes
+8. Fix: VARCHAR(1024) too short for data URIs
+9. Fix: dotenv loading order picking wrong database URL
 
 ## Progress
 
 | Step | Status | Completed |
 |------|--------|-----------|
-| Requirements (grill) | ✅ | 2026-07-05 |
+| Design (lavish spec) | ✅ | 2026-07-06 |
+| Database + Repository | ✅ | 2026-07-06 |
+| Backend API | ✅ | 2026-07-06 |
+| Frontend integration | ✅ | 2026-07-06 |
+| Bug fixes (3) | ✅ | 2026-07-06 |
+| Local Postgres cleanup | ✅ | 2026-07-06 |
+| Learning capture | ✅ | 2026-07-06 |
 | FirstMate Integration | ✅ | 2026-07-05 |
 | Test Architecture Design & Implementation | ✅ | 2026-07-06 |
 | Deduction API Implementation | ✅ | 2026-07-06 |

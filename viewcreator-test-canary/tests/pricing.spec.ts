@@ -3,6 +3,11 @@
  *
  * Tests the credit-only pricing page across all user personas.
  * Verifies credit pack display, CTA buttons, and checkout flow.
+ *
+ * Behavioral decisions (from Lavish spec):
+ *   Q1  — "Sign up to buy" opens Clerk modal + navigates to /sign-up
+ *   Q5  — Dodo checkout opens in same tab
+ *   Q11 — Signed-in users see "Buy more credits" + current balance (tested in clerk-auth)
  */
 
 import { test, expect } from "@playwright/test";
@@ -57,6 +62,9 @@ test.describe("Pricing Page — Contract Tests (mock API)", () => {
   });
 
   // ── Guest Persona ────────────────────────────────────────────
+  // Q1: "Sign up to buy" opens Clerk sign-up modal + navigates to /sign-up.
+  // The button is wrapped in Clerk's <SignUpButton mode="modal">. 
+  // Click behavior requires Clerk auth context — tested in clerk-auth.spec.ts.
 
   test("guest sees Sign up to buy button", async ({ page }) => {
     const buyButton = page.getByRole("button", { name: /sign up to buy/i });

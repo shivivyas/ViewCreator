@@ -5,6 +5,13 @@
  * The gate should block guests (→ sign-up) and free users (0 credits → buy modal),
  * while allowing users with credits to proceed.
  *
+ * Behavioral decisions (from Lavish spec):
+ *   Q2  — Guest sees full form UI but Generate button is disabled "Sign in to generate"
+ *          (CURRENT: button is identical, clicking it opens Clerk sign-up modal)
+ *   Q3  — 0-credit users see the form, gate triggers on Generate click
+ *   Q8  — Exhaustion: modal appears instantly when balance hits 0
+ *   Q10 — Cost indicator shown next to Premium toggle ("2 credits")
+ *
  * Credit boundaries: 0 (blocked), 1 (allowed), 100 (allowed)
  */
 
@@ -13,18 +20,45 @@ import { setupPersona } from "./helpers";
 
 test.describe("Generate Page — Credit Gate — Contract Tests (mock API)", () => {
   // ── Guest ────────────────────────────────────────────────────
+  //
+  // CURRENT behavior: proxy.ts protects /generate via auth.protect().
+  // Guests are redirected to Clerk's hosted sign-in page BEFORE reaching the
+  // generate page. They never see the generate form.
+  //
+  // Q2 (target, after app fix): Remove server-side protect for /generate.
+  // Instead, show the form UI with a disabled "Sign in to generate" button.
+  // The button click would trigger openSignUp().
+  //
+  // The test below verifies the CURRENT redirect-to-sign-in behavior.
 
-  test("guest page shows pricing CTA", async ({ page }) => {
+  test("guest is redirected to Clerk sign-in page", async ({ page }) => {
     await setupPersona(page, "GUEST");
     await page.goto("/generate");
     await page.waitForLoadState("networkidle");
 
-    // Guest sees the page — check for Sign up to buy button
-    // (The detailed guest gate behavior is tested in clerk-auth.spec.ts)
+    // Guest should be on the Clerk sign-in page (not on the generate page)
+    const currentUrl = page.url();
+    expect(currentUrl).toContain("accounts.dev/sign-in");
+
+    // The Clerk sign-in page should show sign-in elements
     await expect(
-      page.getByRole("button", { name: /sign in/i })
+      page.getByRole("heading", { name: /sign in/i })
     ).toBeVisible();
   });
+
+  // TODO: Activate after Q2 app fix — remove proxy.ts protection for /generate,
+  // then guest sees the generate UI with disabled "Sign in to generate" button.
+  // Changes needed:
+  //   1. Remove "/generate(.*)" from isProtectedRoute in proxy.ts
+  //   2. Show disabled button in generate-form.tsx when !isSignedIn
+  // test("guest sees disabled Sign in to generate button (target behavior)", async ({ page }) => {
+  //   await setupPersona(page, "GUEST");
+  //   await page.goto("/generate");
+  //   await page.waitForLoadState("networkidle");
+  //   const genButton = page.getByRole("button", { name: /sign in to generate/i });
+  //   await expect(genButton).toBeVisible();
+  //   await expect(genButton).toBeDisabled();
+  // });
 
   // ── Signed-in Personas (FREE, LOW_CREDIT, CREDIT_USER) ──────
   //

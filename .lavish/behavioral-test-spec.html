@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ViewCreator — Behavioral Test Specification</title>
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+  body { font-family: 'Inter', system-ui, sans-serif; }
+  .persona-card { transition: all 0.15s ease; }
+  .persona-card:hover { transform: translateY(-1px); }
+  .decision-card { border-left: 3px solid #f59e0b; }
+  .decision-card.resolved { border-left-color: #22c55e; }
+  .flow-arrow { color: #94a3b8; font-size: 1.25rem; }
+  .tag-guest { background: #dbeafe; color: #1d4ed8; }
+  .tag-free { background: #fef3c7; color: #b45309; }
+  .tag-low { background: #fce7f3; color: #be185d; }
+  .tag-credit { background: #d1fae5; color: #047857; }
+  .badge-option { cursor: pointer; }
+  .badge-option.selected { outline: 2px solid #6366f1; outline-offset: 2px; }
+  .queued-badge { background: #6366f1; color: white; }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: #f1f5f9; }
+  ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+</style>
+</head>
+<body class="bg-slate-50 text-slate-900 antialiased">
+<div class="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+
+  <!-- Header -->
+  <div class="mb-8">
+    <div class="flex items-center gap-3 mb-2">
+      <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-sm font-bold text-white">VC</span>
+      <div>
+        <h1 class="text-2xl font-bold tracking-tight">Behavioral Test Specification</h1>
+        <p class="text-sm text-slate-500">ViewCreator Credit Payment System — 4 Personas · 24 Behavioral Questions</p>
+      </div>
+    </div>
+    <div class="flex flex-wrap gap-2 mt-3">
+      <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium tag-guest">👤 Guest</span>
+      <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium tag-free">🆓 Free (0 credits)</span>
+      <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium tag-low">⚡ Low Credit (1)</span>
+      <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium tag-credit">💎 Credit User (100)</span>
+      <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium bg-slate-100 text-slate-600">🔄 Repeat Buyer</span>
+    </div>
+  </div>
+
+  <!-- How to use -->
+  <div class="mb-8 rounded-xl border border-indigo-100 bg-indigo-50/50 p-4 text-sm text-indigo-900">
+    <strong>🎯 Battle me, captain.</strong> Each card below has a set of decisions. Read the question, pick your answer, and click <strong>"Queue answer"</strong>. When you're done with a section, click <strong>"Send to agent"</strong>. I'll update the spec with your decisions.
+  </div>
+
+  <!-- ===== PERSONA 1: GUEST ===== -->
+  <div class="persona-card mb-6 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+    <div class="flex items-center gap-3 border-b border-slate-100 bg-slate-50/80 px-5 py-3">
+      <span class="flex h-7 w-7 items-center justify-center rounded-md text-xs font-bold tag-guest">G</span>
+      <h2 class="font-semibold">Persona 1: Guest</h2>
+      <span class="text-xs text-slate-400">— not signed in</span>
+    </div>
+
+    <!-- Flow diagram -->
+    <div class="border-b border-slate-100 bg-white px-5 py-4">
+      <div class="flex flex-wrap items-center gap-2 text-sm">
+        <span class="rounded-md bg-slate-100 px-2 py-1 font-medium">/pricing</span>
+        <span class="flow-arrow">→</span>
+        <span class="rounded-md border border-dashed border-amber-300 bg-amber-50 px-2 py-1 text-amber-800">See plan card</span>
+        <span class="flow-arrow">→</span>
+        <span class="rounded-md border border-dashed border-amber-300 bg-amber-50 px-2 py-1 text-amber-800">CTA: "Sign up to buy"</span>
+        <span class="flow-arrow">→</span>
+        <span class="rounded-md border border-dashed border-slate-300 bg-slate-50 px-2 py-1 text-slate-600">??</span>
+      </div>
+    </div>
+
+    <!-- Decisions -->
+    <div class="divide-y divide-slate-100">
+      <!-- Q1 - RESOLVED -->
+      <div class="decision-card resolved px-5 py-4">
+        <div class="flex items-start gap-3">
+          <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green-100 text-xs font-bold text-green-700">1</span>
+          <div class="min-w-0 flex-1">
+            <p class="font-medium text-sm">"Sign up to buy" button — where does it go?</p>
+            <div class="mt-2 rounded-lg border border-green-200 bg-green-50 p-3">
+              <p class="text-sm font-medium text-green-800">✅ Decision: Both — modal opens + URL changes to /sign-up (option c)</p>
+              <p class="mt-0.5 text-xs text-green-600">Clerk modal overlay appears in-page. URL also navigates to /sign-up so the auth flow is linkable/deep-linkable.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Q2 - RESOLVED -->
+      <div class="decision-card resolved px-5 py-4">
+        <div class="flex items-start gap-3">
+          <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green-100 text-xs font-bold text-green-700">2</span>
+          <div class="min-w-0 flex-1">
+            <p class="font-medium text-sm">Guest navigates to /generate — what do they see?</p>
+            <div class="mt-2 rounded-lg border border-green-200 bg-green-50 p-3">
+              <p class="text-sm font-medium text-green-800">✅ Decision: See UI, button disabled (option c)</p>
+              <p class="mt-0.5 text-xs text-green-600">Generate button shows "Sign in to generate". User can see the full form UI but must sign in to interact. Test verifies button text + disabled state.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== PERSONA 2: FREE USER ===== -->
+  <div class="persona-card mb-6 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+    <div class="flex items-center gap-3 border-b border-slate-100 bg-slate-50/80 px-5 py-3">
+      <span class="flex h-7 w-7 items-center justify-center rounded-md text-xs font-bold tag-free">F</span>
+      <h2 class="font-semibold">Persona 2: Free User</h2>
+      <span class="text-xs text-slate-400">— signed in, 0 credits</span>
+    </div>
+
+    <div class="divide-y divide-slate-100">
+      <!-- Q3 - RESOLVED -->
+      <div class="decision-card resolved px-5 py-4">
+        <div class="flex items-start gap-3">
+          <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green-100 text-xs font-bold text-green-700">3</span>
+          <div class="min-w-0 flex-1">
+            <p class="font-medium text-sm">0-credit user on /generate — gate timing?</p>
+            <div class="mt-2 rounded-lg border border-green-200 bg-green-50 p-3">
+              <p class="text-sm font-medium text-green-800">✅ Decision: Gate on click (option b)</p>
+              <p class="mt-0.5 text-xs text-green-600">Show the form. Let user configure prompt/style. Gate triggers on Generate click. This lets them explore the product before hitting the paywall.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Q4 - RESOLVED -->
+      <div class="decision-card resolved px-5 py-4">
+        <div class="flex items-start gap-3">
+          <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green-100 text-xs font-bold text-green-700">4</span>
+          <div class="min-w-0 flex-1">
+            <p class="font-medium text-sm">Credit gate modal — exact text?</p>
+            <div class="mt-2 rounded-lg border border-green-200 bg-green-50 p-3">
+              <p class="text-sm font-medium text-green-800">✅ Decision: "Buy Credits" / "Purchase credits to start creating. 100 credits for $9."</p>
+              <p class="mt-0.5 text-xs text-green-600">Positive framing. Price-anchored CTA. Tests verify heading text + body + CTA button text.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Q5 - RESOLVED -->
+      <div class="decision-card resolved px-5 py-4">
+        <div class="flex items-start gap-3">
+          <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green-100 text-xs font-bold text-green-700">5</span>
+          <div class="min-w-0 flex-1">
+            <p class="font-medium text-sm">"Buy 100 Credits — $9" checkout behavior?</p>
+            <div class="mt-2 rounded-lg border border-green-200 bg-green-50 p-3">
+              <p class="text-sm font-medium text-green-800">✅ Decision: Same tab navigation (option a)</p>
+              <p class="mt-0.5 text-xs text-green-600">Navigates to Dodo checkout in same tab, returns via return_url after completion. Cleaner UX, no tab juggling.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Q6 - RESOLVED -->
+      <div class="decision-card resolved px-5 py-4">
+        <div class="flex items-start gap-3">
+          <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green-100 text-xs font-bold text-green-700">6</span>
+          <div class="min-w-0 flex-1">
+            <p class="font-medium text-sm">Post-purchase landing — where does user return?</p>
+            <p class="mt-0.5 text-xs text-slate-500">After completing Dodo checkout, where does the user end up?</p>
+            <div class="mt-2 rounded-lg border border-green-200 bg-green-50 p-3">
+              <p class="text-sm font-medium text-green-800">✅ Decision: Back on /generate with same settings preserved</p>
+              <p class="mt-0.5 text-xs text-green-600">Credits granted, auto-trigger pending generation. Form retains prompt/style/config from before they clicked Generate.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== PERSONA 3: LOW CREDIT ===== -->
+  <div class="persona-card mb-6 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+    <div class="flex items-center gap-3 border-b border-slate-100 bg-slate-50/80 px-5 py-3">
+      <span class="flex h-7 w-7 items-center justify-center rounded-md text-xs font-bold tag-low">L</span>
+      <h2 class="font-semibold">Persona 3: Low Credit User</h2>
+      <span class="text-xs text-slate-400">— signed in, 1 credit</span>
+    </div>
+
+    <div class="divide-y divide-slate-100">
+      <!-- Q7 - RESOLVED -->
+      <div class="decision-card resolved px-5 py-4">
+        <div class="flex items-start gap-3">
+          <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green-100 text-xs font-bold text-green-700">7</span>
+          <div class="min-w-0 flex-1">
+            <p class="font-medium text-sm">Generation options for 1-credit user?</p>
+            <div class="mt-2 rounded-lg border border-green-200 bg-green-50 p-3">
+              <p class="text-sm font-medium text-green-800">✅ Decision: Grayed out (option b)</p>
+              <p class="mt-0.5 text-xs text-green-600">Unavailable options are disabled with tooltip "Need 2 credits". User sees what exists but knows the cost. Tests verify disabled state + tooltip text.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Q8 - RESOLVED -->
+      <div class="decision-card resolved px-5 py-4">
+        <div class="flex items-start gap-3">
+          <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green-100 text-xs font-bold text-green-700">8</span>
+          <div class="min-w-0 flex-1">
+            <p class="font-medium text-sm">Exhaustion flow — 1 → 0 → click Generate again</p>
+            <div class="mt-2 rounded-lg border border-green-200 bg-green-50 p-3">
+              <p class="text-sm font-medium text-green-800">✅ Decision: Credit modal appears instantly (option a)</p>
+              <p class="mt-0.5 text-xs text-green-600">No form re-render. Credit gate modal pops immediately on click. Fast feedback loop — user knows right away they're out of credits.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== PERSONA 4: CREDIT USER ===== -->
+  <div class="persona-card mb-6 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+    <div class="flex items-center gap-3 border-b border-slate-100 bg-slate-50/80 px-5 py-3">
+      <span class="flex h-7 w-7 items-center justify-center rounded-md text-xs font-bold tag-credit">C</span>
+      <h2 class="font-semibold">Persona 4: Credit User</h2>
+      <span class="text-xs text-slate-400">— signed in, 100 credits</span>
+    </div>
+
+    <div class="divide-y divide-slate-100">
+      <!-- Q9 - RESOLVED -->
+      <div class="decision-card resolved px-5 py-4">
+        <div class="flex items-start gap-3">
+          <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green-100 text-xs font-bold text-green-700">9</span>
+          <div class="min-w-0 flex-1">
+            <p class="font-medium text-sm">Header badge — real-time update after generation?</p>
+            <p class="mt-0.5 text-xs text-slate-500">User generates an image. Does the "100 credits" badge update immediately?</p>
+            <div class="mt-2 rounded-lg border border-green-200 bg-green-50 p-3">
+              <p class="text-sm font-medium text-green-800">✅ Decision: From API response (option b)</p>
+              <p class="mt-0.5 text-xs text-green-600">The generate endpoint returns <code>{ balance_after, credits_deducted }</code>. The frontend updates the header badge synchronously from the response — no polling needed, instant update, zero extra requests. This is the most efficient + real-time approach for in-page actions.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Q10 - RESOLVED -->
+      <div class="decision-card resolved px-5 py-4">
+        <div class="flex items-start gap-3">
+          <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green-100 text-xs font-bold text-green-700">10</span>
+          <div class="min-w-0 flex-1">
+            <p class="font-medium text-sm">Cost indicator — user picks Premium (2 credits). See cost before clicking?</p>
+            <div class="mt-2 rounded-lg border border-green-200 bg-green-50 p-3">
+              <p class="text-sm font-medium text-green-800">✅ Decision: Yes — shows "2 credits" next to Premium toggle (option a)</p>
+              <p class="mt-0.5 text-xs text-green-600">Inline cost label next to each quality tier. Helps user make informed choices before submitting. Test verifies label text presence.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Q11 - RESOLVED -->
+      <div class="decision-card resolved px-5 py-4">
+        <div class="flex items-start gap-3">
+          <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green-100 text-xs font-bold text-green-700">11</span>
+          <div class="min-w-0 flex-1">
+            <p class="font-medium text-sm">Pricing page — same for signed-in users?</p>
+            <div class="mt-2 rounded-lg border border-green-200 bg-green-50 p-3">
+              <p class="text-sm font-medium text-green-800">✅ Decision: Different (option b)</p>
+              <p class="mt-0.5 text-xs text-green-600">Signed-in users see "Buy more credits" messaging + current balance displayed. Personalized upsell rather than generic sign-up CTA.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== EDGE CASES ===== -->
+  <div class="persona-card mb-6 overflow-hidden rounded-xl border border-red-200 bg-white shadow-sm">
+    <div class="flex items-center gap-3 border-b border-red-100 bg-red-50/50 px-5 py-3">
+      <span class="flex h-7 w-7 items-center justify-center rounded-md bg-red-100 text-xs font-bold text-red-600">⚠</span>
+      <h2 class="font-semibold">Edge Cases & Race Conditions</h2>
+    </div>
+
+    <div class="divide-y divide-slate-100">
+      <!-- Q12 - RESOLVED -->
+      <div class="decision-card resolved px-5 py-4">
+        <div class="flex items-start gap-3">
+          <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green-100 text-xs font-bold text-green-700">12</span>
+          <div class="min-w-0 flex-1">
+            <p class="font-medium text-sm">Two-tab race condition — 1 credit, both tabs click Generate</p>
+            <div class="mt-2 rounded-lg border border-green-200 bg-green-50 p-3">
+              <p class="text-sm font-medium text-green-800">✅ Decision: First wins, second fails (option a)</p>
+              <p class="mt-0.5 text-xs text-green-600">Tab 1 gets image, Tab 2 gets 402 → credit gate modal. Row-level locking (SELECT...FOR UPDATE) ensures atomicity. Test: verify Tab 2 shows gate.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Q13 - RESOLVED -->
+      <div class="decision-card resolved px-5 py-4">
+        <div class="flex items-start gap-3">
+          <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green-100 text-xs font-bold text-green-700">13</span>
+          <div class="min-w-0 flex-1">
+            <p class="font-medium text-sm">Premium + insufficient — 1 credit, click Premium (costs 2)</p>
+            <p class="mt-0.5 text-xs text-slate-500">What happens when user selects Premium but doesn't have enough credits?</p>
+            <div class="mt-2 rounded-lg border border-green-200 bg-green-50 p-3">
+              <p class="text-sm font-medium text-green-800">✅ Decision: Credit gate modal (option a)</p>
+              <p class="mt-0.5 text-xs text-green-600">"You have 1 credit but need 2" — buy CTA in the modal. Same gate component, dynamic messaging based on shortfall amount.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Q14 - RESOLVED -->
+      <div class="decision-card resolved px-5 py-4">
+        <div class="flex items-start gap-3">
+          <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green-100 text-xs font-bold text-green-700">14</span>
+          <div class="min-w-0 flex-1">
+            <p class="font-medium text-sm">Concurrent webhook + manual purchase — double credit grant?</p>
+            <div class="mt-2 rounded-lg border border-green-200 bg-green-50 p-3">
+              <p class="text-sm font-medium text-green-800">✅ Decision: Idempotent (option a)</p>
+              <p class="mt-0.5 text-xs text-green-600">webhook_events table with event_id prevents double-grant. First path (webhook or confirm-purchase) writes event_id, second path sees it exists and skips. Test: replay webhook event, verify no extra credits.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Q15 - SKIPPED per captain -->
+      <div class="decision-card px-5 py-4" style="border-left-color: #94a3b8;">
+        <div class="flex items-start gap-3">
+          <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-bold text-slate-500">15</span>
+          <div class="min-w-0 flex-1">
+            <p class="font-medium text-sm">Header badge update mechanism? <span class="text-xs text-slate-400 font-normal">(skipped per captain)</span></p>
+            <div class="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <p class="text-sm text-slate-700"><strong>Context:</strong> This question exists because credits can change <em>outside</em> the current page — e.g. purchasing in another tab, admin grant, Dodo webhook arriving while user is on /generate. But since we're using <strong>API response sync</strong> (Q9), the in-page balance is updated instantly from the generate endpoint response. The only gap is external changes, which isn't a practical concern for MVP. We can revisit if needed — skipping for now.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== HEADER BEHAVIOR ===== -->
+  <div class="persona-card mb-6 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+    <div class="flex items-center gap-3 border-b border-slate-100 bg-slate-50/80 px-5 py-3">
+      <span class="flex h-7 w-7 items-center justify-center rounded-md bg-slate-200 text-xs font-bold text-slate-600">H</span>
+      <h2 class="font-semibold">Header Credit Badge Behavior</h2>
+    </div>
+
+    <div class="divide-y divide-slate-100">
+      <!-- Q16 - RESOLVED -->
+      <div class="decision-card resolved px-5 py-4">
+        <div class="flex items-start gap-3">
+          <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green-100 text-xs font-bold text-green-700">16</span>
+          <div class="min-w-0 flex-1">
+            <p class="font-medium text-sm">Free user (0 credits) — what does header show EXACTLY?</p>
+            <div class="mt-2 rounded-lg border border-green-200 bg-green-50 p-3">
+              <p class="text-sm font-medium text-green-800">✅ Decision: Both — "0 credits — Buy"</p>
+              <p class="mt-0.5 text-xs text-green-600">Shows balance (0) and action CTA together. Links to /pricing. Tests verify text "0 credits" + click navigates to /pricing.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Q17 - RESOLVED -->
+      <div class="decision-card resolved px-5 py-4">
+        <div class="flex items-start gap-3">
+          <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green-100 text-xs font-bold text-green-700">17</span>
+          <div class="min-w-0 flex-1">
+            <p class="font-medium text-sm">Credit user (100 credits) — clicking badge?</p>
+            <div class="mt-2 rounded-lg border border-green-200 bg-green-50 p-3">
+              <p class="text-sm font-medium text-green-800">✅ Decision: Dropdown (option b)</p>
+              <p class="mt-0.5 text-xs text-green-600">Shows balance breakdown (remaining, lifetime spent) + "Buy more" CTA. Tests verify dropdown visibility + content on click.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Send to Agent -->
+  <div class="sticky bottom-4 flex items-center justify-between rounded-xl border border-indigo-200 bg-indigo-50 p-4 shadow-lg">
+    <p class="text-sm font-medium text-green-900">🎯 <strong>All 17 decisions resolved!</strong> 16 resolved · 1 skipped</p>
+    <span class="rounded-lg bg-green-600 px-5 py-2 text-sm font-medium text-white shadow-sm">Complete ✓</span>
+  </div>
+
+</div>
+
+<script>
+// Track queued answers
+const queuedAnswers = {};
+
+function queueChoice(form, questionId) {
+  const formData = new FormData(form);
+  const value = formData.get(questionId);
+  const custom = formData.get(questionId + '-custom');
+  
+  if (!value && !custom) return;
+  
+  const answer = custom || value;
+  queuedAnswers[questionId] = answer;
+  
+  // Visual feedback
+  form.querySelector('.queued-indicator').classList.remove('hidden');
+  form.querySelector('button[type="submit"]').textContent = '✓ Queued';
+  form.querySelector('button[type="submit"]').classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+  form.querySelector('button[type="submit"]').classList.add('bg-indigo-400');
+  
+  // Mark card as resolved
+  form.classList.add('resolved');
+}
+
+function sendAllQueued() {
+  const count = Object.keys(queuedAnswers).length;
+  if (count === 0) return;
+  
+  let message = '## Behavioral decisions from captain\n\n';
+  const labels = {
+    'guest-q1': '1. "Sign up to buy" destination',
+    'guest-q2': '2. Guest /generate behavior',
+    'free-q3': '3. 0-credit gate timing',
+    'free-q4': '4. Credit gate modal text',
+    'free-q5': '5. Dodo checkout behavior',
+    'free-q6': '6. Post-purchase landing',
+    'low-q7': '7. Generation options visibility',
+    'low-q8': '8. Exhaustion flow (1→0)',
+    'credit-q9': '9. Badge real-time update',
+    'credit-q10': '10. Cost indicator',
+    'credit-q11': '11. Pricing page for signed-in',
+    'edge-q12': '12. Two-tab race condition',
+    'edge-q13': '13. Premium + insufficient credits',
+    'edge-q14': '14. Double credit grant',
+    'edge-q15': '15. Badge update mechanism',
+    'header-q16': '16. Header for free user',
+    'header-q17': '17. Credit badge click behavior'
+  };
+  
+  for (const [id, answer] of Object.entries(queuedAnswers)) {
+    const label = labels[id] || id;
+    message += `- **${label}**: ${answer}\n`;
+  }
+  
+  if (typeof window.lavish !== 'undefined' && window.lavish.queuePrompt) {
+    window.lavish.queuePrompt(message, {
+      tag: 'behavioral-decisions',
+      text: count + ' behavioral decisions queued',
+      data: { queuedAnswers }
+    });
+  }
+}
+</script>
+
+</body>
+</html>

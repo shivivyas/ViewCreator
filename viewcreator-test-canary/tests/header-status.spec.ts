@@ -4,10 +4,14 @@
  * Tests the credit balance badge in the site header across all user personas.
  * Verifies correct badge content, dropdown behavior, and CTAs.
  *
- * Personas (credit-only, no subscriptions):
- *   GUEST       — not signed in, sees Sign in / Sign up buttons
- *   FREE        — signed in, 0 credits, sees "0 credits" or "Buy Credits" badge
- *   CREDIT_USER — signed in, has credits, sees credit count badge
+ * Behavioral decisions (from Lavish spec):
+ *   Q16 — Free user header shows "0 credits — Buy" (both balance + CTA)
+ *          (CURRENT: shows "[⚡ Buy Credits]" button only)
+ *   Q17 — Credit user badge click opens dropdown with balance breakdown + "Buy more"
+ *          (CURRENT: badge links to /pricing)
+ *
+ * NOTE: Signed-in header behaviors require real Clerk auth context.
+ * Full signed-in badge tests are in clerk-auth.spec.ts.
  */
 
 import { test, expect } from "@playwright/test";
@@ -40,8 +44,12 @@ test.describe("Header — Credit Balance Badge — Contract Tests (mock API)", (
   });
 
   // ── Free User (0 credits) ────────────────────────────────────
-  // Note: The credit badge in the header is not yet implemented (step 3 in dev plan).
-  // These tests validate what currently exists — the navigation and pricing page.
+  //
+  // Q16 (target): Header shows "0 credits — Buy" with link to /pricing.
+  // Q16 (current): Header shows "[⚡ Buy Credits]" button.
+  // Full Q16 test with real Clerk auth is in clerk-auth.spec.ts.
+  //
+  // These mock-based tests verify the page renders without crashing.
 
   test("free user sees navigation links", async ({ page }) => {
     await setupPersona(page, "FREE");
@@ -65,7 +73,10 @@ test.describe("Header — Credit Balance Badge — Contract Tests (mock API)", (
   });
 
   // ── Credit User (has credits) ────────────────────────────────
-  // Note: The credit count badge in the header is not yet implemented.
+  //
+  // Q17 (target): Clicking badge opens dropdown with balance breakdown + "Buy more".
+  // Q17 (current): Badge links to /pricing.
+  // Full Q17 test with real Clerk auth is in clerk-auth.spec.ts.
 
   test("credit user sees pricing page", async ({ page }) => {
     await setupPersona(page, "CREDIT_USER");

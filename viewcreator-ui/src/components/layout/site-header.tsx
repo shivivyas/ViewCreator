@@ -20,35 +20,37 @@ const navLinks = [
 
 /**
  * Credit balance badge.
- * Shows current credit count. Becomes a "Buy Credits" CTA when balance is 0.
+ * Shows current credit count. When balance is 0, shows "0 credits — Buy".
+ * When balance > 0, shows the count as a styled pill linking to /pricing.
  */
 function CreditBadge({ status }: { status: UserPaymentStatus }) {
   const balance = status.credits?.balance ?? 0;
-
-  if (balance === 0) {
-    return (
-      <Link href="/pricing">
-        <Button size="sm" variant="default" className="gap-1.5 rounded-lg text-xs h-8">
-          <Zap className="size-3.5" />
-          Buy Credits
-        </Button>
-      </Link>
-    );
-  }
 
   return (
     <Link
       href="/pricing"
       className={cn(
         "flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors",
-        "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100",
-        "dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300 dark:hover:bg-amber-900"
+        balance === 0
+          ? "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300 dark:hover:bg-amber-900"
+          : "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300 dark:hover:bg-amber-900"
       )}
     >
       <Zap className="size-3.5" />
-      <span className="tabular-nums">{balance.toLocaleString()}</span>
-      <span className="hidden sm:inline">credits</span>
-      <CreditCard className="size-3 opacity-50 ml-0.5" />
+      {balance === 0 ? (
+        <>
+          <span className="tabular-nums">0</span>
+          <span className="hidden sm:inline">credits</span>
+          <span className="mx-0.5 opacity-50">—</span>
+          <span className="font-semibold">Buy</span>
+        </>
+      ) : (
+        <>
+          <span className="tabular-nums">{balance.toLocaleString()}</span>
+          <span className="hidden sm:inline">credits</span>
+          <CreditCard className="size-3 opacity-50 ml-0.5" />
+        </>
+      )}
     </Link>
   );
 }

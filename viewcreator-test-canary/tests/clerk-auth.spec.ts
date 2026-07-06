@@ -184,8 +184,8 @@ test.describe("Clerk: Fresh User (0 credits)", () => {
   test("Q16: free user sees credit CTA in header", async ({ page }) => {
     await signInUser(page);
     // signInUser already waits for balance mock to resolve on /pricing
-    const headerRegion = page.locator("header, nav, [role='banner']");
-    const creditCta = headerRegion.getByText(/buy credits|0 credits|\d+ credits/i).first();
+    // The CreditBadge renders as a link showing "0 credits — Buy"
+    const creditCta = page.getByRole("link", { name: /0.*credits.*buy/i });
     await expect(creditCta).toBeVisible({ timeout: 15000 });
   });
 

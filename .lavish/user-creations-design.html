@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ViewCreator — User Creations Persistence Design</title>
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+  body { font-family: 'Inter', system-ui, sans-serif; }
+  .section-card { transition: all 0.15s ease; }
+  .section-card:hover { transform: translateY(-1px); }
+  .file-tag { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.75rem; }
+  kbd { font-family: 'SF Mono', 'Fira Code', monospace; background: #f1f5f9; padding: 0.125rem 0.375rem; border-radius: 0.25rem; font-size: 0.75rem; border: 1px solid #e2e8f0; }
+  .flow-arrow { color: #94a3b8; }
+  .mermaid-wrapper { background: #f8fafc; border-radius: 0.75rem; padding: 1rem; border: 1px solid #e2e8f0; }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: #f1f5f9; }
+  ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+  .timeline-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
+  .status-planned { background: #93c5fd; }
+  .status-current { background: #22c55e; }
+  .status-done { background: #6366f1; }
+</style>
+</head>
+<body class="bg-neutral-50 text-neutral-900 antialiased">
+<div class="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+
+  <!-- Header -->
+  <div class="mb-8">
+    <div class="flex items-center gap-3 mb-2">
+      <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-neutral-900 text-sm font-bold text-white">VC</span>
+      <div>
+        <h1 class="text-2xl font-bold tracking-tight">User Creations Persistence</h1>
+        <p class="text-sm text-neutral-500">Database-backed generation history — survive login/logout, persist across sessions</p>
+      </div>
+    </div>
+    <div class="flex flex-wrap gap-2 mt-3">
+      <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium bg-blue-100 text-blue-700">🧱 Database</span>
+      <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium bg-emerald-100 text-emerald-700">⚡ API</span>
+      <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium bg-amber-100 text-amber-700">🎨 Frontend</span>
+      <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium bg-purple-100 text-purple-700">☁️ S3</span>
+    </div>
+  </div>
+
+  <!-- ===== SECTION: GOAL & CURRENT STATE ===== -->
+  <div class="section-card mb-6 overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
+    <div class="flex items-center gap-3 border-b border-neutral-100 bg-neutral-50/80 px-5 py-3">
+      <span class="text-lg">🎯</span>
+      <h2 class="font-semibold">Goal & Current State</h2>
+    </div>
+    <div class="divide-y divide-neutral-100">
+      <div class="px-5 py-4">
+        <p class="text-sm text-neutral-600 mb-3"><strong>Goal:</strong> Every generation a user creates gets persisted to the database. When they log out and log back in, their full history is restored — prompt, settings, generated images, everything.</p>
+        <div class="rounded-lg border border-amber-200 bg-amber-50 p-3.5 text-sm">
+          <p class="font-medium text-amber-800">⚠️ Current State</p>
+          <ul class="mt-1.5 space-y-1 text-amber-700">
+            <li>• <code class="text-xs">GenerationHistoryItem</code> lives only in Redux — lost on page refresh or login/logout</li>
+            <li>• Generated images are base64 data URIs — not stored anywhere persistent</li>
+            <li>• No mechanism to load history from a server</li>
+            <li>• Delete & Clear operations only affect in-memory Redux state</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Decisions from interview -->
+      <div class="px-5 py-4">
+        <p class="font-medium text-sm mb-2">✅ Decisions Made</p>
+        <div class="grid sm:grid-cols-3 gap-3">
+          <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+            <p class="text-xs font-medium text-emerald-800">Image Storage</p>
+            <p class="text-xs text-emerald-600 mt-0.5">Upload to S3 during generation. Backend handles upload, returns S3 URLs. Follows existing template pattern.</p>
+          </div>
+          <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+            <p class="text-xs font-medium text-emerald-800">Editor Changes</p>
+            <p class="text-xs text-emerald-600 mt-0.5">Update in-place + keep snapshot. Edited images overwrite the creation but previous version is preserved.</p>
+          </div>
+          <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+            <p class="text-xs font-medium text-emerald-800">S3 vs DB</p>
+            <p class="text-xs text-emerald-600 mt-0.5">S3 — do it right. Generated images go to S3, DB stores URLs.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SECTION: DATA FLOW ===== -->
+  <div class="section-card mb-6 overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
+    <div class="flex items-center gap-3 border-b border-neutral-100 bg-neutral-50/80 px-5 py-3">
+      <span class="text-lg">🔄</span>
+      <h2 class="font-semibold">Data Flow</h2>
+    </div>
+    <div class="px-5 py-4">
+      <div class="mermaid-wrapper">
+        <pre class="mermaid" style="font-family: 'Inter', sans-serif;">
+flowchart TD
+    subgraph Generation["Generation Flow"]
+        direction TB
+        A[User clicks Generate] --> B[POST /api/generate]
+        B --> C[Gemini generates images]
+        C --> D[Backend uploads to S3]
+        D --> E[Backend creates user_creations row]
+        E --> F[Returns {imageUrls, s3Urls, creationId}]
+        F --> G[Frontend displays images from data URIs]
+        G --> H[Redux stores history with s3Urls + creationId]
+    end
+
+    subgraph Load["Page Load Flow"]
+        direction TB
+        I[User navigates to /generate] --> J[GET /api/generations]
+        J --> K[Backend queries user_creations]
+        K --> L[Returns all creations with S3 URLs]
+        L --> M[Frontend populates Redux history]
+        M --> N[HistoryPanel renders from S3 URLs]
+    end
+
+    subgraph Delete["Delete Flow"]
+        direction TB
+        O[User clicks Remove in HistoryPanel] --> P[DELETE /api/generations/:id]
+        P --> Q[Backend deletes row]
+        Q --> R[Frontend removes from Redux]
+    end
+
+    style A fill:#e0f2fe,stroke:#0284c7
+    style B fill:#e0f2fe,stroke:#0284c7
+    style C fill:#e0f2fe,stroke:#0284c7
+    style D fill:#f3e8ff,stroke:#9333ea
+    style E fill:#dcfce7,stroke:#16a34a
+    style F fill:#e0f2fe,stroke:#0284c7
+    style G fill:#fef3c7,stroke:#d97706
+    style H fill:#fef3c7,stroke:#d97706
+    style I fill:#e0f2fe,stroke:#0284c7
+    style J fill:#e0f2fe,stroke:#0284c7
+    style K fill:#dcfce7,stroke:#16a34a
+    style L fill:#e0f2fe,stroke:#0284c7
+    style M fill:#fef3c7,stroke:#d97706
+    style N fill:#fef3c7,stroke:#d97706
+    style O fill:#fef3c7,stroke:#d97706
+    style P fill:#e0f2fe,stroke:#0284c7
+    style Q fill:#dcfce7,stroke:#16a34a
+    style R fill:#fef3c7,stroke:#d97706
+        </pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SECTION: DATABASE ===== -->
+  <div class="section-card mb-6 overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
+    <div class="flex items-center gap-3 border-b border-neutral-100 bg-neutral-50/80 px-5 py-3">
+      <span class="flex h-7 w-7 items-center justify-center rounded-md bg-emerald-100 text-sm">🗄️</span>
+      <h2 class="font-semibold">Database — <span class="font-mono text-sm font-normal text-neutral-500">user_creations</span></h2>
+    </div>
+    <div class="px-5 py-4">
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm border-collapse">
+          <thead>
+            <tr class="border-b border-neutral-200">
+              <th class="text-left py-2 pr-4 font-medium text-neutral-500">Column</th>
+              <th class="text-left py-2 pr-4 font-medium text-neutral-500">Type</th>
+              <th class="text-left py-2 pr-4 font-medium text-neutral-500">Constraints</th>
+              <th class="text-left py-2 font-medium text-neutral-500">Notes</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-neutral-100">
+            <tr><td class="py-2 pr-4 font-mono text-xs">id</td><td class="py-2 pr-4">UUID</td><td class="py-2 pr-4">PK, DEFAULT uuid_generate_v4()</td><td class="py-2 text-neutral-500"></td></tr>
+            <tr><td class="py-2 pr-4 font-mono text-xs">user_id</td><td class="py-2 pr-4">VARCHAR(255)</td><td class="py-2 pr-4">NOT NULL, FK → users(id) ON DELETE CASCADE</td><td class="py-2 text-neutral-500">Clerk user ID</td></tr>
+            <tr><td class="py-2 pr-4 font-mono text-xs">media_type</td><td class="py-2 pr-4">VARCHAR(10)</td><td class="py-2 pr-4">NOT NULL, CHECK('image','video')</td><td class="py-2 text-neutral-500"></td></tr>
+            <tr><td class="py-2 pr-4 font-mono text-xs">prompt</td><td class="py-2 pr-4">TEXT</td><td class="py-2 pr-4">NOT NULL</td><td class="py-2 text-neutral-500">Full prompt text</td></tr>
+            <tr><td class="py-2 pr-4 font-mono text-xs">style</td><td class="py-2 pr-4">VARCHAR(255)</td><td class="py-2 pr-4">DEFAULT 'None'</td><td class="py-2 text-neutral-500"></td></tr>
+            <tr><td class="py-2 pr-4 font-mono text-xs">aspect_ratio</td><td class="py-2 pr-4">VARCHAR(10)</td><td class="py-2 pr-4">DEFAULT '1:1'</td><td class="py-2 text-neutral-500"></td></tr>
+            <tr><td class="py-2 pr-4 font-mono text-xs">image_size</td><td class="py-2 pr-4">VARCHAR(10)</td><td class="py-2 pr-4">DEFAULT '1K'</td><td class="py-2 text-neutral-500">Images only</td></tr>
+            <tr><td class="py-2 pr-4 font-mono text-xs">number_of_images</td><td class="py-2 pr-4">INT</td><td class="py-2 pr-4">DEFAULT 1</td><td class="py-2 text-neutral-500"></td></tr>
+            <tr><td class="py-2 pr-4 font-mono text-xs">quality</td><td class="py-2 pr-4">VARCHAR(20)</td><td class="py-2 pr-4">DEFAULT 'Standard'</td><td class="py-2 text-neutral="500">Standard | Premium</td></tr>
+            <tr><td class="py-2 pr-4 font-mono text-xs">thinking_level</td><td class="py-2 pr-4">VARCHAR(20)</td><td class="py-2 pr-4">DEFAULT 'minimal'</td><td class="py-2 text-neutral-500"></td></tr>
+            <tr><td class="py-2 pr-4 font-mono text-xs">duration</td><td class="py-2 pr-4">INT</td><td class="py-2 pr-4">NULLABLE</td><td class="py-2 text-neutral-500">Videos only (seconds)</td></tr>
+            <tr><td class="py-2 pr-4 font-mono text-xs">template_id</td><td class="py-2 pr-4">UUID</td><td class="py-2 pr-4">NULLABLE</td><td class="py-2 text-neutral-500">FK → templates(id) — optional</td></tr>
+            <tr><td class="py-2 pr-4 font-mono text-xs">s3_urls</td><td class="py-2 pr-4">JSONB</td><td class="py-2 pr-4">DEFAULT '[]'::jsonb, NOT NULL</td><td class="py-2 text-neutral-500">Array of S3 URLs for generated images/videos</td></tr>
+            <tr><td class="py-2 pr-4 font-mono text-xs">reference_images</td><td class="py-2 pr-4">JSONB</td><td class="py-2 pr-4">DEFAULT '[]'::jsonb</td><td class="py-2 text-neutral-500">Original reference images (data URIs)</td></tr>
+            <tr><td class="py-2 pr-4 font-mono text-xs">thumbnail_url</td><td class="py-2 pr-4">VARCHAR(1024)</td><td class="py-2 pr-4">NULLABLE</td><td class="py-2 text-neutral-500">First image S3 URL for quick previews</td></tr>
+            <tr><td class="py-2 pr-4 font-mono text-xs">metadata</td><td class="py-2 pr-4">JSONB</td><td class="py-2 pr-4">DEFAULT '{}'::jsonb</td><td class="py-2 text-neutral-500">Flexible: edit snapshots, etc.</td></tr>
+            <tr><td class="py-2 pr-4 font-mono text-xs">created_at</td><td class="py-2 pr-4">TIMESTAMPTZ</td><td class="py-2 pr-4">DEFAULT now(), NOT NULL</td><td class="py-2 text-neutral-500"></td></tr>
+            <tr><td class="py-2 pr-4 font-mono text-xs">updated_at</td><td class="py-2 pr-4">TIMESTAMPTZ</td><td class="py-2 pr-4">DEFAULT now(), NOT NULL</td><td class="py-2 text-neutral-500">Auto-updated via trigger</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="mt-3 text-xs text-neutral-500 space-y-1">
+        <p>📌 <strong>Index:</strong> <code class="text-xs">idx_user_creations_user_id</code> on <code class="text-xs">(user_id, created_at DESC)</code></p>
+        <p>📌 <strong>Trigger:</strong> <code class="text-xs">update_user_creations_timestamp</code> — same pattern as existing tables</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SECTION: API ===== -->
+  <div class="section-card mb-6 overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
+    <div class="flex items-center gap-3 border-b border-neutral-100 bg-neutral-50/80 px-5 py-3">
+      <span class="flex h-7 w-7 items-center justify-center rounded-md bg-blue-100 text-sm">🔌</span>
+      <h2 class="font-semibold">API Changes</h2>
+    </div>
+    <div class="divide-y divide-neutral-100">
+
+      <!-- Modified generate endpoint -->
+      <div class="px-5 py-4">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="rounded-md bg-amber-100 text-amber-800 px-2 py-0.5 text-xs font-medium">MODIFIED</span>
+          <span class="font-mono text-xs font-semibold bg-neutral-100 px-2 py-0.5 rounded">POST /api/generate</span>
+          <span class="font-mono text-xs bg-neutral-100 px-2 py-0.5 rounded">POST /api/generate/video</span>
+        </div>
+        <p class="text-sm text-neutral-600 mb-2">After Gemini returns images, the backend now also:</p>
+        <ol class="list-decimal list-inside text-sm text-neutral-600 space-y-1 ml-2">
+          <li>Uploads each generated image to S3 (<code class="text-xs">generations/{userId}/{timestamp}-{random}.webp</code>)</li>
+          <li>Creates a <code class="text-xs">user_creations</code> row with all params + S3 URLs</li>
+          <li>Returns <code class="text-xs">creationId</code> and <code class="text-xs">s3Urls</code> alongside existing <code class="text-xs">imageUrls</code></li>
+        </ol>
+        <div class="mt-2 rounded-lg bg-neutral-50 border border-neutral-200 p-3">
+          <pre class="text-xs text-neutral-700">// New response shape
+{
+  "imageUrls": ["data:image/webp;base64,..."],  // Immediate display (unchanged)
+  "s3Urls": ["https://bucket.s3.amazonaws.com/generations/..."],  // NEW
+  "creationId": "uuid"  // NEW
+}</pre>
+        </div>
+      </div>
+
+      <!-- New endpoints -->
+      <div class="px-5 py-4">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="rounded-md bg-emerald-100 text-emerald-800 px-2 py-0.5 text-xs font-medium">NEW</span>
+          <span class="font-mono text-xs font-semibold bg-neutral-100 px-2 py-0.5 rounded">GET /api/generations</span>
+        </div>
+        <p class="text-sm text-neutral-600 mb-2">Returns all creations for the authenticated user, sorted newest-first.</p>
+        <div class="rounded-lg bg-neutral-50 border border-neutral-200 p-3">
+          <pre class="text-xs text-neutral-700">// Response
+{
+  "creations": [
+    {
+      "id": "uuid",
+      "mediaType": "image",
+      "prompt": "...",
+      "style": "None",
+      "aspectRatio": "1:1",
+      "imageSize": "1K",
+      "numberOfImages": 4,
+      "quality": "Standard",
+      "thinkingLevel": "minimal",
+      "duration": null,
+      "templateId": null,
+      "s3Urls": ["https://..."],
+      "referenceImages": [],
+      "thumbnailUrl": "https://...",
+      "createdAt": "2026-07-06T..."
+    }
+  ]
+}</pre>
+        </div>
+      </div>
+
+      <div class="px-5 py-4">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="rounded-md bg-emerald-100 text-emerald-800 px-2 py-0.5 text-xs font-medium">NEW</span>
+          <span class="font-mono text-xs font-semibold bg-neutral-100 px-2 py-0.5 rounded">DELETE /api/generations/:id</span>
+        </div>
+        <p class="text-sm text-neutral-600">Deletes a specific creation (owner-only). Returns <code class="text-xs">{ success: true }</code>.</p>
+      </div>
+
+      <div class="px-5 py-4">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="rounded-md bg-emerald-100 text-emerald-800 px-2 py-0.5 text-xs font-medium">NEW</span>
+          <span class="font-mono text-xs font-semibold bg-neutral-100 px-2 py-0.5 rounded">PUT /api/generations/:id/images</span>
+        </div>
+        <p class="text-sm text-neutral-600">Updates creation images after editor save. Body: <code class="text-xs">{ imageUrls: string[] }</code> (data URIs). Backend uploads to S3, updates row, snapshots old URLs in metadata.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SECTION: FRONTEND ===== -->
+  <div class="section-card mb-6 overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
+    <div class="flex items-center gap-3 border-b border-neutral-100 bg-neutral-50/80 px-5 py-3">
+      <span class="flex h-7 w-7 items-center justify-center rounded-md bg-amber-100 text-sm">🎨</span>
+      <h2 class="font-semibold">Frontend Changes</h2>
+    </div>
+    <div class="divide-y divide-neutral-100">
+
+      <!-- Types -->
+      <div class="px-5 py-4">
+        <p class="font-medium text-sm mb-2">📄 Type: <span class="font-mono text-xs">GenerationHistoryItem</span></p>
+        <div class="rounded-lg bg-neutral-50 border border-neutral-200 p-3">
+          <pre class="text-xs text-neutral-700">// New fields
+export interface GenerationHistoryItem {
+  // ... existing fields ...
+  creationId?: string;      // NEW — DB record ID
+  s3Urls?: string[];        // NEW — persistent S3 URLs
+}</pre>
+        </div>
+      </div>
+
+      <!-- Service -->
+      <div class="px-5 py-4">
+        <p class="font-medium text-sm mb-2">📄 Service: <span class="font-mono text-xs">generation-service.ts</span></p>
+        <p class="text-sm text-neutral-600">New functions + updated response types:</p>
+        <div class="mt-1 rounded-lg bg-neutral-50 border border-neutral-200 p-3">
+          <pre class="text-xs text-neutral-700">export interface GenerateResponse {
+  imageUrls: string[];
+  s3Urls: string[];
+  creationId: string;
+}
+
+export async function getUserCreations(token?: string): Promise<GenerationHistoryItem[]>
+export async function deleteCreation(id: string, token?: string): Promise<boolean>
+export async function updateCreationImages(id: string, imageUrls: string[], token?: string): Promise<{ s3Urls: string[] }></pre>
+        </div>
+      </div>
+
+      <!-- Generate page -->
+      <div class="px-5 py-4">
+        <p class="font-medium text-sm mb-2">📄 Page: <span class="font-mono text-xs">/generate/page.tsx</span></p>
+        <ul class="text-sm text-neutral-600 space-y-1.5 ml-4 list-disc">
+          <li><strong>On mount</strong> — fetch <code class="text-xs">GET /api/generations</code>, populate Redux history with persisted creations</li>
+          <li><strong>After generation</strong> — store <code class="text-xs">creationId</code> and <code class="text-xs">s3Urls</code> in the <code class="text-xs">GenerationHistoryItem</code> dispatched to Redux</li>
+          <li>Merge: only persisted creations from API, skip if <code class="text-xs">creationId</code> already exists in history (prevent dupes on re-render)</li>
+        </ul>
+      </div>
+
+      <!-- History panel -->
+      <div class="px-5 py-4">
+        <p class="font-medium text-sm mb-2">📄 Component: <span class="font-mono text-xs">history-panel.tsx</span></p>
+        <ul class="text-sm text-neutral-600 space-y-1.5 ml-4 list-disc">
+          <li><strong>Delete</strong> — calls <code class="text-xs">DELETE /api/generations/:id</code> then removes from Redux</li>
+          <li><strong>Clear All</strong> — calls DELETE for each persisted creation, then clears Redux</li>
+          <li>Display images from <code class="text-xs">s3Urls</code> when available, fall back to <code class="text-xs">imageUrls</code> (data URIs)</li>
+        </ul>
+      </div>
+
+      <!-- Redux slice -->
+      <div class="px-5 py-4">
+        <p class="font-medium text-sm mb-2">📄 Redux: <span class="font-mono text-xs">image-editor-slice.ts</span></p>
+        <p class="text-sm text-neutral-600">Minimal changes — the existing actions already handle <code class="text-xs">GenerationHistoryItem</code>. The new fields (<code class="text-xs">creationId</code>, <code class="text-xs">s3Urls</code>) flow through naturally.</p>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===== SECTION: FILES TOUCHED ===== -->
+  <div class="section-card mb-6 overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
+    <div class="flex items-center gap-3 border-b border-neutral-100 bg-neutral-50/80 px-5 py-3">
+      <span class="flex h-7 w-7 items-center justify-center rounded-md bg-neutral-100 text-sm">📁</span>
+      <h2 class="font-semibold">Files Changed</h2>
+    </div>
+    <div class="px-5 py-4">
+      <div class="grid sm:grid-cols-2 gap-3">
+        <div class="rounded-lg border border-neutral-200 p-3">
+          <p class="font-mono text-xs font-medium">viewcreator-database/src/schema.sql</p>
+          <p class="text-xs text-neutral-500 mt-1">Add <code class="text-xs">user_creations</code> table + index + trigger</p>
+        </div>
+        <div class="rounded-lg border border-neutral-200 p-3">
+          <p class="font-mono text-xs font-medium">viewcreator-database/src/repositories/creation-repository.ts</p>
+          <p class="text-xs text-neutral-500 mt-1">New file — CRUD for user_creations</p>
+        </div>
+        <div class="rounded-lg border border-neutral-200 p-3">
+          <p class="font-mono text-xs font-medium">viewcreator-database/src/index.ts</p>
+          <p class="text-xs text-neutral-500 mt-1">Export CreationRepository</p>
+        </div>
+        <div class="rounded-lg border border-neutral-200 p-3">
+          <p class="font-mono text-xs font-medium">viewcreator-api/src/index.ts</p>
+          <p class="text-xs text-neutral-500 mt-1">Modify generate endpoints + add GET/DELETE/PUT routes</p>
+        </div>
+        <div class="rounded-lg border border-neutral-200 p-3">
+          <p class="font-mono text-xs font-medium">viewcreator-ui/src/types/index.ts</p>
+          <p class="text-xs text-neutral-500 mt-1">Add <code class="text-xs">creationId</code>, <code class="text-xs">s3Urls</code> to GenerationHistoryItem</p>
+        </div>
+        <div class="rounded-lg border border-neutral-200 p-3">
+          <p class="font-mono text-xs font-medium">viewcreator-ui/src/services/api/generation-service.ts</p>
+          <p class="text-xs text-neutral-500 mt-1">Add <code class="text-xs">getUserCreations</code>, <code class="text-xs">deleteCreation</code>, <code class="text-xs">updateCreationImages</code></p>
+        </div>
+        <div class="rounded-lg border border-neutral-200 p-3">
+          <p class="font-mono text-xs font-medium">viewcreator-ui/src/app/generate/page.tsx</p>
+          <p class="text-xs text-neutral-500 mt-1">Fetch creations on mount, store creationId on success</p>
+        </div>
+        <div class="rounded-lg border border-neutral-200 p-3">
+          <p class="font-mono text-xs font-medium">viewcreator-ui/src/components/generate/history-panel.tsx</p>
+          <p class="text-xs text-neutral-500 mt-1">API-backed delete, display from s3Urls</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SECTION: IMPLEMENTATION ORDER ===== -->
+  <div class="section-card mb-6 overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
+    <div class="flex items-center gap-3 border-b border-neutral-100 bg-neutral-50/80 px-5 py-3">
+      <span class="flex h-7 w-7 items-center justify-center rounded-md bg-neutral-100 text-sm">📋</span>
+      <h2 class="font-semibold">Implementation Order</h2>
+    </div>
+    <div class="px-5 py-4">
+      <div class="space-y-4">
+        <div class="flex items-start gap-3">
+          <div class="timeline-dot status-done"></div>
+          <div>
+            <p class="text-sm font-medium">Phase 1: Database + Repository</p>
+            <p class="text-xs text-neutral-500">Schema → CreationRepository → export from package</p>
+          </div>
+        </div>
+        <div class="flex items-start gap-3">
+          <div class="timeline-dot status-current"></div>
+          <div>
+            <p class="text-sm font-medium">Phase 2: Backend API</p>
+            <p class="text-xs text-neutral-500">Modify generate endpoint (S3 upload + auto-save) → GET/DELETE/PUT routes</p>
+          </div>
+        </div>
+        <div class="flex items-start gap-3">
+          <div class="timeline-dot status-planned"></div>
+          <div>
+            <p class="text-sm font-medium">Phase 3: Frontend</p>
+            <p class="text-xs text-neutral-500">Types → Service → Generate page (on-mount fetch) → History panel (API delete)</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SECTION: OPEN QUESTIONS ===== -->
+  <div class="section-card mb-6 overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
+    <div class="flex items-center gap-3 border-b border-neutral-100 bg-neutral-50/80 px-5 py-3">
+      <span class="flex h-7 w-7 items-center justify-center rounded-md bg-amber-100 text-sm">❓</span>
+      <h2 class="font-semibold">Review & Confirm</h2>
+    </div>
+    <div class="px-5 py-4">
+      <ul class="space-y-3 text-sm">
+        <li class="flex items-start gap-2">
+          <span class="rounded-full bg-blue-100 text-blue-700 px-2 py-0.5 text-xs font-medium shrink-0 mt-0.5">Q1</span>
+          <span><strong>S3 key prefix:</strong> Generations stored at <code class="text-xs">generations/{userId}/{mediaType}/{timestamp}-{random}.{ext}</code> — same bucket as templates, different prefix. The <code class="text-xs">{mediaType}</code> segment keeps images and videos in separate prefixes for future extensibility.</span>
+        </li>
+        <li class="flex items-start gap-2">
+          <span class="rounded-full bg-blue-100 text-blue-700 px-2 py-0.5 text-xs font-medium shrink-0 mt-0.5">Q2</span>
+          <span><strong>Editor snapshots:</strong> ✅ Store in simple JSONB (<code class="text-xs">metadata.previousImages</code>). Extensible enough for complete edit tracing — can always migrate to a separate table later if querying snapshots becomes a bottleneck.</span>
+        </li>
+        <li class="flex items-start gap-2">
+          <span class="rounded-full bg-blue-100 text-blue-700 px-2 py-0.5 text-xs font-medium shrink-0 mt-0.5">Q3</span>
+          <span><strong>On-mount loading:</strong> When /generate page loads — replace Redux history entirely with API data, or merge?</span>
+          <div class="mt-2 rounded-lg border border-neutral-200 bg-neutral-50 p-3">
+            <p class="text-xs font-medium text-neutral-700 mb-2">Trade-offs:</p>
+            <table class="w-full text-xs border-collapse">
+              <thead>
+                <tr class="border-b border-neutral-200">
+                  <th class="text-left py-1 pr-3 font-medium text-neutral-500"></th>
+                  <th class="text-left py-1 pr-3 font-medium text-neutral-500">Replace (API source of truth)</th>
+                  <th class="text-left py-1 font-medium text-neutral-500">Merge (keep in-memory + API)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="border-b border-neutral-100">
+                  <td class="py-1.5 pr-3 font-medium">Correctness</td>
+                  <td class="py-1.5 pr-3">✅ Perfect — API is authoritative. No stale local state.</td>
+                  <td class="py-1.5">⚠️ Can show items the API doesn't know about (e.g., failed saves).</td>
+                </tr>
+                <tr class="border-b border-neutral-100">
+                  <td class="py-1.5 pr-3 font-medium">Simplicity</td>
+                  <td class="py-1.5 pr-3">✅ Replace entire history array. One source of truth.</td>
+                  <td class="py-1.5">⚠️ Need dedup logic by creationId. Edge cases with pending generations.</td>
+                </tr>
+                <tr class="border-b border-neutral-100">
+                  <td class="py-1.5 pr-3 font-medium">Fresh generations</td>
+                  <td class="py-1.5">⚠️ In-memory items from current session (not yet in DB) would be lost on re-fetch.</td>
+                  <td class="py-1.5">✅ Current session's new generations stay visible even before API confirms them.</td>
+                </tr>
+                <tr>
+                  <td class="py-1.5 pr-3 font-medium">Recommendation</td>
+                  <td class="py-1.5 pr-3" colspan="2"><strong>Merge approach:</strong> On mount, fetch API data + prepend to Redux history. But skip any API items that already have a matching <code class="text-xs">creationId</code> in the in-memory history (prevents duplicates after re-renders). This gives us the best of both: persisted creations survive logout, and fresh generations show up instantly.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </li>
+        <li class="flex items-start gap-2">
+          <span class="rounded-full bg-blue-100 text-blue-700 px-2 py-0.5 text-xs font-medium shrink-0 mt-0.5">Q4</span>
+          <span><strong>Video support:</strong> Videos are also generated as data URIs. Same S3 upload pattern applies? S3 key: <code class="text-xs">generations/{userId}/{timestamp}-{random}.mp4</code></span>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="text-center text-xs text-neutral-400 mt-8 mb-4">
+    ViewCreator — User Creations Persistence Design · Review before implementation
+  </div>
+
+</div>
+
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({ startOnLoad: true, theme: 'neutral', fontFamily: 'Inter' });
+</script>
+</body>
+</html>

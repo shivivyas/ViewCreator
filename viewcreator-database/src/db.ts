@@ -1,28 +1,25 @@
 import { Pool, PoolConfig, QueryResult, QueryResultRow } from 'pg';
 import dotenv from 'dotenv';
-import path from 'path';
 
-// Load .env from the package directory or workspace root if needed
+// Load .env — prefers package-level .env, falls back to parent monorepo .env
 dotenv.config();
-// Also look for .env in the parent folders to support monorepo setups
-dotenv.config({ path: path.resolve(process.cwd(), '../.env') });
-dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+dotenv.config({ path: '../.env' });
+
+// Only DATABASE_URL is used — no local Postgres fallbacks
+const databaseUrl = process.env.DATABASE_URL;
+if (!databaseUrl) {
+  throw new Error(
+    'DATABASE_URL is not set. Configure it in viewcreator-database/.env or viewcreator-api/.env\n' +
+    'Example: DATABASE_URL=postgresql://postgres:password@db.example.supabase.co:5432/postgres'
+  );
+}
 
 const poolConfig: PoolConfig = {
-  user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432', 10),
-  database: process.env.DB_NAME || 'viewcreator',
-  max: parseInt(process.env.DB_MAX_CONNECTIONS || '20', 10),
+  connectionString: databaseUrl,
+  max: parseInt(process.env.DB_MAX_CONNECTIONS || '10', 10),
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
+  connectionTimeoutMillis: 5000,
 };
-
-// If a single DATABASE_URL environment variable is provided, use it instead
-if (process.env.DATABASE_URL) {
-  poolConfig.connectionString = process.env.DATABASE_URL;
-}
 
 export const pool = new Pool(poolConfig);
 

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.WebhookEventRepository = exports.SubscriptionRepository = exports.CreditRepository = exports.PlanRepository = exports.VoteRepository = exports.TemplateRepository = exports.UserRepository = exports.closePool = exports.checkConnection = exports.transaction = exports.query = exports.pool = void 0;
+exports.CreationRepository = exports.WebhookEventRepository = exports.SubscriptionRepository = exports.CreditRepository = exports.PlanRepository = exports.VoteRepository = exports.TemplateRepository = exports.UserRepository = exports.closePool = exports.checkConnection = exports.transaction = exports.query = exports.pool = void 0;
 // Core database connection and helper exports
 var db_js_1 = require("./db.js");
 Object.defineProperty(exports, "pool", { enumerable: true, get: function () { return db_js_1.pool; } });
@@ -29,4 +29,7 @@ Object.defineProperty(exports, "SubscriptionRepository", { enumerable: true, get
 // Webhook event repository
 var webhook_repository_js_1 = require("./repositories/webhook-repository.js");
 Object.defineProperty(exports, "WebhookEventRepository", { enumerable: true, get: function () { return webhook_repository_js_1.WebhookEventRepository; } });
+// Creation repository (user-generated content persistence)
+var creation_repository_js_1 = require("./repositories/creation-repository.js");
+Object.defineProperty(exports, "CreationRepository", { enumerable: true, get: function () { return creation_repository_js_1.CreationRepository; } });
 //# sourceMappingURL=index.js.map

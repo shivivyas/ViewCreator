@@ -5,7 +5,7 @@ dotenv.config();
 import express from 'express';
 import cors from 'cors';
 import { GoogleGenAI } from "@google/genai";
-import { TemplateRepository, UserRepository, VoteRepository } from 'viewcreator-database';
+import { TemplateRepository, UserRepository, VoteRepository, CreationRepository } from 'viewcreator-database';
 import { clerkMiddleware, requireAuth, clerkClient, getAuth } from '@clerk/express';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import paymentRoutes from './routes/payments.js';
@@ -73,6 +73,48 @@ const syncUserMiddleware = async (req: express.Request, res: express.Response, n
   }
   next();
 };
+
+/**
+ * Uploads a generated image/video to S3 for persistent storage.
+ * @returns The public S3 URL of the uploaded file.
+ */
+async function uploadToS3(
+  dataUri: string,
+  userId: string,
+  mediaType: 'image' | 'video'
+): Promise<string> {
+  const bucketName = process.env.AWS_S3_BUCKET;
+  if (!bucketName) {
+    throw new Error('S3 bucket name is not configured. Please check the AWS_S3_BUCKET setting.');
+  }
+
+  const mimePrefix = mediaType === 'video' ? 'video' : 'image';
+  const match = dataUri.match(new RegExp(`^data:(${mimePrefix}\\/[\\w.+-]+);base64,(.+)$`));
+  if (!match) {
+    throw new Error(`Invalid base64 ${mediaType} data format`);
+  }
+
+  const mimeType = match[1];
+  const base64Data = match[2];
+  const buffer = Buffer.from(base64Data, 'base64');
+  const extMatch = mimeType.split('/')[1];
+  const extension = extMatch?.replace('webp', 'webp').replace('jpeg', 'jpg') || (mediaType === 'video' ? 'mp4' : 'png');
+  const timestamp = Date.now();
+  const random = Math.random().toString(36).substring(2, 9);
+  const s3Key = `generations/${userId}/${mediaType}/${timestamp}-${random}.${extension}`;
+
+  await s3Client.send(
+    new PutObjectCommand({
+      Bucket: bucketName,
+      Key: s3Key,
+      Body: buffer,
+      ContentType: mimeType,
+    })
+  );
+
+  const region = process.env.AWS_REGION || 'us-east-1';
+  return `https://${bucketName}.s3.${region}.amazonaws.com/${s3Key}`;
+}
 
 /**
  * Downloads a public S3 template image and converts it to base64 format for Gemini
@@ -428,16 +470,55 @@ app.post('/api/generate', generationRateLimiter, requireAuth(), syncUserMiddlewa
       throw new Error('API did not return any images.');
     }
 
+    // ── Save to S3 (best-effort) ────────────────────────────────
+    const s3Urls: string[] = [];
+    for (const dataUri of imageUrls) {
+      try {
+        const s3Url = await uploadToS3(dataUri, userId!, 'image');
+        s3Urls.push(s3Url);
+        console.log(`[Generate API] Uploaded to S3: ${s3Url.substring(0, 80)}...`);
+      } catch (uploadErr: any) {
+        console.warn(`[Generate API] S3 upload skipped (${uploadErr.message}) — will use data URI fallback`);
+      }
+    }
+
+    // ── Persist to database (ALWAYS save, even if S3 failed) ──
+    // When S3 works → store S3 URLs; when S3 fails → store data URIs directly
+    // Data URIs are larger but survive login/logout; upgrade to S3 later
+    const urlsForDb = s3Urls.length > 0 ? s3Urls : imageUrls;
+    let creationId: string | null = null;
+    try {
+      const creation = await CreationRepository.create({
+        user_id: userId!,
+        media_type: 'image',
+        prompt,
+        style,
+        aspect_ratio: aspectRatio,
+        image_size: finalImageSize,
+        number_of_images: imageUrls.length,
+        quality,
+        thinking_level: thinkingLevel,
+        template_id: templateId || null,
+        s3_urls: urlsForDb,
+        reference_images: Array.isArray(referenceImages) ? referenceImages.slice(0, 3) : [],
+        thumbnail_url: urlsForDb[0],
+      });
+      creationId = creation.id;
+      console.log(`[Generate API] ✅ Persisted creation ${creation.id} (${s3Urls.length > 0 ? 'S3' : 'data URI fallback'}, ${urlsForDb.length} image(s))`);
+    } catch (dbErr) {
+      console.error('[Generate API] ❌ Failed to save creation record — history will not survive logout:', dbErr);
+    }
+
     // Deduct credits after successful generation
     const promptPreview = prompt.substring(0, 100);
     await deductForGeneration(
       userId!,
       totalCost,
       `Generated ${imageUrls.length} image(s)`,
-      { prompt_preview: promptPreview, quality, count: imageUrls.length }
+      { prompt_preview: promptPreview, quality, count: imageUrls.length, creation_id: creationId }
     );
 
-    return res.json({ imageUrls });
+    return res.json({ imageUrls, s3Urls, creationId });
   } catch (error: any) {
     console.error('Error generating image:', error);
     return res.status(500).json({ error: error.message || 'Internal Server Error' });
@@ -558,15 +639,49 @@ app.post('/api/generate/video', videoGenerationRateLimiter, requireAuth(), syncU
         throw new Error('API did not return any content.');
       }
 
+      // ── Save to S3 (best-effort) ────────────────────────────────
+      let creationId: string | null = null;
+      const s3Urls: string[] = [];
+      for (const dataUri of videoUrls) {
+        try {
+          const s3Url = await uploadToS3(dataUri, userId!, 'video');
+          s3Urls.push(s3Url);
+          console.log(`[Generate Video API] Uploaded to S3: ${s3Url.substring(0, 80)}...`);
+        } catch (uploadErr: any) {
+          console.warn(`[Generate Video API] S3 upload skipped (${uploadErr.message}) — will use data URI fallback`);
+        }
+      }
+
+      // ── Persist to database (ALWAYS save, even if S3 failed) ──
+      const urlsForDb = s3Urls.length > 0 ? s3Urls : videoUrls;
+      try {
+        const creation = await CreationRepository.create({
+          user_id: userId!,
+          media_type: 'video',
+          prompt,
+          style,
+          aspect_ratio: aspectRatio,
+          quality,
+          duration: duration || 6,
+          template_id: templateId || null,
+          s3_urls: urlsForDb,
+          thumbnail_url: urlsForDb[0],
+        });
+        creationId = creation.id;
+        console.log(`[Generate Video API] ✅ Persisted creation ${creation.id} (${s3Urls.length > 0 ? 'S3' : 'data URI fallback'}, ${urlsForDb.length} video(s))`);
+      } catch (dbErr) {
+        console.error('[Generate Video API] ❌ Failed to save creation record — history will not survive logout:', dbErr);
+      }
+
       // Deduct credits after successful generation
       await deductForGeneration(
         userId!,
         CREDIT_COSTS.VIDEO,
         'Generated video',
-        { prompt_preview: prompt.substring(0, 100), quality }
+        { prompt_preview: prompt.substring(0, 100), quality, creation_id: creationId }
       );
 
-      return res.json({ videoUrls, duration });
+      return res.json({ videoUrls, duration, s3Urls, creationId });
     } catch (genError: any) {
       console.error('[Generate Video API] Generation failed:', genError);
       return res.status(500).json({ error: `Video generation failed: ${genError.message}` });
@@ -574,6 +689,145 @@ app.post('/api/generate/video', videoGenerationRateLimiter, requireAuth(), syncU
   } catch (error: any) {
     console.error('Error in video generation endpoint:', error);
     return res.status(500).json({ error: error.message || 'Internal Server Error' });
+  }
+});
+
+// ── User Creations Routes ────────────────────────────────────────────────────
+
+// Get all creations for the authenticated user
+app.get('/api/generations', requireAuth(), syncUserMiddleware, async (req: express.Request, res: express.Response): Promise<any> => {
+  try {
+    const { userId } = getAuth(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const creations = await CreationRepository.findByUserId(userId);
+
+    // Map to camelCase for the frontend
+    const mapped = creations.map((c) => ({
+      id: c.id,
+      mediaType: c.media_type,
+      prompt: c.prompt,
+      style: c.style,
+      aspectRatio: c.aspect_ratio,
+      imageSize: c.image_size,
+      numberOfImages: c.number_of_images,
+      quality: c.quality,
+      thinkingLevel: c.thinking_level,
+      duration: c.duration,
+      templateId: c.template_id,
+      s3Urls: c.s3_urls,
+      referenceImages: c.reference_images,
+      thumbnailUrl: c.thumbnail_url,
+      createdAt: c.created_at,
+      updatedAt: c.updated_at,
+    }));
+
+    return res.json({ creations: mapped });
+  } catch (error: any) {
+    console.error('[Generations API] Error fetching creations:', error);
+    return res.status(500).json({ error: 'Failed to fetch creations' });
+  }
+});
+
+// Delete a specific creation (owner-only)
+app.delete('/api/generations/:id', requireAuth(), syncUserMiddleware, async (req: express.Request, res: express.Response): Promise<any> => {
+  try {
+    const { userId } = getAuth(req);
+    const creationId = req.params.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    if (!creationId) {
+      return res.status(400).json({ error: 'Creation ID is required' });
+    }
+
+    const deleted = await CreationRepository.delete(creationId, userId);
+    if (!deleted) {
+      return res.status(404).json({ error: 'Creation not found or not owned by user' });
+    }
+
+    return res.json({ success: true });
+  } catch (error: any) {
+    console.error('[Generations API] Error deleting creation:', error);
+    return res.status(500).json({ error: 'Failed to delete creation' });
+  }
+});
+
+// Delete all creations for the authenticated user
+app.delete('/api/generations', requireAuth(), syncUserMiddleware, async (req: express.Request, res: express.Response): Promise<any> => {
+  try {
+    const { userId } = getAuth(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const count = await CreationRepository.deleteAllByUserId(userId);
+    console.log(`[Generations API] Cleared ${count} creations for user ${userId}`);
+    return res.json({ success: true, deletedCount: count });
+  } catch (error: any) {
+    console.error('[Generations API] Error clearing creations:', error);
+    return res.status(500).json({ error: 'Failed to clear creations' });
+  }
+});
+
+// Update creation images after editor save
+app.put('/api/generations/:id/images', requireAuth(), syncUserMiddleware, async (req: express.Request, res: express.Response): Promise<any> => {
+  try {
+    const { userId } = getAuth(req);
+    const creationId = req.params.id;
+    const { imageUrls: newDataUris } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    if (!creationId) {
+      return res.status(400).json({ error: 'Creation ID is required' });
+    }
+
+    if (!Array.isArray(newDataUris) || newDataUris.length === 0) {
+      return res.status(400).json({ error: 'imageUrls must be a non-empty array of data URIs' });
+    }
+
+    // Upload new images to S3
+    const newS3Urls: string[] = [];
+    for (const dataUri of newDataUris) {
+      try {
+        const s3Url = await uploadToS3(dataUri, userId, 'image');
+        newS3Urls.push(s3Url);
+      } catch (uploadErr) {
+        console.error('[Generations API] S3 upload failed during update:', uploadErr);
+      }
+    }
+
+    if (newS3Urls.length === 0) {
+      return res.status(500).json({ error: 'Failed to upload any images to S3' });
+    }
+
+    // Update the creation record (snapshots old images in metadata)
+    const updated = await CreationRepository.updateImages(
+      creationId,
+      userId,
+      newS3Urls,
+      newS3Urls[0]
+    );
+
+    if (!updated) {
+      return res.status(404).json({ error: 'Creation not found or not owned by user' });
+    }
+
+    return res.json({
+      s3Urls: updated.s3_urls,
+      creationId: updated.id,
+      thumbnailUrl: updated.thumbnail_url,
+    });
+  } catch (error: any) {
+    console.error('[Generations API] Error updating creation images:', error);
+    return res.status(500).json({ error: 'Failed to update creation images' });
   }
 });
 

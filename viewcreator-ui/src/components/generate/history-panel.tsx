@@ -1,11 +1,13 @@
 import React, { useState } from "react";
 import JSZip from "jszip";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { useAuth } from "@clerk/nextjs";
 import {
   clearHistory,
   deleteGenerationFromHistory,
 } from "@/store/slices/image-editor-slice";
 import type { GenerationHistoryItem, MediaType } from "@/types";
+import { deleteCreation, clearCreations } from "@/services";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
@@ -145,6 +147,28 @@ function HistoryItem({
   onSelectImage: (item: GenerationHistoryItem, index: number) => void;
 }) {
   const dispatch = useAppDispatch();
+  const { getToken } = useAuth();
+
+  const handleDelete = async () => {
+    // If persisted, delete from API first
+    if (item.creationId) {
+      try {
+        const token = await getToken();
+        if (token) {
+          await deleteCreation(item.creationId, token);
+        }
+      } catch (err) {
+        console.error('Failed to delete creation from API:', err);
+        // Continue with Redux removal even if API fails
+      }
+    }
+    dispatch(deleteGenerationFromHistory(item.id));
+  };
+
+  // Determine display URLs: prefer s3Urls, fall back to imageUrls (data URIs)
+  const displayUrls = item.s3Urls && item.s3Urls.length > 0
+    ? item.s3Urls
+    : item.imageUrls;
 
   return (
     <div className="rounded-2xl border border-border/50 bg-card overflow-hidden">
@@ -189,7 +213,7 @@ function HistoryItem({
             <span className="hidden sm:inline">Retry</span>
           </button>
           <button
-            onClick={() => dispatch(deleteGenerationFromHistory(item.id))}
+            onClick={handleDelete}
             className="h-7 w-7 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors flex items-center justify-center"
             title="Remove"
           >
@@ -230,9 +254,9 @@ function HistoryItem({
         )}
 
         {/* Video or Image grid */}
-        {item.mediaType === "video" && item.videoUrls?.length ? (
+        {item.mediaType === "video" && displayUrls.length ? (
           <div className="grid gap-3 max-w-lg">
-            {item.videoUrls.map((url, i) => (
+            {displayUrls.map((url, i) => (
               <div
                 key={i}
                 className="relative rounded-xl overflow-hidden border border-border/50 bg-black"
@@ -253,14 +277,14 @@ function HistoryItem({
         ) : (
           <div
             className={`grid gap-3 ${
-              item.imageUrls.length === 1
+              displayUrls.length === 1
                 ? "grid-cols-1 max-w-sm"
-                : item.imageUrls.length === 2
+                : displayUrls.length === 2
                 ? "grid-cols-2"
                 : "grid-cols-2 lg:grid-cols-4"
             }`}
           >
-            {item.imageUrls.map((url, i) => (
+            {displayUrls.map((url, i) => (
               <div
                 key={i}
                 className="group relative rounded-xl overflow-hidden border border-border/50 bg-muted/20 aspect-square cursor-pointer transition-all duration-300 hover:border-border hover:shadow-sm"
@@ -305,10 +329,27 @@ export function HistoryPanel({
   handleSelectImageFromHistory,
 }: HistoryPanelProps) {
   const dispatch = useAppDispatch();
+  const { getToken } = useAuth();
   const editorState = useAppSelector((state) => state.imageEditor);
   const hasHistory =
     editorState.history && editorState.history.length > 0;
   const [showClearModal, setShowClearModal] = useState(false);
+
+  const handleClear = async () => {
+    setShowClearModal(false);
+    // Delete from API first
+    try {
+      const token = await getToken();
+      if (token) {
+        const count = await clearCreations(token);
+        console.log(`[HistoryPanel] Cleared ${count} creations from API`);
+      }
+    } catch (err) {
+      console.error('[HistoryPanel] Failed to clear creations from API:', err);
+    }
+    dispatch(clearHistory());
+    toast.success('History cleared');
+  };
 
   return (
     <div className="h-full min-h-0 flex flex-col overflow-hidden">
@@ -333,8 +374,8 @@ export function HistoryPanel({
                 for (const [hi, item] of editorState.history.entries()) {
                   const urls =
                     item.mediaType === "video"
-                      ? item.videoUrls ?? []
-                      : item.imageUrls;
+                      ? (item.s3Urls && item.s3Urls.length > 0 ? item.s3Urls : item.videoUrls ?? [])
+                      : (item.s3Urls && item.s3Urls.length > 0 ? item.s3Urls : item.imageUrls);
 
                   for (const [ai, url] of urls.entries()) {
                     const prefix =
@@ -396,6 +437,8 @@ export function HistoryPanel({
       <ConfirmDialog
         open={showClearModal}
         title="Clear all history?"
+        onConfirm={handleClear}
+        onCancel={() => setShowClearModal(false)}
         description={
           <>
             This will permanently remove all{" "}
@@ -405,11 +448,6 @@ export function HistoryPanel({
         }
         confirmLabel="Clear all"
         cancelLabel="Cancel"
-        onConfirm={() => {
-          dispatch(clearHistory());
-          setShowClearModal(false);
-        }}
-        onCancel={() => setShowClearModal(false)}
       />
 
       <ScrollArea className="flex-1 min-h-0">

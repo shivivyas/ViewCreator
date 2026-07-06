@@ -272,3 +272,39 @@ BEGIN
     );
 END;
 $$;
+
+-- ── User Creations Table ─────────────────────────────────────────────────────
+
+-- Stores all user-generated content (images and videos) for persistence across sessions.
+-- Each row represents one generation request with its output stored in S3.
+DROP TABLE IF EXISTS user_creations CASCADE;
+CREATE TABLE IF NOT EXISTS user_creations (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    media_type VARCHAR(10) NOT NULL CHECK (media_type IN ('image', 'video')),
+    prompt TEXT NOT NULL,
+    style VARCHAR(255) DEFAULT 'None',
+    aspect_ratio VARCHAR(10) DEFAULT '1:1',
+    image_size VARCHAR(10) DEFAULT '1K',
+    number_of_images INT DEFAULT 1,
+    quality VARCHAR(20) DEFAULT 'Standard',
+    thinking_level VARCHAR(20) DEFAULT 'minimal',
+    duration INT,
+    template_id UUID REFERENCES templates(id) ON DELETE SET NULL,
+    s3_urls JSONB DEFAULT '[]'::jsonb NOT NULL,
+    reference_images JSONB DEFAULT '[]'::jsonb,
+    thumbnail_url TEXT,
+    metadata JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+-- Index for fast retrieval of a user's creations, newest first
+CREATE INDEX IF NOT EXISTS idx_user_creations_user_id ON user_creations(user_id, created_at DESC);
+
+-- Apply update_timestamp trigger to user_creations
+DROP TRIGGER IF EXISTS update_user_creations_timestamp ON user_creations;
+CREATE TRIGGER update_user_creations_timestamp
+    BEFORE UPDATE ON user_creations
+    FOR EACH ROW
+    EXECUTE FUNCTION update_timestamp();

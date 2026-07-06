@@ -167,7 +167,7 @@ export default function EditImagePage() {
 
     try {
       const token = await getToken().catch(() => undefined) || undefined;
-      const imageUrlsResult = await generateImages({
+      const imageResult = await generateImages({
         prompt: `${basePrompt}. ${instruction}`,
         style,
         aspectRatio,
@@ -179,7 +179,7 @@ export default function EditImagePage() {
         templateId: null
       }, token);
 
-      const updatedUrl = imageUrlsResult?.[0] ?? currentImage;
+      const updatedUrl = imageResult.imageUrls?.[0] ?? currentImage;
       setPreviewImageUrl(updatedUrl);
       setInstruction("");
       pushToHistory(updatedUrl);

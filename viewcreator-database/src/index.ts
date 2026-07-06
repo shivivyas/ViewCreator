@@ -48,3 +48,10 @@ export {
 export {
   WebhookEventRepository,
 } from './repositories/webhook-repository.js';
+
+// Creation repository (user-generated content persistence)
+export {
+  UserCreation,
+  CreateCreationParams,
+  CreationRepository,
+} from './repositories/creation-repository.js';

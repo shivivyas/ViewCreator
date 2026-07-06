@@ -23,6 +23,44 @@ export interface GenerationHistoryItem {
   duration?: number;
   referenceImages?: string[];
   templateId?: string | null;
+  /** Persisted creation ID from the database, if saved */
+  creationId?: string;
+  /** Persistent S3 URLs for generated images/videos */
+  s3Urls?: string[];
+}
+
+/** Shape returned by GET /api/generations (snake_case from DB mapped to camelCase) */
+export interface UserCreation {
+  id: string;
+  mediaType: MediaType;
+  prompt: string;
+  style: string;
+  aspectRatio: string;
+  imageSize: string;
+  numberOfImages: number;
+  quality: string;
+  thinkingLevel: string;
+  duration: number | null;
+  templateId: string | null;
+  s3Urls: string[];
+  referenceImages: string[];
+  thumbnailUrl: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Response from generate endpoints (modified to include persistence data) */
+export interface GenerateImagesResponse {
+  imageUrls: string[];
+  s3Urls?: string[];
+  creationId?: string | null;
+}
+
+export interface GenerateVideoResponse {
+  videoUrls: string[];
+  duration: number;
+  s3Urls?: string[];
+  creationId?: string | null;
 }
 
 export interface ImageEditorState {

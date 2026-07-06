@@ -146,7 +146,7 @@ export function TemplateDetailModal({
 
     try {
       const token = (await getToken().catch(() => undefined)) || undefined;
-      const urls = await generateImages(
+      const result = await generateImages(
         {
           prompt: prompt.trim(),
           style: stylePreset,
@@ -161,11 +161,12 @@ export function TemplateDetailModal({
         token
       );
 
-      if (urls.length === 0) {
+      const urlsArray = result.imageUrls || [];
+      if (urlsArray.length === 0) {
         setErrorMessage("No images were generated. Try a different prompt.");
         setModalState("error");
       } else {
-        setGeneratedUrls(urls);
+        setGeneratedUrls(urlsArray);
         setModalState("results");
       }
     } catch (err: unknown) {

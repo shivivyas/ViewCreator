@@ -10,7 +10,7 @@ import {
   addGenerationToHistory
 } from '@/store/slices/image-editor-slice';
 import type { Template, GenerationHistoryItem, GenerateParams, GenerateVideoParams, MediaType } from '@/types';
-import { getTemplates, generateImages as apiGenerateImages, generateVideo as apiGenerateVideo } from '@/services';
+import { getTemplates, generateImages as apiGenerateImages, generateVideo as apiGenerateVideo, getUserCreations } from '@/services';
 import { Wand2, Video, Image as ImageIcon, Loader2, Zap, X } from 'lucide-react';
 import { getBalance, createCheckoutSession, getPlans } from '@/services/api/payment-service';
 import { Button } from '@/components/ui/button';
@@ -214,6 +214,8 @@ function GenerateImagePageContent() {
                     videoUrls: result.videoUrls,
                     duration: result.duration,
                     templateId: vp.templateId,
+                    creationId: result.creationId ?? undefined,
+                    s3Urls: result.s3Urls,
                   };
                   dispatch(addGenerationToHistory(historyItem));
                   setVideoUrls(result.videoUrls);
@@ -222,7 +224,8 @@ function GenerateImagePageContent() {
                 setIsLoading(false);
               } else {
                 const ip = pg.params as GenerateParams;
-                const urls = await apiGenerateImages(ip, await getToken() || undefined);
+                const result = await apiGenerateImages(ip, await getToken() || undefined);
+                const urls = result.imageUrls;
                 if (urls.length > 0) {
                   const historyItem: GenerationHistoryItem = {
                     id: `gen-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -238,6 +241,8 @@ function GenerateImagePageContent() {
                     imageUrls: urls,
                     referenceImages: ip.referenceImages.length > 0 ? [...ip.referenceImages] : undefined,
                     templateId: ip.templateId,
+                    creationId: result.creationId ?? undefined,
+                    s3Urls: result.s3Urls,
                   };
                   dispatch(addGenerationToHistory(historyItem));
                   setImageUrls(urls);
@@ -300,6 +305,61 @@ function GenerateImagePageContent() {
     };
     fetchTemplates();
   }, [getToken]);
+
+  // Fetch persisted creations on mount and populate Redux history
+  useEffect(() => {
+    const fetchCreations = async () => {
+      if (!isSignedIn) return;
+      try {
+        const token = await getToken();
+        if (!token) return;
+        const creations = await getUserCreations(token);
+        if (creations.length === 0) return;
+
+        // Build history items from persisted creations
+        const historyItems: GenerationHistoryItem[] = creations.map((c) => {
+          const isVideo = c.mediaType === 'video';
+          return {
+            id: `persisted-${c.id}`,
+            creationId: c.id,
+            timestamp: new Date(c.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            prompt: c.prompt,
+            style: c.style,
+            aspectRatio: c.aspectRatio,
+            numberOfImages: c.numberOfImages,
+            imageSize: c.imageSize,
+            thinkingLevel: c.thinkingLevel,
+            quality: c.quality as 'Standard' | 'Premium',
+            mediaType: c.mediaType,
+            imageUrls: isVideo ? [] : c.s3Urls,
+            videoUrls: isVideo ? c.s3Urls : undefined,
+            duration: c.duration ?? undefined,
+            templateId: c.templateId,
+            referenceImages: c.referenceImages.length > 0 ? c.referenceImages : undefined,
+            s3Urls: c.s3Urls,
+          };
+        });
+
+        // Merge: only add items that don't already exist in history (by creationId)
+        dispatch((thunkDispatch, getState) => {
+          const existing = getState().imageEditor.history;
+          const existingIds = new Set(
+            existing.map((h) => h.creationId).filter(Boolean)
+          );
+          const newItems = historyItems.filter((h) => !existingIds.has(h.creationId));
+          if (newItems.length > 0) {
+            // Add them to the end (newest first from API, oldest creations at bottom)
+            newItems.forEach((item) => {
+              thunkDispatch(addGenerationToHistory(item));
+            });
+          }
+        });
+      } catch (err) {
+        console.error('Error fetching persisted creations:', err);
+      }
+    };
+    fetchCreations();
+  }, [isSignedIn, getToken, dispatch]);
 
   useEffect(() => {
     if (templates.length === 0 || initialSelectionDone.current) return;
@@ -387,7 +447,8 @@ function GenerateImagePageContent() {
 
     try {
       const token = await getToken().catch(() => undefined) || undefined;
-      const generatedUrls = await apiGenerateImages(params, token);
+      const result = await apiGenerateImages(params, token);
+      const generatedUrls = result.imageUrls;
       setImageUrls(generatedUrls);
 
       if (generatedUrls.length > 0) {
@@ -404,7 +465,9 @@ function GenerateImagePageContent() {
           mediaType: 'image',
           imageUrls: generatedUrls,
           referenceImages: params.referenceImages.length > 0 ? [...params.referenceImages] : undefined,
-          templateId: params.templateId
+          templateId: params.templateId,
+          creationId: result.creationId ?? undefined,
+          s3Urls: result.s3Urls,
         };
         dispatch(addGenerationToHistory(historyItem));
         toast.success(`Successfully generated ${generatedUrls.length} image(s)!`);
@@ -443,7 +506,9 @@ function GenerateImagePageContent() {
           imageUrls: [],
           videoUrls: result.videoUrls,
           duration: result.duration,
-          templateId: params.templateId
+          templateId: params.templateId,
+          creationId: result.creationId ?? undefined,
+          s3Urls: result.s3Urls,
         };
         dispatch(addGenerationToHistory(historyItem));
         toast.success("Video generated successfully!");

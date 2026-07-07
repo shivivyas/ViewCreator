@@ -9,7 +9,8 @@ import { s3Client } from '../services/s3-service.js';
 const router = Router();
 
 // Get All Templates Endpoint (with vote counts, pagination, and caching)
-router.get('/api/templates', requireAuth(), syncUserMiddleware, async (req, res) => {
+// No requireAuth — guests can browse templates freely
+router.get('/api/templates', syncUserMiddleware, async (req, res) => {
   try {
     const { userId } = getAuth(req);
     const limit = Math.min(parseInt(req.query.limit as string) || 100, 200);

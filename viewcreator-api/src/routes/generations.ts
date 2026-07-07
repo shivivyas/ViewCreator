@@ -8,28 +8,25 @@ import { checkCredits, deductCredits as deductForGeneration } from '../services/
 import { syncUserMiddleware } from '../middleware/auth-sync.js';
 import { uploadToS3, fetchS3ImageAsBase64 } from '../services/s3-service.js';
 import { generationRateLimiter, videoGenerationRateLimiter } from '../middleware/rate-limiter.js';
+import { validate, generateSchema, generateVideoSchema, editImageSchema, updateGenerationImagesSchema } from '../middleware/validate.js';
 
 const router = Router();
 
 // Image Generation Endpoint
-router.post('/api/generate', generationRateLimiter, requireAuth(), syncUserMiddleware, async (req, res): Promise<any> => {
+router.post('/api/generate', generationRateLimiter, validate(generateSchema), requireAuth(), syncUserMiddleware, async (req, res): Promise<any> => {
   try {
     const { 
       prompt, 
-      aspectRatio = '1:1',
-      imageSize = '1K',
-      numberOfImages = 1,
-      style = 'None',
-      quality = 'Standard',
-      thinkingLevel = 'minimal',
-      referenceImages = [],
-      personGeneration = 'DONT_ALLOW',
+      aspectRatio,
+      imageSize,
+      numberOfImages,
+      style,
+      quality,
+      thinkingLevel,
+      referenceImages,
+      personGeneration,
       templateId
     } = req.body;
-
-    if (!prompt) {
-      return res.status(400).json({ error: 'Prompt is required' });
-    }
 
     // ── Credit Check ───────────────────────────────────────────
     const { userId } = getAuth(req);
@@ -235,20 +232,9 @@ router.post('/api/generate', generationRateLimiter, requireAuth(), syncUserMiddl
 });
 
 // Video Generation Endpoint
-router.post('/api/generate/video', videoGenerationRateLimiter, requireAuth(), syncUserMiddleware, async (req, res): Promise<any> => {
+router.post('/api/generate/video', videoGenerationRateLimiter, validate(generateVideoSchema), requireAuth(), syncUserMiddleware, async (req, res): Promise<any> => {
   try {
-    const {
-      prompt,
-      aspectRatio = '16:9',
-      style = 'None',
-      quality = 'Standard',
-      duration = 6,
-      templateId
-    } = req.body;
-
-    if (!prompt) {
-      return res.status(400).json({ error: 'Prompt is required' });
-    }
+    const { prompt, aspectRatio, style, quality, duration, templateId } = req.body;
 
     // ── Credit Check ───────────────────────────────────────────
     const { userId } = getAuth(req);
@@ -487,7 +473,7 @@ router.delete('/api/generations', requireAuth(), syncUserMiddleware, async (req,
 });
 
 // Update creation images after editor save
-router.put('/api/generations/:id/images', requireAuth(), syncUserMiddleware, async (req, res): Promise<any> => {
+router.put('/api/generations/:id/images', validate(updateGenerationImagesSchema), requireAuth(), syncUserMiddleware, async (req, res): Promise<any> => {
   try {
     const { userId } = getAuth(req);
     const creationId = req.params.id;
@@ -499,10 +485,6 @@ router.put('/api/generations/:id/images', requireAuth(), syncUserMiddleware, asy
 
     if (!creationId) {
       return res.status(400).json({ error: 'Creation ID is required' });
-    }
-
-    if (!Array.isArray(newDataUris) || newDataUris.length === 0) {
-      return res.status(400).json({ error: 'imageUrls must be a non-empty array of data URIs' });
     }
 
     // Upload new images to S3
@@ -548,16 +530,9 @@ router.put('/api/generations/:id/images', requireAuth(), syncUserMiddleware, asy
  * This is distinct from /api/generate which always persists a new creation.
  * Credits are deducted at the EDIT rate (1 credit per edit).
  */
-router.post('/api/edit-image', requireAuth(), syncUserMiddleware, async (req, res): Promise<any> => {
+router.post('/api/edit-image', validate(editImageSchema), requireAuth(), syncUserMiddleware, async (req, res): Promise<any> => {
   try {
-    const { referenceImage, instruction, aspectRatio = '1:1' } = req.body;
-
-    if (!referenceImage) {
-      return res.status(400).json({ error: 'Reference image is required' });
-    }
-    if (!instruction || !instruction.trim()) {
-      return res.status(400).json({ error: 'Edit instruction is required' });
-    }
+    const { referenceImage, instruction, aspectRatio } = req.body;
 
     // ── Credit Check ───────────────────────────────────────────
     const { userId } = getAuth(req);

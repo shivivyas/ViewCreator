@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { PlanRepository, CreditRepository, WebhookEventRepository } from 'viewcreator-database';
 import { pool } from 'viewcreator-database';
+import { validate, grantCreditsSchema } from '../middleware/validate.js';
 
 const router = Router();
 

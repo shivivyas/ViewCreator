@@ -4,6 +4,7 @@ import { GoogleGenAI } from "@google/genai";
 import { TemplateRepository } from 'viewcreator-database';
 import { syncUserMiddleware } from '../middleware/auth-sync.js';
 import { fetchS3ImageAsBase64 } from '../services/s3-service.js';
+import { validate, analyzeTemplateSchema } from '../middleware/validate.js';
 
 const router = Router();
 
@@ -28,7 +29,7 @@ function trace(req: any, ...args: any[]) {
  * This is a FREE call — no credits are checked or deducted.
  * Results are cached in the template's config JSONB field.
  */
-router.post('/api/templates/analyze', requireAuth(), syncUserMiddleware, async (req, res): Promise<any> => {
+router.post('/api/templates/analyze', validate(analyzeTemplateSchema), requireAuth(), syncUserMiddleware, async (req, res): Promise<any> => {
   const { templateId } = req.body;
 
   // ╔══════════════════════════════════════════════════════════════╗
@@ -44,12 +45,7 @@ router.post('/api/templates/analyze', requireAuth(), syncUserMiddleware, async (
     // ╔══════════════════════════════════════════════════════════════╗
     // ║  STEP 1 — Validate input                                    ║
     // ╚══════════════════════════════════════════════════════════════╝
-    trace(req, 'STEP 1 — Validating input...');
-    if (!templateId) {
-      trace(req, 'STEP 1 ✖ FAILED: templateId missing');
-      return res.status(400).json({ error: 'templateId is required' });
-    }
-    trace(req, 'STEP 1 ✓ OK');
+    trace(req, 'STEP 1 — Validation passed (Zod)');
 
     // ╔══════════════════════════════════════════════════════════════╗
     // ║  STEP 2 — Fetch template from DB                           ║

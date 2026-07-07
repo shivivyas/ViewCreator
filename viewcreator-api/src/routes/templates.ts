@@ -5,6 +5,7 @@ import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { TemplateRepository, VoteRepository } from 'viewcreator-database';
 import { syncUserMiddleware } from '../middleware/auth-sync.js';
 import { s3Client } from '../services/s3-service.js';
+import { validate, uploadTemplateSchema } from '../middleware/validate.js';
 
 const router = Router();
 
@@ -87,23 +88,11 @@ router.post('/api/templates/:id/vote', requireAuth(), syncUserMiddleware, async 
 });
 
 // Upload Template Image to S3 and Save Reference Endpoint
-router.post('/api/templates/upload', requireAuth(), syncUserMiddleware, async (req, res): Promise<any> => {
+router.post('/api/templates/upload', validate(uploadTemplateSchema), requireAuth(), syncUserMiddleware, async (req, res): Promise<any> => {
   try {
     const { userId } = getAuth(req);
-    const { title, description, base64Image, base64Video, mediaType, tags = [], isPublic = false } = req.body;
-
-    if (!title) {
-      return res.status(400).json({ error: 'Title is required' });
-    }
-
+    const { title, description, base64Image, base64Video, mediaType, tags, isPublic } = req.body;
     const isVideo = mediaType === 'video';
-
-    if (!isVideo && !base64Image) {
-      return res.status(400).json({ error: 'base64Image content is required for image templates' });
-    }
-    if (isVideo && !base64Video) {
-      return res.status(400).json({ error: 'base64Video content is required for video templates' });
-    }
 
     const bucketName = process.env.AWS_S3_BUCKET;
     if (!bucketName) {

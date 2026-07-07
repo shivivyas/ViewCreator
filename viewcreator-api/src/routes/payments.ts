@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { getAuth, clerkClient } from '@clerk/express';
 import DodoPayments from 'dodopayments';
 import { PlanRepository, CreditRepository, SubscriptionRepository, WebhookEventRepository } from 'viewcreator-database';
+import { validate, createCheckoutSchema, confirmPurchaseSchema, deductCreditsSchema } from '../middleware/validate.js';
 
 const router = Router();
 
@@ -111,7 +112,7 @@ router.get('/api/payments/transactions', async (req, res) => {
  * Keeps user IDs and plan IDs out of browser URL params.
  * Auth required.
  */
-router.post('/api/payments/create-checkout', async (req, res) => {
+router.post('/api/payments/create-checkout', validate(createCheckoutSchema), async (req, res) => {
   try {
     const { userId } = getAuth(req);
     if (!userId) {
@@ -119,9 +120,6 @@ router.post('/api/payments/create-checkout', async (req, res) => {
     }
 
     const { plan_id, success_url, cancel_url } = req.body;
-    if (!plan_id) {
-      return res.status(400).json({ error: 'plan_id is required' });
-    }
 
     // Look up plan
     const plan = await PlanRepository.findById(plan_id);
@@ -181,7 +179,7 @@ router.post('/api/payments/create-checkout', async (req, res) => {
  *
  * Auth required.
  */
-router.post('/api/payments/confirm-purchase', async (req, res) => {
+router.post('/api/payments/confirm-purchase', validate(confirmPurchaseSchema), async (req, res) => {
   try {
     const { userId } = getAuth(req);
     if (!userId) {
@@ -189,9 +187,6 @@ router.post('/api/payments/confirm-purchase', async (req, res) => {
     }
 
     const { plan_id, idempotency_key } = req.body;
-    if (!plan_id) {
-      return res.status(400).json({ error: 'plan_id is required' });
-    }
 
     console.log('[Confirm Purchase] Request received', {
       userId,
@@ -286,7 +281,7 @@ function requireAdmin(req: any, res: any, next: any) {
   next();
 }
 
-router.post('/api/payments/deduct', requireAdmin, async (req, res) => {
+router.post('/api/payments/deduct', requireAdmin, validate(deductCreditsSchema), async (req, res) => {
   try {
     const userId = req.headers['x-user-id'] as string;
     if (!userId) {
@@ -294,10 +289,6 @@ router.post('/api/payments/deduct', requireAdmin, async (req, res) => {
     }
 
     const { amount, description, idempotency_key } = req.body;
-
-    if (!amount || typeof amount !== 'number' || amount <= 0) {
-      return res.status(400).json({ error: 'Invalid amount' });
-    }
 
     const result = await CreditRepository.deductWithIdempotency(
       userId,

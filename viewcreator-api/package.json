@@ -18,7 +18,8 @@
     "express": "^4.21.2",
     "express-rate-limit": "^8.5.2",
     "viewcreator-database": "file:../viewcreator-database",
-    "viewcreator-shared": "file:../viewcreator-shared"
+    "viewcreator-shared": "file:../viewcreator-shared",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",

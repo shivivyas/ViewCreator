@@ -6,10 +6,8 @@
  * for the cost model across the entire application (API, UI, tests).
  */
 export const CREDIT_COSTS = {
-  /** Standard quality image generation (default) */
+  /** Standard quality image generation */
   IMAGE_STANDARD: 1,
-  /** Premium quality image generation */
-  IMAGE_PREMIUM: 2,
   /** Video generation */
   VIDEO: 5,
   /** Image edit operation */

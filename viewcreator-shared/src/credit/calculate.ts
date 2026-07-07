@@ -16,26 +16,24 @@ export interface CreditCalculationResult {
 /**
  * Calculate the total credit cost for an image generation request.
  *
- * @param quality - 'Standard' (1 credit/image) or 'Premium' (2 credits/image)
+ * @param quality - Always 'Standard' (1 credit/image)
  * @param numberOfImages - How many images to generate (clamped to 1-4)
  * @returns The total credit cost
  *
  * @example
  * ```ts
- * calculateGenerationCost('Premium', 3) // → { total: 6, perUnit: 2, label: "2 credits × 3 images" }
- * calculateGenerationCost('Standard', 1) // → { total: 1, perUnit: 1, label: "1 credit × 1 image" }
+ * calculateGenerationCost(3) // → { total: 3, perUnit: 1, label: "1 credit × 3 images" }
+ * calculateGenerationCost(1) // → { total: 1, perUnit: 1, label: "1 credit × 1 image" }
  * ```
  */
 export function calculateGenerationCost(
-  quality: 'Standard' | 'Premium',
   numberOfImages: number
 ): CreditCalculationResult {
   const clampedCount = Math.min(
     Math.max(MIN_IMAGES_PER_REQUEST, numberOfImages),
     MAX_IMAGES_PER_REQUEST
   );
-  const costPerImage =
-    quality === 'Premium' ? CREDIT_COSTS.IMAGE_PREMIUM : CREDIT_COSTS.IMAGE_STANDARD;
+  const costPerImage = CREDIT_COSTS.IMAGE_STANDARD;
   const total = costPerImage * clampedCount;
 
   return {

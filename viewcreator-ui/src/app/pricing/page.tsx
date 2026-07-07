@@ -179,7 +179,7 @@ export default function PricingPage() {
             {[
               {
                 q: "How do credits work?",
-                a: "Each credit lets you generate one standard-quality image. Premium images cost 2 credits and videos cost 5 credits. When you buy 100 credits, they never expire.",
+                a: "Each credit lets you generate one standard-quality image. Videos cost 5 credits. When you buy 100 credits, they never expire.",
               },
               {
                 q: "Can I use credits across multiple projects?",

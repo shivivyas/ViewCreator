@@ -192,7 +192,7 @@ function GenerateImagePageContent() {
 
             const cost = pg.type === 'video'
               ? calculateVideoCost().total
-              : calculateGenerationCost('Standard', (pg.params as GenerateParams).numberOfImages).total;
+              : calculateGenerationCost((pg.params as GenerateParams).numberOfImages).total;
 
             if (balance >= cost) {
               toast.success('Credits confirmed. Starting generation...');
@@ -330,7 +330,7 @@ function GenerateImagePageContent() {
             numberOfImages: c.numberOfImages,
             imageSize: c.imageSize,
             thinkingLevel: c.thinkingLevel,
-            quality: c.quality as 'Standard' | 'Premium',
+            quality: c.quality as 'Standard',
             mediaType: c.mediaType,
             imageUrls: isVideo ? [] : c.s3Urls,
             videoUrls: isVideo ? c.s3Urls : undefined,
@@ -539,7 +539,7 @@ function GenerateImagePageContent() {
 
     // ── Credit Check ───────────────────────────────────────
     if (mediaType === 'image') {
-      const { total: cost } = calculateGenerationCost('Standard', numberOfImages);
+      const { total: cost } = calculateGenerationCost(numberOfImages);
       const hasCredits = await credit.checkCredits(cost);
       if (!hasCredits) {
         // Save form state for resume after purchase

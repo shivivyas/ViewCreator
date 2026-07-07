@@ -60,9 +60,6 @@ router.post('/api/generate', generationRateLimiter, requireAuth(), syncUserMiddl
     if (style !== 'None') {
       finalPrompt += `\n\nStyle: ${style}.`;
     }
-    if (quality === 'Premium') {
-      finalPrompt += `\n\nQuality: Ultra high quality, 4k resolution, photorealistic, highly detailed, masterpiece, professional marketing asset.`;
-    }
 
     // Build the contents array
     const contents: any[] = [finalPrompt];
@@ -279,9 +276,6 @@ router.post('/api/generate/video', videoGenerationRateLimiter, requireAuth(), sy
     let finalPrompt = prompt;
     if (style !== 'None') {
       finalPrompt += `\n\nStyle: ${style}.`;
-    }
-    if (quality === 'Premium') {
-      finalPrompt += `\n\nQuality: Ultra high quality, 4k resolution, cinematic, highly detailed, professional production.`;
     }
 
     const contents: any[] = [finalPrompt];

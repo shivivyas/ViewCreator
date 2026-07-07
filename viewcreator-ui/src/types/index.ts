@@ -16,7 +16,7 @@ export interface GenerationHistoryItem {
   numberOfImages: number;
   imageSize: string;
   thinkingLevel: string;
-  quality: 'Standard' | 'Premium';
+  quality: 'Standard';
   mediaType: MediaType;
   imageUrls: string[];
   videoUrls?: string[];
@@ -106,7 +106,7 @@ export interface GenerateParams {
   numberOfImages: number;
   imageSize: string;
   thinkingLevel: string;
-  quality: 'Standard' | 'Premium';
+  quality: 'Standard';
   referenceImages: string[];
   templateId: string | null;
 }
@@ -115,7 +115,7 @@ export interface GenerateVideoParams {
   prompt: string;
   style: string;
   aspectRatio: string;
-  quality: 'Standard' | 'Premium';
+  quality: 'Standard';
   duration: number;
   templateId: string | null;
 }

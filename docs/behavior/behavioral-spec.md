@@ -307,7 +307,7 @@
 
 | Issue | Priority | File(s) |
 |-------|----------|---------|
-| Remove "Premium" quality tier from codebase (only Standard, 1 credit/image) | High | UI components, types, API routes, shared package |
+| Remove "Premium" quality tier from codebase (only Standard, 1 credit/image) | ✅ Complete |
 | Credit gate modal text may need updating | Medium | Credit gate modal component |
 | Guest "Sign in to generate" button aria-disabled | Medium | Generate form component |
 

@@ -15,10 +15,11 @@ import {
   Info,
   Palette,
 } from "lucide-react";
-import type { Template } from "@/types";
+import type { Template, TemplateAnalysis } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { generateImages } from "@/services/api/generation-service";
+import { analyzeTemplate } from "@/services/api/analysis-service";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -94,6 +95,14 @@ export function TemplateDetailModal({
   const [generationStep, setGenerationStep] = useState(0);
   const generationTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // ── AI Analysis (free — no credits consumed) ────────────────
+  const [analysis, setAnalysis] = useState<TemplateAnalysis | null>(
+    template?.config?.aiAnalysis ?? null
+  );
+  const [analysisLoading, setAnalysisLoading] = useState(
+    !template?.config?.aiAnalysis
+  );
+
   useEffect(() => {
     if (modalState !== "generating") {
       const raf = requestAnimationFrame(() => setGenerationStep(0));
@@ -118,6 +127,39 @@ export function TemplateDetailModal({
       if (generationTimerRef.current) clearInterval(generationTimerRef.current);
     };
   }, [modalState]);
+
+  // ── Trigger AI analysis on mount (if not already cached) ──
+  useEffect(() => {
+    if (!template) return;
+
+    // If already cached in config, no need to fetch
+    if (template.config?.aiAnalysis) {
+      setAnalysis(template.config.aiAnalysis);
+      setAnalysisLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setAnalysisLoading(true);
+
+    (async () => {
+      try {
+        const token = (await getToken().catch(() => undefined)) || undefined;
+        const result = await analyzeTemplate(template.id, token);
+        if (!cancelled) {
+          setAnalysis(result.analysis);
+          setAnalysisLoading(false);
+        }
+      } catch (err) {
+        console.warn("[TemplateModal] AI analysis failed (non-blocking):", err);
+        if (!cancelled) {
+          setAnalysisLoading(false);
+        }
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [template?.id, getToken]);
 
   if (!template) return null;
 
@@ -258,18 +300,29 @@ export function TemplateDetailModal({
 
         <h2 className="text-lg font-bold mb-3">{template.title}</h2>
 
-        {/* Works well for */}
+        {/* Works well for — AI-powered analysis */}
         <div className="space-y-1.5">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
             Works well for
+            {analysisLoading && (
+              <span className="size-2.5 rounded-full bg-muted-foreground/30 animate-pulse" />
+            )}
           </p>
           <div className="grid grid-cols-2 gap-x-3 gap-y-1">
-            {["Restaurants", "Product launches", "Seasonal offers", "Ecommerce", "Promotions", "Social media"].map((use) => (
-              <span key={use} className="text-[11px] text-muted-foreground flex items-center gap-1.5">
-                <span className="size-1 rounded-full bg-green-400 shrink-0" />
-                {use}
-              </span>
-            ))}
+            {analysisLoading ? (
+              <>
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <span key={i} className="h-3.5 w-20 bg-muted rounded animate-pulse" />
+                ))}
+              </>
+            ) : (
+              (analysis?.worksWellFor ?? ["Restaurants", "Product launches", "Seasonal offers", "Ecommerce", "Promotions", "Social media"]).slice(0, 8).map((use) => (
+                <span key={use} className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+                  <span className="size-1 rounded-full bg-green-400 shrink-0" />
+                  {use}
+                </span>
+              ))
+            )}
           </div>
         </div>
 
@@ -303,7 +356,14 @@ export function TemplateDetailModal({
       <div className="flex items-center gap-2">
         <span className="text-base">{template.media_type === "video" ? "🎬" : "🎨"}</span>
         <p className="text-xs font-semibold text-foreground">
-          You&apos;re creating from: <span className="text-primary">{template.title}</span>
+          You&apos;re creating from:{" "}
+          {analysisLoading ? (
+            <span className="inline-block h-3.5 w-32 bg-muted-foreground/20 rounded animate-pulse align-middle" />
+          ) : (
+            <span className="text-primary">
+              {analysis?.title || template.title}
+            </span>
+          )}
         </p>
       </div>
       <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[11px]">
@@ -311,17 +371,33 @@ export function TemplateDetailModal({
           <p className="font-medium text-emerald-600 mb-1 flex items-center gap-1">
             <Info className="size-3" /> The AI will preserve
           </p>
-          <p className="text-muted-foreground pl-4">✓ Layout</p>
-          <p className="text-muted-foreground pl-4">✓ Typography style</p>
-          <p className="text-muted-foreground pl-4">✓ Overall aesthetic</p>
+          {analysisLoading ? (
+            <div className="space-y-1.5 pl-4">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <p key={i} className="h-3 bg-muted rounded animate-pulse w-3/4" />
+              ))}
+            </div>
+          ) : (
+            (analysis?.preserves ?? ["Layout", "Typography style", "Overall aesthetic"]).map((item) => (
+              <p key={item} className="text-muted-foreground pl-4">✓ {item}</p>
+            ))
+          )}
         </div>
         <div>
           <p className="font-medium text-primary mb-1 flex items-center gap-1">
             <Palette className="size-3" /> The AI will customize
           </p>
-          <p className="text-muted-foreground pl-4">✓ Product / content</p>
-          <p className="text-muted-foreground pl-4">✓ Text & copy</p>
-          <p className="text-muted-foreground pl-4">✓ Colors & branding</p>
+          {analysisLoading ? (
+            <div className="space-y-1.5 pl-4">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <p key={i} className="h-3 bg-muted rounded animate-pulse w-2/3" />
+              ))}
+            </div>
+          ) : (
+            (analysis?.customizes ?? ["Product / content", "Text & copy", "Colors & branding"]).map((item) => (
+              <p key={item} className="text-muted-foreground pl-4">✓ {item}</p>
+            ))
+          )}
         </div>
       </div>
     </div>

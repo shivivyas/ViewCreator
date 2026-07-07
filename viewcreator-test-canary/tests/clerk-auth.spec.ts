@@ -29,6 +29,8 @@
 import { test, expect } from "@playwright/test";
 import { signInUser, deleteClerkUser } from "./auth-helpers";
 
+const API_BASE = "http://localhost:3001";
+
 // ── Fresh User (0 credits) — signed in via Clerk UI ─────────────────────────
 
 test.describe("Clerk: Fresh User (0 credits)", () => {

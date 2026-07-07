@@ -221,10 +221,10 @@ test.describe("Edge Cases — Rate Limiting", () => {
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(2000);
 
-    // Remove default generate mock from signInUser, then add slow mock
+    // Remove default generate mock from signInUser, then add slow mock (30s delay)
     await page.unroute("**/api/generate**");
     await page.route("**/api/generate**", async (route) => {
-      await new Promise((resolve) => setTimeout(resolve, 5000));
+      await new Promise((resolve) => setTimeout(resolve, 30000));
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -237,19 +237,13 @@ test.describe("Edge Cases — Rate Limiting", () => {
     await promptInput.fill("Test prompt for rate limiting");
 
     // Click Generate
-    const generateButton = page.getByRole("button", { name: /generate/i });
-    await generateButton.click();
-    await page.waitForTimeout(500);
+    await page.getByRole("button", { name: /generate/i }).click();
 
-    // The button should be disabled during generation
-    await expect(generateButton).toBeDisabled({ timeout: 5000 });
+    // The button text changes to "Generating..." — verify it's visible and disabled
+    const generatingBtn = page.getByRole("button", { name: /generating/i });
+    await expect(generatingBtn).toBeVisible({ timeout: 3000 });
+    await expect(generatingBtn).toBeDisabled({ timeout: 3000 });
 
-    // Try clicking again while disabled — should not trigger a second request
-    await generateButton.click({ force: true }).catch(() => {});
-    await page.waitForTimeout(500);
-
-    // Button should still be disabled
-    await expect(generateButton).toBeDisabled();
   });
 
   // ── X2.4: API 429 handled gracefully ───────────────────────

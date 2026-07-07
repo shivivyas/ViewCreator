@@ -141,9 +141,9 @@ test.describe("Navigation — Signed-In (Clerk)", () => {
     const historyLink = page.getByRole("link", { name: /history/i });
     await expect(historyLink).toBeVisible();
 
-    // Credit badge in header
+    // Credit badge in header — multiple /pricing links exist, use .first()
     const header = page.locator("header");
-    const badgeLink = header.locator('a[href="/pricing"]');
+    const badgeLink = header.locator('a[href="/pricing"]').first();
     await expect(badgeLink).toBeVisible({ timeout: 5000 });
   });
 
@@ -178,9 +178,9 @@ test.describe("Navigation — Signed-In (Clerk)", () => {
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(2000);
 
-    // Credit badge is a Link to /pricing in the header
+    // Credit badge is a Link to /pricing in the header — use .first() due to multiple /pricing links
     const header = page.locator("header");
-    const badgeLink = header.locator('a[href="/pricing"]');
+    const badgeLink = header.locator('a[href="/pricing"]').first();
     await expect(badgeLink).toBeVisible({ timeout: 5000 });
 
     // Verify href attribute is correct — navigate directly to test

@@ -249,6 +249,9 @@ test.describe("Generate Page — Purchase Flow (Clerk)", () => {
   // ── 24. Post-purchase redirect restores form ────────────────
 
   test("post-purchase redirect restores form", async ({ page }) => {
+    // Refresh Clerk testing token (may have expired after many preceding auth tests)
+    await setupClerkTestingToken({ page });
+
     // Create a credit user with balance so the resume flow doesn't hit the gate
     const { userId } = await signInUser(page, { grantCredits: 100 });
     clerkUserIds.push(userId);

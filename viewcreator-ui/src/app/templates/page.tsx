@@ -14,13 +14,10 @@ import {
   ThumbsUp,
   Trash2,
   Grid3X3,
-  Zap,
 } from "lucide-react";
 
 import { getTemplates, uploadTemplate, deleteTemplate, voteTemplate } from "@/services/api/template-service";
-import { getBalance, createCheckoutSession, getPlans } from "@/services/api/payment-service";
-import { calculateTemplateUploadCost } from "viewcreator-shared";
-import type { Template, MediaType, SubscriptionPlan } from "@/types";
+import type { Template, MediaType } from "@/types";
 import { Button } from "@/components/ui/button";
 import { TemplateDetailModal } from "@/components/templates/template-detail-modal";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -271,13 +268,6 @@ export default function TemplatesPage() {
   const [isPublic, setIsPublic] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
 
-  // Credit gate states
-  const [showCreditModal, setShowCreditModal] = useState(false);
-  const [creditModalLoading, setCreditModalLoading] = useState(false);
-  const [creditPacks, setCreditPacks] = useState<SubscriptionPlan[]>([]);
-  const [userBalance, setUserBalance] = useState<number | null>(null);
-  const UPLOAD_CREDIT_COST = calculateTemplateUploadCost().total;
-
   // Detail modal state
   const [viewTemplate, setViewTemplate] = useState<Template | null>(null);
 
@@ -327,65 +317,6 @@ export default function TemplatesPage() {
   useEffect(() => {
     fetchTemplates();
   }, [fetchTemplates]);
-
-  // Handle post-purchase redirect from Dodo Payments
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("checkout") === "success") {
-      // Clean URL
-      const url = new URL(window.location.href);
-      url.searchParams.delete("checkout");
-      url.searchParams.delete("plan");
-      url.searchParams.delete("status");
-      url.searchParams.delete("subscription_id");
-      url.searchParams.delete("email");
-      window.history.replaceState({}, "", url.toString());
-
-      toast.success("Purchase successful! Confirming credits...");
-      window.dispatchEvent(new CustomEvent("payment-updated"));
-
-      const confirmCredits = async () => {
-        const token = await getToken();
-        if (!token) return;
-        const storedPlanId = sessionStorage.getItem("pending_plan_id");
-        const storedKey = sessionStorage.getItem("pending_idempotency_key") || undefined;
-        if (storedPlanId) {
-          try {
-            const body: Record<string, any> = { plan_id: storedPlanId };
-            if (storedKey) body.idempotency_key = storedKey;
-            await fetch(
-              `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"}/api/payments/confirm-purchase`,
-              {
-                method: "POST",
-                headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-                body: JSON.stringify(body),
-              }
-            );
-            sessionStorage.removeItem("pending_plan_id");
-            sessionStorage.removeItem("pending_idempotency_key");
-            toast.success("Credits added!");
-
-            // Restore pending upload state
-            const pending = sessionStorage.getItem("pending_upload");
-            if (pending) {
-              const state = JSON.parse(pending);
-              setUploadTitle(state.title || "");
-              setUploadDescription(state.description || "");
-              setUploadTagsInput(state.tags || "");
-              setIsPublic(state.isPublic ?? true);
-              setUploadFileType(state.fileType || "image");
-              setPreviewImage(state.preview || null);
-              setShowUploadModal(true);
-              sessionStorage.removeItem("pending_upload");
-            }
-          } catch {
-            toast.error("Failed to confirm purchase. Please contact support.");
-          }
-        }
-      };
-      confirmCredits();
-    }
-  }, [getToken]);
 
   const { categories } = useMemo(() => {
     const tags = Array.from(
@@ -499,41 +430,9 @@ export default function TemplatesPage() {
     processFile(e.dataTransfer.files?.[0]);
   };
 
-  /**
-   * Check the user's credit balance and show the credit gate modal if insufficient.
-   * Returns true if sufficient, false if the credit gate was shown.
-   */
-  const checkCreditsForUpload = useCallback(async (): Promise<boolean> => {
-    const token = await getToken().catch(() => undefined);
-    if (!token) return false;
-
-    try {
-      const status = await getBalance(token);
-      const balance = status.credits?.balance ?? 0;
-      setUserBalance(balance);
-
-      if (balance < UPLOAD_CREDIT_COST) {
-        // Fetch credit packs for the purchase buttons
-        const plans = await getPlans();
-        setCreditPacks(plans.creditPacks);
-        setShowCreditModal(true);
-        return false;
-      }
-
-      return true;
-    } catch {
-      // If balance check fails, allow the upload to proceed
-      return true;
-    }
-  }, [getToken, UPLOAD_CREDIT_COST]);
-
   const handleUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!previewImage || !uploadTitle) return;
-
-    // Check credits before uploading
-    const hasCredits = await checkCreditsForUpload();
-    if (!hasCredits) return;
 
     setUploading(true);
     try {
@@ -887,14 +786,6 @@ export default function TemplatesPage() {
                 />
               </div>
 
-              {/* Credit cost indicator */}
-              <div className="flex items-center gap-2 rounded-xl bg-muted/50 border border-border/50 px-3.5 py-2.5">
-                <Zap className="size-4 text-amber-500 shrink-0" />
-                <span className="text-xs text-muted-foreground">
-                  Uploading costs <strong className="text-foreground">{UPLOAD_CREDIT_COST} credit{UPLOAD_CREDIT_COST !== 1 ? "s" : ""}</strong>
-                </span>
-              </div>
-
               <Button
                 type="submit"
                 className="w-full h-10 rounded-xl"
@@ -906,7 +797,7 @@ export default function TemplatesPage() {
                     Uploading...
                   </>
                 ) : (
-                  `Upload — ${UPLOAD_CREDIT_COST} credit${UPLOAD_CREDIT_COST !== 1 ? "s" : ""}`
+                  "Upload Template"
                 )}
               </Button>
             </form>
@@ -942,96 +833,6 @@ export default function TemplatesPage() {
           setTemplateToDelete(null);
         }}
       />
-
-      {/* ── Credit Gate Modal ──────────────────────────────────── */}
-      {showCreditModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-card w-full max-w-md rounded-2xl shadow-xl border border-border/50 overflow-hidden">
-            <div className="flex items-center justify-between p-5 border-b border-border/50">
-              <div className="flex items-center gap-3">
-                <div className="size-9 rounded-xl bg-amber-500/10 flex items-center justify-center">
-                  <Zap className="size-5 text-amber-500" />
-                </div>
-                <div>
-                  <h2 className="font-semibold text-base">Insufficient Credits</h2>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    You need {UPLOAD_CREDIT_COST} credit{UPLOAD_CREDIT_COST !== 1 ? "s" : ""} to upload a template
-                  </p>
-                </div>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setShowCreditModal(false)}
-                className="h-8 w-8 rounded-full"
-              >
-                <X className="size-4" />
-              </Button>
-            </div>
-            <div className="p-5 space-y-4">
-              <div className="rounded-xl bg-muted/50 border border-border/50 p-3.5">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Your balance</span>
-                  <span className="font-semibold tabular-nums">{userBalance ?? 0} credits</span>
-                </div>
-                <div className="flex items-center justify-between text-sm mt-2">
-                  <span className="text-muted-foreground">Required</span>
-                  <span className="font-semibold tabular-nums text-amber-500">{UPLOAD_CREDIT_COST} credit{UPLOAD_CREDIT_COST !== 1 ? "s" : ""}</span>
-                </div>
-              </div>
-
-              <p className="text-xs text-muted-foreground text-center">
-                Purchase credits to continue uploading templates
-              </p>
-
-              {creditPacks.map((pack) => (
-                <Button
-                  key={pack.id}
-                  className="w-full h-11 rounded-xl justify-between px-4"
-                  variant={creditPacks.length === 1 ? "default" : "outline"}
-                  disabled={creditModalLoading}
-                  onClick={async () => {
-                    setCreditModalLoading(true);
-                    try {
-                      const token = await getToken();
-                      if (!token) return;
-                      const { checkout_url } = await createCheckoutSession(
-                        pack.id,
-                        token,
-                        window.location.href
-                      );
-                      // Save upload state so user can resume after purchase
-                      sessionStorage.setItem("pending_plan_id", pack.id);
-                      sessionStorage.setItem(
-                        "pending_idempotency_key",
-                        `tpl-upload-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-                      );
-                      sessionStorage.setItem(
-                        "pending_upload",
-                        JSON.stringify({
-                          title: uploadTitle,
-                          description: uploadDescription,
-                          tags: uploadTagsInput,
-                          isPublic,
-                          fileType: uploadFileType,
-                          preview: previewImage,
-                        })
-                      );
-                      window.location.href = checkout_url;
-                    } catch {
-                      toast.error("Failed to initiate purchase.");
-                      setCreditModalLoading(false);
-                    }
-                  }}
-                >
-                  <span className="text-sm font-medium">Buy {pack.name}</span>
-                  <span className="text-sm font-semibold tabular-nums">{pack.display_price}</span>
-                </Button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

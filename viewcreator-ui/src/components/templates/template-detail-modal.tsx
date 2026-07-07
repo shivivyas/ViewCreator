@@ -613,17 +613,24 @@ export function TemplateDetailModal({
                   <span className="text-[10px] font-medium text-white">
                     {VARIATION_LABELS[i] || `#${i + 1}`}
                   </span>
-                  <button
-                    type="button"
+                  <span
                     onClick={(e) => {
                       e.stopPropagation();
                       handleDownload(url, i);
                     }}
-                    className="size-6 rounded-full bg-white/90 flex items-center justify-center hover:bg-white transition-colors"
+                    className="size-6 rounded-full bg-white/90 flex items-center justify-center hover:bg-white transition-colors cursor-pointer"
                     title="Download"
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.stopPropagation();
+                        handleDownload(url, i);
+                      }
+                    }}
                   >
                     <Download className="size-3 text-black" />
-                  </button>
+                  </span>
                 </div>
               </button>
             );

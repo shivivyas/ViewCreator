@@ -43,7 +43,7 @@
 
 | Property | Value |
 |----------|-------|
-| Credit cost | **0 credits** (FREE) — credit check must be removed from code |
+| Credit cost | **0 credits** (FREE) |
 | File types | Images (PNG, JPEG) + Videos (MP4) |
 | Image size limit | 10MB |
 | Video size limit | 100MB |
@@ -308,7 +308,6 @@
 | Issue | Priority | File(s) |
 |-------|----------|---------|
 | Remove "Premium" quality tier from codebase (only Standard, 1 credit/image) | High | UI components, types, API routes, shared package |
-| Remove upload credit cost (upload should be free) | High | `templates/page.tsx` — remove `checkCreditsForUpload()` call |
 | Credit gate modal text may need updating | Medium | Credit gate modal component |
 | Guest "Sign in to generate" button aria-disabled | Medium | Generate form component |
 

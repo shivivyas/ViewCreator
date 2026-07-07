@@ -112,12 +112,50 @@ FirstMate integrated into all agent files. Director is now First Mate. All speci
 
 ---
 
-## 2026-07-06 — Credit payment system: E2E testing, deduction API, test architecture
+## 2026-07-08 — Codebase simplification sprint (7 items)
 
 ### Agent
-Director (First Mate)
+Director (First Mate) + Builder
 
 ### Skill
+code-simplification
+
+### Summary
+Completed 7 simplification items from the engineering polish plan across both API and UI packages.
+
+**Backend (viewcreator-api):**
+- **Removed `credit-guard.ts`** — 9-line re-export shim deleted; 2 imports updated to point directly to `credit-service.ts` or `viewcreator-shared`
+- **Rate limiter factory** — Two identical rate limiters replaced with `createRateLimiter(max, label)` factory (-15 lines)
+- **Static imports** — 2 dynamic imports (`await import('@clerk/express')`, `await import('dodopayments')`) replaced with top-level static imports in `payments.ts`
+- **Workspace protocol consistency** — `viewcreator-shared` changed from `workspace:*` to `file:../viewcreator-shared` to match the database package
+
+**Frontend (viewcreator-ui):**
+- **History item factory** — `buildHistoryItem()` function replaces 4 identical `GenerationHistoryItem` constructions across the generate page (was 2 image + 2 video, now 1 function)
+- **`usePostPurchaseResume` hook** — Extracted ~150 lines of post-purchase resume flow from `generate/page.tsx` into a standalone, testable hook at `hooks/use-post-purchase-resume.ts`. The page provides an `onGenerate` callback; the hook owns URL parsing, credit granting, balance polling
+- **Dependency bucket fix** — Moved `svix` and `@dodopayments/nextjs` from `devDependencies` to `dependencies` (both used at runtime)
+
+**Key metrics:**
+- `generate/page.tsx`: 758 → 599 lines (-21%)
+- 1 new file, 1 deleted file, 8 modified files
+- Both packages type-check clean (`tsc --noEmit`)
+- All 7 changes committed in one commit on `main` and pushed to GitHub
+
+### Decisions Made
+- Post-purchase flow belongs in its own hook, not inline in the page
+- `onGenerate` callback pattern keeps the hook decoupled from page-specific state
+- Use `file:` protocol consistently for workspace deps (avoids `gpkg` Airlock issues)
+
+### Artifacts Produced
+- `viewcreator-ui/src/hooks/use-post-purchase-resume.ts` (new)
+- `viewcreator-api/src/middleware/credit-guard.ts` (deleted)
+- `viewcreator-api/src/middleware/rate-limiter.ts` (refactored)
+- `viewcreator-ui/src/app/generate/page.tsx` (simplified)
+- `.gitignore` (added `.playwright-mcp/` and `no-mistakes/`)
+
+### State At End
+All 7 simplification items complete. Codebase is leaner. `generate/page.tsx` is 21% smaller. Ready for next task — remaining P1 items (Zod validation, loading boundaries, proxy coverage, template cache invalidation) or test coverage (P2).
+
+---
 none
 
 ### Summary

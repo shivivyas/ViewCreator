@@ -128,6 +128,38 @@ Adopt **firstmate** (vendored at `firstmate/`) as the agent orchestration layer.
 Simple starting point. The cost system is configurable by design (`CREDIT_COSTS` constant) so it can become model-priced later without rewriting the engine.
 
 ### Decided By
+
+---
+
+## 2026-07-08: Post-purchase flow belongs in its own hook
+
+### Context
+The generate page's post-purchase resume flow (~150 lines) was deeply embedded in a `useEffect`, tightly coupled to page state setters, and untestable.
+
+### Decision
+Extract into `usePostPurchaseResume` hook. The hook owns: URL param detection, credit granting, balance polling, and webhook race handling. The page provides an `onGenerate(pg)` callback that only handles restoring its own form state and calling the generation API.
+
+### Rationale
+- Hook is independently testable (no page state required)
+- `onGenerate` callback keeps a clean separation boundary — hook doesn't need to know about form state
+- Credit gate hook (`useCreditGate`) no longer exposes raw `setShowModal`/`setPendingGenerate` to the page for post-purchase — the new hook owns those internally
+- `PendingGenerate` type is defined once in `use-post-purchase-resume.ts` and imported by `use-credit-gate.ts` (was duplicated)
+
+---
+
+## 2026-07-08: Consistent workspace dependency protocol
+
+### Context
+`viewcreator-api/package.json` used `workspace:*` for `viewcreator-shared` but `file:../viewcreator-database` for the database package. The `workspace:*` protocol is a pnpm convention that npm tolerates via the lockfile, but fails on `npm install` through the corporate `gpkg` Airlock proxy.
+
+### Decision
+Use `file:` protocol consistently for all local workspace dependencies across all packages.
+
+### Rationale
+- `file:` works with all npm/pnpm/yarn configurations
+- No dependency on lockfile resolution for protocol support
+- Consistent across all 3 inter-package references
+- Prevents install failures in restricted environments
 {{agency-grill / agency-spec / agency-handoff / agency-review / agency-retro / client}}
 
 ### Reopens?

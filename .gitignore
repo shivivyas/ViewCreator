@@ -28,6 +28,12 @@ node_modules
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Playwright MCP artifacts
+.playwright-mcp/
+
+# Embedded tools (not project source)
+no-mistakes/
 .pnpm-debug.log*
 
 # env files (can opt-in for committing if needed)

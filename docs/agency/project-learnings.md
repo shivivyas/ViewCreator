@@ -127,6 +127,28 @@ Builder (implementation), Reviewer (test verification)
 
 ---
 
+## 2026-07-08: Codebase simplification patterns
+
+### Context
+When refactoring a Next.js + Express monorepo for clarity and maintainability.
+
+### The Pattern
+1. **Dead re-export wrappers** — If a file only re-exports from another file with an alias, delete it and update the 1-2 imports. The "backward compat" argument doesn't hold in a codebase that has no consuming packages.
+2. **Rate limiter factory** — When rate limiters differ only in `max` and label, extract a factory. This eliminates 100% of the copy-paste.
+3. **Dynamic import → static** — Dynamic `await import()` inside route handlers is a premature optimization for server code. The module is loaded at startup anyway. Use top-level static imports instead.
+4. **History item factory** — When the same 15-field object is constructed in 4 places with slight variations, extract a factory. The factory encodes the variation logic once.
+5. **Post-purchase flow → hook** — Any useEffect that orchestrates a multi-step flow (detect URL param → API call → poll → callback) should be a hook. The page provides callbacks for the parts that touch its state; the hook owns the orchestration.
+6. **Dependency bucket audit** — Every time you add a dependency, ask: "Is this imported at runtime?" If yes, it goes in `dependencies`, not `devDependencies`. Run `grep -r "from 'package'" src/` to verify.
+7. **Workspace protocol** — In npm workspaces, use `file:` protocol for local deps, not `workspace:*`. The latter is pnpm-specific and causes issues with corporate proxy tools.
+
+### Evidence
+All 7 patterns applied in one session. Both packages type-check clean. 21% reduction in the largest page file.
+
+### Applied By
+Builder (any agent refactoring the codebase)
+
+---
+
 ## 2026-07-06: Behavioral spec battles via Lavish interactive artifacts
 
 ### Context

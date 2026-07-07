@@ -476,6 +476,74 @@ test.describe("Templates — Auth-Gated Actions (Clerk)", () => {
     // Use force:true to bypass overlay interception
     await expect(page.getByText("Summer Sale").first()).toBeVisible();
   });
+
+  // ── 18. Delete button opens confirm dialog (not detail modal) ──
+
+  test("delete button opens confirm dialog, not detail modal", async ({ page }) => {
+    const { userId } = await signInUser(page);
+    clerkUserIds.push(userId);
+
+    // Create a mock template owned by this user
+    const myTemplate: Template = {
+      id: "tmpl-delete-test",
+      title: "Delete Test Template",
+      description: "Template owned by current user",
+      media_type: "image",
+      s3_link: "https://placehold.co/400x500?text=Delete+Test",
+      upvotes: 0,
+      user_upvoted: false,
+      user_id: userId,
+      created_at: new Date().toISOString(),
+      config: {
+        stylePreset: "Modern",
+        aspectRatio: "1:1",
+        category: "Test",
+        tags: ["test"],
+      },
+    };
+
+    await mockTemplatesEndpoint(page as any, [myTemplate, ...MOCK_TEMPLATES]);
+
+    await page.goto("/templates");
+    await page.waitForLoadState("networkidle");
+    await expect(page.getByText("Delete Test Template").first()).toBeVisible({ timeout: 10000 });
+
+    // The delete button (Trash2) is only visible on hover for owned templates
+    // Use force:true to bypass the CSS hover overlay
+    const templateCard = page.getByText("Delete Test Template").first();
+    await templateCard.hover({ force: true });
+    await page.waitForTimeout(500);
+
+    // Click the trash/delete button — it's the icon-only button inside the card's hover overlay
+    // The Trash2 icon renders a specific SVG path. Use the absolute positioned container.
+    await page.evaluate((title) => {
+      // Find the template card by its heading text
+      const headings = document.querySelectorAll('h3');
+      for (const h3 of headings) {
+        if (h3.textContent?.includes(title)) {
+          // Walk up to the card container
+          const card = h3.closest('[class*="group"]');
+          if (card) {
+            // Find the trash button inside
+            const trashBtn = card.querySelector('button svg[class*="size"]')?.closest('button');
+            if (trashBtn) {
+              (trashBtn as HTMLButtonElement).click();
+            }
+          }
+        }
+      }
+    }, "Delete Test Template");
+    await page.waitForTimeout(1000);
+
+    // Assert: the delete confirm dialog opened (NOT the detail modal)
+    await expect(
+      page.getByText(/Are you sure you want to delete/i)
+    ).toBeVisible({ timeout: 5000 });
+
+    // Assert: the detail modal did NOT open (no "Generate from this template" heading)
+    const detailModalHeading = page.getByText(/Generate from this template/i);
+    await expect(detailModalHeading).not.toBeVisible();
+  });
 });
 
 // ── Template Visibility ────────────────────────────────────────────────────

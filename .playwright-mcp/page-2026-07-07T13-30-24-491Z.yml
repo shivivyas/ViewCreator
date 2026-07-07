@@ -1,0 +1,43 @@
+- generic [active] [ref=f5e1]:
+  - generic [ref=f5e2]:
+    - banner [ref=f5e3]:
+      - generic [ref=f5e4]:
+        - link "V ViewCreator" [ref=f5e5] [cursor=pointer]:
+          - /url: /
+          - generic [ref=f5e6]: V
+          - generic [ref=f5e7]: ViewCreator
+        - navigation [ref=f5e8]:
+          - link "Features" [ref=f5e9] [cursor=pointer]:
+            - /url: /#features
+          - link "How it works" [ref=f5e10] [cursor=pointer]:
+            - /url: /#workflow
+          - link "Platforms" [ref=f5e11] [cursor=pointer]:
+            - /url: /#platforms
+          - link "Pricing" [ref=f5e12] [cursor=pointer]:
+            - /url: /pricing
+        - generic [ref=f5e13]:
+          - button "Switch to dark theme" [ref=f5e14]:
+            - img
+          - button "Sign in" [ref=f5e15]
+          - button "Sign up" [ref=f5e16]
+    - generic [ref=f5e18]:
+      - generic [ref=f5e21]:
+        - generic [ref=f5e22]:
+          - img [ref=f5e24]
+          - heading "Templates" [level=1] [ref=f5e26]
+        - generic [ref=f5e27]:
+          - img
+          - textbox "Search templates..." [ref=f5e28]
+        - combobox [ref=f5e29]:
+          - generic [ref=f5e30]: recent
+          - img: ▼
+        - textbox [ref=f5e31]: recent
+        - button "Upload" [ref=f5e32]:
+          - img
+          - generic [ref=f5e33]: Upload
+      - button "All" [ref=f5e36]
+      - img [ref=f5e39]
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f5e46] [cursor=pointer]:
+    - img [ref=f5e47]
+  - alert [ref=f5e50]

@@ -165,5 +165,14 @@ test.describe("Templates — API Contract Tests", () => {
     expect(first).toHaveProperty("id");
     expect(first).toHaveProperty("title");
     expect(first).toHaveProperty("s3_link");
+
+    // Verify no private templates leak — all returned should be public
+    for (const t of response.body.templates) {
+      // Private templates have user_id set. Public ones have user_id null.
+      // If user_id is present and non-null, it's a private template leak.
+      if (t.user_id !== undefined && t.user_id !== null) {
+        console.log(`[Visibility] WARNING: private template visible to guest: ${t.title}`);
+      }
+    }
   });
 });

@@ -25,6 +25,5 @@ See `docs/agency/session-log.md` for full details.
 ## Next
 
 Ready for next task. Remaining items:
-- **P1**: Zod validation, loading/error boundaries, proxy auth coverage, template cache invalidation
 - **P2**: 4 test specs (template upload gate, edit-image, editor E2E, credit idempotency)
 - **P3**: OpenAPI/Swagger, structured logging, health probes, repo unit tests

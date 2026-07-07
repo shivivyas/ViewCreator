@@ -28,7 +28,7 @@ export const generateSchema = z.object({
   imageSize: z.string().default('1K'),
   numberOfImages: z.number().int().min(1).max(4).default(1),
   style: z.string().default('None'),
-  quality: z.enum(['Standard', 'Premium']).default('Standard'),
+  quality: z.literal('Standard').default('Standard'),
   thinkingLevel: z.enum(['none', 'minimal', 'full']).default('minimal'),
   referenceImages: z.array(z.string()).default([]),
   personGeneration: z.enum(['DONT_ALLOW', 'ALLOW']).default('DONT_ALLOW'),
@@ -39,7 +39,7 @@ export const generateVideoSchema = z.object({
   prompt: z.string().min(1, 'Prompt is required').max(5000),
   aspectRatio: z.string().default('16:9'),
   style: z.string().default('None'),
-  quality: z.enum(['Standard', 'Premium']).default('Standard'),
+  quality: z.literal('Standard').default('Standard'),
   duration: z.number().int().min(1).max(30).default(6),
   templateId: z.string().nullable().optional(),
 });

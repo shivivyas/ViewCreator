@@ -27,24 +27,24 @@ test.describe("Generate Page — Credit Gate — Contract Tests (mock API)", () 
   // proxy.ts no longer protects /generate (only /generate/edit).
   // Clerk's openSignUp() is the secondary defense in handleGenerate.
 
-  test("guest redirected to Clerk sign-in from /generate", async ({ page }) => {
+  test("guest sees generate page with Sign in to generate button", async ({ page }) => {
     await setupPersona(page, "GUEST");
     await page.goto("/generate");
     await page.waitForLoadState("networkidle");
 
-    // Guest is redirected to Clerk sign-in page (route-level guard)
-    const currentUrl = page.url();
-    expect(currentUrl).toContain("accounts.dev");
-    // Should see Clerk's sign-in UI
-    await expect(page.getByText(/sign in/i).first()).toBeVisible();
+    // Guest stays on /generate (no redirect) — proxy only protects /generate/edit
+    expect(page.url()).not.toContain("accounts.dev");
+    // Should see the "Sign in to generate" button
+    await expect(page.getByText(/sign in to generate/i).first()).toBeVisible();
   });
 
-  test("guest redirected from /generate (verify)", async ({ page }) => {
-    // Verification of the same redirect behavior
+  test("guest sees generate page (verify)", async ({ page }) => {
+    // Verification that guest is NOT redirected
     await setupPersona(page, "GUEST");
     await page.goto("/generate");
     await page.waitForLoadState("networkidle");
-    expect(page.url()).toContain("accounts.dev");
+    expect(page.url()).toContain("/generate");
+    expect(page.url()).not.toContain("accounts.dev");
   });
 
   // ── Signed-in Personas (FREE, LOW_CREDIT, CREDIT_USER) ──────

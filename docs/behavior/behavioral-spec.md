@@ -147,8 +147,8 @@
 |-------|---------------|-------------------|
 | `/` | Landing page — full access | Same landing page (no user-specific content) |
 | `/templates` | Full browse | Full access + upload/vote/use |
-| `/generate` | Form visible, Generate gated | Full access |
-| `/generate/edit` | Redirected to sign-up | Full access |
+| `/generate` | **Redirected to Clerk sign-in page** (route-level guard) | Full access — form visible, Generate deducts credits |
+| `/generate/edit` | Redirected to sign-up (proxy.ts) | Full access |
 | `/pricing` | Full access, "Sign up to buy" CTAs | "Buy more credits" CTAs + balance display |
 
 ### 4.3 Deep Link Returns

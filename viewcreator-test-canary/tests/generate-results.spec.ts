@@ -16,199 +16,181 @@
  */
 
 import { test, expect } from "@playwright/test";
-import { setupPersona } from "./helpers";
+import { signInUser, deleteClerkUser } from "./auth-helpers";
 
-// ── Mock Generate API — Success ─────────────────────────────────────────────
+/**
+ * Generate Results Tests
+ *
+ * These tests use real Clerk authentication (chromium-auth project).
+ * They mock the generate API to verify the post-generation UI.
+ *
+ * Behaviors tested:
+ *   G4.1 — Generation results appear in history panel
+ *   G4.2 — Download button available for each generated image
+ *   G4.3 — "Continue to Workspace" navigates to /generate/edit
+ *   G4.5 — Generation error shows inline error with retry button
+ *
+ * G4.4 (regenerate) requires real generation state — tested in clerk-auth.spec.ts
+ */
 
-const MOCK_GENERATE_SUCCESS = {
+const MOCK_RESULTS = {
   imageUrls: [
-    "https://placehold.co/400x500?text=Generated+1",
-    "https://placehold.co/400x500?text=Generated+2",
-    "https://placehold.co/400x500?text=Generated+3",
-    "https://placehold.co/400x500?text=Generated+4",
+    "https://placehold.co/400x500?text=Result+1",
+    "https://placehold.co/400x500?text=Result+2",
+    "https://placehold.co/400x500?text=Result+3",
+    "https://placehold.co/400x500?text=Result+4",
   ],
   s3Urls: [
-    "https://placehold.co/400x500?text=Generated+1",
-    "https://placehold.co/400x500?text=Generated+2",
-    "https://placehold.co/400x500?text=Generated+3",
-    "https://placehold.co/400x500?text=Generated+4",
+    "https://placehold.co/400x500?text=Result+1",
+    "https://placehold.co/400x500?text=Result+2",
+    "https://placehold.co/400x500?text=Result+3",
+    "https://placehold.co/400x500?text=Result+4",
   ],
   balance_after: 96,
   credits_deducted: 4,
 };
 
-const MOCK_GENERATE_2_IMAGES = {
-  imageUrls: [
-    "https://placehold.co/400x500?text=Generated+1",
-    "https://placehold.co/400x500?text=Generated+2",
-  ],
-  s3Urls: [
-    "https://placehold.co/400x500?text=Generated+1",
-    "https://placehold.co/400x500?text=Generated+2",
-  ],
-  balance_after: 98,
-  credits_deducted: 2,
-};
+test.describe("Generate Page — Results Display — Auth Tests", () => {
+  const clerkUserIds: string[] = [];
 
-test.describe("Generate Page — Results Display — Contract Tests", () => {
-  // ── 17. Results in history panel ────────────────────────────
+  test.afterEach(async () => {
+    for (const id of clerkUserIds) {
+      await deleteClerkUser(id);
+    }
+    clerkUserIds.length = 0;
+  });
+
+  // ── G4.1: Results in history panel ──────────────────────────
 
   test("generation results appear in history panel", async ({ page }) => {
-    await setupPersona(page, "CREDIT_USER");
+    const { userId } = await signInUser(page, { grantCredits: 100 });
+    clerkUserIds.push(userId);
 
-    // Mock the generate API to return 2 image URLs
-    await page.route("**/api/generate", async (route) => {
+    // Mock generate API to return results
+    await page.route("**/api/generate**", async (route) => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify(MOCK_GENERATE_2_IMAGES),
+        body: JSON.stringify(MOCK_RESULTS),
       });
     });
 
     await page.goto("/generate");
     await page.waitForLoadState("networkidle");
+    await page.waitForTimeout(2000);
 
-    // Fill prompt
+    // Fill prompt and generate
     const promptInput = page.getByPlaceholder(/describe/i).first();
-    await expect(promptInput).toBeVisible();
-    await promptInput.fill("Test prompt for results display");
+    await promptInput.fill("Test prompt for results");
 
-    // Click generate (for guest, this may show "Sign in to generate")
-    // The test verifies the page structure — actual post-generation
-    // results require real Clerk auth and successful generation
     const genButton = page.getByRole("button", { name: /generate/i }).first();
-    if (genButton.isVisible() && !(await genButton.isDisabled())) {
-      await genButton.click();
-      await page.waitForTimeout(2000);
-    }
+    await genButton.click();
+    await page.waitForTimeout(3000);
 
-    // History panel should be present on the page
-    // Look for a section that contains generation history
-    const historySection = page.getByText(/history|generated|results/i).first();
-    // The history panel may or may not be visible depending on auth state
-    // This test verifies the API contract is intact
+    // History panel should show the generated results
+    // Look for any image or result in the right panel
+    const resultImages = page.locator('img[src*="Result+"]');
+    await expect(resultImages.first()).toBeVisible({ timeout: 5000 });
   });
 
-  // ── 18. Download button ────────────────────────────────────
+  // ── G4.2: Download button ──────────────────────────────────
 
   test("download button works for individual image", async ({ page }) => {
-    await setupPersona(page, "CREDIT_USER");
+    const { userId } = await signInUser(page, { grantCredits: 100 });
+    clerkUserIds.push(userId);
 
-    // Mock generate API to return 2 image URLs
-    await page.route("**/api/generate", async (route) => {
+    await page.route("**/api/generate**", async (route) => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify(MOCK_GENERATE_2_IMAGES),
+        body: JSON.stringify(MOCK_RESULTS),
       });
     });
 
     await page.goto("/generate");
     await page.waitForLoadState("networkidle");
+    await page.waitForTimeout(2000);
 
-    // Fill prompt
     const promptInput = page.getByPlaceholder(/describe/i).first();
-    await expect(promptInput).toBeVisible();
     await promptInput.fill("Test prompt for download");
 
-    // Look for download related buttons or links on the page
-    // Download buttons appear after successful generation
-    const downloadButton = page.getByRole("button", { name: /download/i }).first();
+    const genButton = page.getByRole("button", { name: /generate/i }).first();
+    await genButton.click();
+    await page.waitForTimeout(3000);
 
-    // Without real auth + generation, download buttons won't appear
-    // This test verifies the page structure is correct
-    // Download functionality is tested end-to-end in clerk-auth tests
+    // Download button should be available for generated images
+    const downloadBtn = page.getByRole("button", { name: /download/i }).first();
+    await expect(downloadBtn).toBeVisible({ timeout: 5000 });
   });
 
-  // ── 19. Continue to Workspace ──────────────────────────────
+  // ── G4.3: Navigate to Workspace from results ────────────────
 
-  test('"Continue to Workspace" navigates to edit', async ({ page }) => {
-    await setupPersona(page, "CREDIT_USER");
+  test("clicking generated result navigates to /generate/edit", async ({ page }) => {
+    const { userId } = await signInUser(page, { grantCredits: 100 });
+    clerkUserIds.push(userId);
 
-    // Mock generate API
-    await page.route("**/api/generate", async (route) => {
+    await page.unroute("**/api/generate**");
+    await page.route("**/api/generate**", async (route) => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify(MOCK_GENERATE_2_IMAGES),
+        body: JSON.stringify(MOCK_RESULTS),
       });
     });
 
     await page.goto("/generate");
     await page.waitForLoadState("networkidle");
+    await page.waitForTimeout(2000);
 
-    // Fill prompt
     const promptInput = page.getByPlaceholder(/describe/i).first();
-    await expect(promptInput).toBeVisible();
-    await promptInput.fill("Test prompt for workspace navigation");
+    await promptInput.fill("Test prompt for workspace");
 
-    // Look for the "Continue to Workspace" button
-    const workspaceButton = page.getByRole("button", { name: /continue to workspace/i }).first();
+    const genButton = page.getByRole("button", { name: /generate/i }).first();
+    await genButton.click();
+    await page.waitForTimeout(3000);
 
-    // Without real auth, this button won't be present
-    // This test verifies the page doesn't crash with the mock API setup
-    // Full workspace navigation flow is tested in clerk-auth tests
+    // Results should appear as images in the history panel.
+    // The user can click on a result to navigate to /generate/edit.
+    // Look for the generated result images in the right-side history panel.
+    const resultImages = page.locator('img[src*="Result+"]');
+    await expect(resultImages.first()).toBeVisible({ timeout: 10000 });
+
+    // Clicking a result image dispatches to Redux and navigates to /generate/edit
+    await resultImages.first().click();
+    await page.waitForTimeout(3000);
+
+    // Should navigate to the edit page
+    expect(page.url()).toContain("/generate/edit");
   });
 
-  // ── 20. Generation error state ─────────────────────────────
+  // ── G4.5: Generation error state ──────────────────────────
 
   test("generation error shows error state", async ({ page }) => {
-    await setupPersona(page, "CREDIT_USER");
+    const { userId } = await signInUser(page, { grantCredits: 100 });
+    clerkUserIds.push(userId);
 
-    // Mock generate API to return 500
-    await page.route("**/api/generate", async (route) => {
+    // Mock generate API to return error
+    await page.route("**/api/generate**", async (route) => {
       await route.fulfill({
         status: 500,
         contentType: "application/json",
-        body: JSON.stringify({ error: "Generation failed", message: "Internal server error" }),
+        body: JSON.stringify({ error: "Generation failed" }),
       });
     });
 
     await page.goto("/generate");
     await page.waitForLoadState("networkidle");
+    await page.waitForTimeout(2000);
 
-    // Fill prompt
     const promptInput = page.getByPlaceholder(/describe/i).first();
-    await expect(promptInput).toBeVisible();
-    await promptInput.fill("Test prompt for error state");
+    await promptInput.fill("Test prompt for error");
 
-    // The page should load without crashing even with the error mock in place
-    const body = page.locator("body");
-    await expect(body).toBeVisible();
+    const genButton = page.getByRole("button", { name: /generate/i }).first();
+    await genButton.click();
+    await page.waitForTimeout(3000);
 
-    // Error UI (toast/banner/message) would appear after clicking generate
-    // with real auth. This verifies the mock setup is correct.
-  });
-
-  // ── 21. Regenerate button ──────────────────────────────────
-
-  test("regenerate button works", async ({ page }) => {
-    await setupPersona(page, "CREDIT_USER");
-
-    // Mock generate API with success response
-    let generateCount = 0;
-    await page.route("**/api/generate", async (route) => {
-      generateCount++;
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(MOCK_GENERATE_2_IMAGES),
-      });
-    });
-
-    await page.goto("/generate");
-    await page.waitForLoadState("networkidle");
-
-    // Fill prompt
-    const promptInput = page.getByPlaceholder(/describe/i).first();
-    await expect(promptInput).toBeVisible();
-    await promptInput.fill("Test prompt for regenerate");
-
-    // Look for a regenerate or "Generate Again" button
-    const regenerateButton = page.getByRole("button", { name: /regenerate|generate again/i }).first();
-
-    // Without real auth and successful generation first, regenerate won't appear
-    // This test verifies the page contract — the regenerate button is expected
-    // to appear after generation completes
+    // Error toast should appear (Sonner toast with error message)
+    // Look for a toast or error message on the page
+    await expect(page.getByText(/generation failed|something went wrong|error/i).first()).toBeVisible({ timeout: 5000 });
   });
 });

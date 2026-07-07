@@ -78,7 +78,8 @@ test.describe("Public API — Plans", () => {
     const body = await response.json();
     expect(body.creditPacks).toBeDefined();
     expect(body.subscriptions).toBeDefined();
-    expect(body.subscriptions.length).toBeGreaterThanOrEqual(1);
+    // Credit-only model: subscriptions may be empty array
+    expect(Array.isArray(body.subscriptions)).toBe(true);
   });
 });
 

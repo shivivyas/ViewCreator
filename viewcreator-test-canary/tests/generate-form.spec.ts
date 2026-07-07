@@ -19,168 +19,195 @@
  */
 
 import { test, expect } from "@playwright/test";
-import { setupPersona, mockTemplatesEndpoint, MOCK_TEMPLATES } from "./helpers";
+import { signInUser, deleteClerkUser } from "./auth-helpers";
+import { mockTemplatesEndpoint, MOCK_TEMPLATES } from "./helpers";
 
-test.describe("Generate Page — Form Behavior — Contract Tests", () => {
-  // ── 10. Template pre-fill ──────────────────────────────────
+/**
+ * Generate Form Behavior Tests
+ *
+ * These tests use real Clerk authentication (chromium-auth project).
+ * The /generate page has a route-level guard that redirects guests.
+ *
+ * Behaviors tested:
+ *   G2.1 — Template ID pre-fills form
+ *   G2.3 — Empty prompt disables Generate button
+ *   G2.4 — Prompt input accepts and displays text
+ *   G2.5 — Media type toggle switches form fields
+ *   G2.6 — Number of images selector
+ *   G2.7 — Aspect ratio selector
+ *   G3.5 — Generate button disables during generation
+ */
 
-  test("form pre-fills from URL templateId", async ({ page }) => {
-    await setupPersona(page, "GUEST");
-    await mockTemplatesEndpoint(page);
-    await page.goto("/generate?templateId=tmpl-1");
-    await page.waitForLoadState("networkidle");
+test.describe("Generate Page — Form Behavior — Auth Tests", () => {
+  const clerkUserIds: string[] = [];
 
-    // The template config for tmpl-1 has stylePreset "Modern" and aspectRatio "1:1"
-    // After a brief wait for template fetch and form population
-    await page.waitForTimeout(2000);
-
-    // The prompt input should exist (form rendered)
-    const promptInput = page.getByPlaceholder(/describe/i).first();
-    await expect(promptInput).toBeVisible();
-
-    // The aspect ratio should reflect the template's config (1:1)
-    // Check that the 1:1 button is present (it's the default for this template)
-    const aspectOneOne = page.getByRole("button", { name: "1:1" }).first();
-    await expect(aspectOneOne).toBeVisible();
-
-    // Try to detect if the template's style preset influenced the form
-    // The template name or recommended prompts might appear somewhere
-    // Verify the page URL contains the templateId
-    const currentUrl = page.url();
-    expect(currentUrl).toContain("templateId=tmpl-1");
+  test.afterEach(async () => {
+    for (const id of clerkUserIds) {
+      await deleteClerkUser(id);
+    }
+    clerkUserIds.length = 0;
   });
 
-  // ── 11. Empty prompt disables button ───────────────────────
+  // ── G2.1: Template pre-fill ───────────────────────────────
+
+  test("form pre-fills from URL templateId", async ({ page }) => {
+    const { userId } = await signInUser(page, { grantCredits: 100 });
+    clerkUserIds.push(userId);
+
+    await mockTemplatesEndpoint(page);
+
+    await page.goto("/generate?templateId=tmpl-1");
+    await page.waitForLoadState("networkidle");
+    await page.waitForTimeout(2000);
+
+    // Template name should appear in the form
+    await expect(page.getByText("Summer Sale").first()).toBeVisible({ timeout: 5000 });
+
+    // Aspect ratio should reflect template config (1:1)
+    await expect(page.getByRole("button", { name: "1:1" }).first()).toBeVisible();
+  });
+
+  // ── G2.3: Empty prompt disables Generate ──────────────────
 
   test("empty prompt disables generate button", async ({ page }) => {
-    await setupPersona(page, "GUEST");
+    const { userId } = await signInUser(page, { grantCredits: 100 });
+    clerkUserIds.push(userId);
+
     await page.goto("/generate");
     await page.waitForLoadState("networkidle");
+    await page.waitForTimeout(2000);
 
-    // The generate button should be disabled when prompt is empty
-    // For guest users, this shows as "Sign in to generate" which is also disabled
-    const genButton = page.getByRole("button", { name: /generate|sign in to generate/i }).first();
+    // With prompt empty, generate button should be disabled
+    const genButton = page.getByRole("button", { name: /generate/i }).first();
+    await expect(genButton).toBeVisible();
     await expect(genButton).toBeDisabled();
   });
 
-  // ── 12. Prompt input accepts text ──────────────────────────
+  // ── G2.4: Prompt input accepts text ───────────────────────
 
   test("prompt input accepts text", async ({ page }) => {
-    await setupPersona(page, "GUEST");
+    const { userId } = await signInUser(page, { grantCredits: 100 });
+    clerkUserIds.push(userId);
+
     await page.goto("/generate");
     await page.waitForLoadState("networkidle");
+    await page.waitForTimeout(2000);
 
     const promptInput = page.getByPlaceholder(/describe/i).first();
     await expect(promptInput).toBeVisible();
 
-    // Type into the prompt input and verify value updates
     await promptInput.fill("A beautiful sunset over mountains");
     const value = await promptInput.inputValue();
     expect(value).toBe("A beautiful sunset over mountains");
   });
 
-  // ── 13. Aspect ratio selection ─────────────────────────────
+  // ── G2.7: Aspect ratio selection ──────────────────────────
 
   test("aspect ratio selection changes UI", async ({ page }) => {
-    await setupPersona(page, "GUEST");
+    const { userId } = await signInUser(page, { grantCredits: 100 });
+    clerkUserIds.push(userId);
+
     await page.goto("/generate");
     await page.waitForLoadState("networkidle");
+    await page.waitForTimeout(2000);
 
-    // Get all aspect ratio buttons
     const aspectButtons = [
       page.getByRole("button", { name: "1:1" }).first(),
       page.getByRole("button", { name: "4:5" }).first(),
       page.getByRole("button", { name: "9:16" }).first(),
       page.getByRole("button", { name: "16:9" }).first(),
+      page.getByRole("button", { name: "2:3" }).first(),
     ];
 
-    // Click each button and verify it becomes active
     for (const btn of aspectButtons) {
       await expect(btn).toBeVisible();
       await btn.click();
-      await page.waitForTimeout(300);
-
-      // The clicked button should have an active/selected state
-      // Check that it's not disabled and has a different CSS class
+      await page.waitForTimeout(200);
       await expect(btn).toBeEnabled();
-
-      // Different aspect ratios may affect the preview area visually
-      // At minimum, clicking each button should not cause errors
     }
   });
 
-  // ── 14. Number of images selector ──────────────────────────
+  // ── G2.6: Number of images selector ───────────────────────
 
   test("number of images selector works", async ({ page }) => {
-    await setupPersona(page, "GUEST");
+    const { userId } = await signInUser(page, { grantCredits: 100 });
+    clerkUserIds.push(userId);
+
     await page.goto("/generate");
     await page.waitForLoadState("networkidle");
+    await page.waitForTimeout(2000);
 
-    // Find the number of images buttons
-    const twoIdeasBtn = page.getByRole("button", { name: /2 ideas/i }).first();
-    const fourIdeasBtn = page.getByRole("button", { name: /4 ideas/i }).first();
+    const count1Btn = page.getByRole("button", { name: "1", exact: true }).first();
+    const count2Btn = page.getByRole("button", { name: "2", exact: true }).first();
+    const count4Btn = page.getByRole("button", { name: "4", exact: true }).first();
 
-    await expect(twoIdeasBtn).toBeVisible();
-    await expect(fourIdeasBtn).toBeVisible();
+    await expect(count1Btn).toBeVisible();
+    await expect(count2Btn).toBeVisible();
+    await expect(count4Btn).toBeVisible();
 
-    // Click "2 ideas" and verify it's selected
-    await twoIdeasBtn.click();
-    await page.waitForTimeout(300);
+    await count2Btn.click();
+    await page.waitForTimeout(200);
+    await count4Btn.click();
+    await page.waitForTimeout(200);
 
-    // Click "4 ideas" and verify it's selected
-    await fourIdeasBtn.click();
-    await page.waitForTimeout(300);
-
-    // Both buttons should be enabled after interaction
-    await expect(twoIdeasBtn).toBeEnabled();
-    await expect(fourIdeasBtn).toBeEnabled();
+    await expect(count2Btn).toBeEnabled();
+    await expect(count4Btn).toBeEnabled();
   });
 
-  // ── 15. Media type toggle ──────────────────────────────────
+  // ── G2.5: Media type toggle ───────────────────────────────
 
   test("media type toggle switches form", async ({ page }) => {
-    await setupPersona(page, "GUEST");
+    const { userId } = await signInUser(page, { grantCredits: 100 });
+    clerkUserIds.push(userId);
+
     await page.goto("/generate");
     await page.waitForLoadState("networkidle");
+    await page.waitForTimeout(2000);
 
-    // Image and Video toggle buttons should exist
     const imageToggle = page.getByRole("button", { name: /image/i }).first();
     const videoToggle = page.getByRole("button", { name: /video/i }).first();
 
     await expect(imageToggle).toBeVisible();
     await expect(videoToggle).toBeVisible();
 
-    // Click Video toggle — video-specific controls should appear
+    // Switch to video — duration controls should appear
     await videoToggle.click();
     await page.waitForTimeout(500);
+    await expect(page.getByRole("button", { name: "6s" }).first()).toBeVisible();
 
-    // Video mode might show duration controls instead of image controls
-    // Look for video-specific UI elements
-    const durationControl = page.getByText(/duration/i).first();
-    // Duration controls may or may not be present depending on implementation
-    // At minimum, the toggle should have switched state
-    await expect(videoToggle).toBeEnabled();
-
-    // Switch back to Image
+    // Switch back to image
     await imageToggle.click();
     await page.waitForTimeout(500);
     await expect(imageToggle).toBeEnabled();
   });
 
-  // ── 16. Button disables during generation ──────────────────
+  // ── G3.5: Button disables during generation ───────────────
 
   test("generate button disables during generation", async ({ page }) => {
-    await setupPersona(page, "GUEST");
+    const { userId } = await signInUser(page, { grantCredits: 100 });
+    clerkUserIds.push(userId);
+
+    // Mock generate to be slow so we can observe the loading state
+    await page.route("**/api/generate**", async (route) => {
+      await new Promise((r) => setTimeout(r, 5000));
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ imageUrls: [] }),
+      });
+    });
+
     await page.goto("/generate");
     await page.waitForLoadState("networkidle");
+    await page.waitForTimeout(2000);
 
-    // The generate button should be present
-    const genButton = page.getByRole("button", { name: /generate|sign in to generate/i }).first();
-    await expect(genButton).toBeVisible();
+    const promptInput = page.getByPlaceholder(/describe/i).first();
+    await promptInput.fill("Test prompt");
 
-    // For guest users, the button is "Sign in to generate" and is disabled
-    // This test verifies the button state prevents double-submission
-    // Note: With real auth, clicking Generate would trigger loading state
-    // and the button would show "Generating..." while disabled
+    const genButton = page.getByRole("button", { name: /generate/i }).first();
+    await genButton.click();
+
+    // Button should show "Generating..." and be disabled
+    await expect(page.getByRole("button", { name: /generating/i }).first()).toBeVisible({ timeout: 3000 });
   });
 });

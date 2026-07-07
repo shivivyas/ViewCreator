@@ -44,6 +44,8 @@ export default defineConfig({
       testIgnore: [
         "clerk-auth.spec.ts",
         "templates-auth.spec.ts",
+        "generate-form.spec.ts",
+        "generate-results.spec.ts",
         "generate-purchase-flow.spec.ts",
         "navigation.spec.ts",
         "auth-guards.spec.ts",
@@ -60,6 +62,8 @@ export default defineConfig({
       testMatch: [
         "clerk-auth.spec.ts",
         "templates-auth.spec.ts",
+        "generate-form.spec.ts",
+        "generate-results.spec.ts",
         "generate-purchase-flow.spec.ts",
         "navigation.spec.ts",
         "auth-guards.spec.ts",

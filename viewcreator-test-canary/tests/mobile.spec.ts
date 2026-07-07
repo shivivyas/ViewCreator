@@ -62,20 +62,16 @@ test.describe("Mobile Responsive — Viewports", () => {
 
   // ── R1.2: Generate page on mobile ───────────────────────────
 
-  test("generate page renders on mobile", async ({ page }) => {
+  test("generate page redirects guest to Clerk sign-in on mobile", async ({ page }) => {
     await page.setViewportSize(MOBILE_VIEWPORT);
     await setupPersona(page, "GUEST");
 
     await page.goto("/generate");
     await page.waitForLoadState("networkidle");
 
-    // Verify the form or page content is visible
-    // Guest sees the form UI even without signing in
+    // Guest is redirected to Clerk sign-in — verify the redirect works on mobile
+    expect(page.url()).toContain("accounts.dev");
     await expect(page.locator("body")).toBeVisible();
-
-    // The prompt textarea / input should be present
-    const promptInput = page.getByPlaceholder(/describe/i).first();
-    await expect(promptInput).toBeVisible({ timeout: 10000 });
   });
 
   // ── R1.4: Header nav collapses on mobile ────────────────────

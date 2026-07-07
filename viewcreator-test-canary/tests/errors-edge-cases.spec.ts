@@ -18,111 +18,8 @@
  */
 
 import { test, expect } from "@playwright/test";
-import { setupClerkTestingToken, clerk } from "@clerk/testing/playwright";
-import {
-  setupPersona,
-  mockPlansEndpoint,
-  mockBalanceForPersona,
-  mockTemplatesEndpoint,
-} from "./helpers";
-
-const CLERK_SECRET_KEY = process.env.CLERK_SECRET_KEY || "";
-const API_BASE = "http://localhost:3001";
-const ADMIN_KEY = "dev-admin-key";
-
-// ── Cleanup ─────────────────────────────────────────────────────────────────
-
-async function deleteClerkUser(userId: string) {
-  try {
-    const res = await fetch(`https://api.clerk.com/v1/users/${userId}`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${CLERK_SECRET_KEY}` },
-    });
-    if (!res.ok) {
-      console.warn(`[Cleanup] Failed to delete user ${userId}: ${res.status}`);
-    }
-  } catch (err) {
-    console.warn(`[Cleanup] Error deleting user ${userId}:`, err);
-  }
-}
-
-// ── Sign-In Helper ──────────────────────────────────────────────────────────
-
-async function signInUser(
-  page: any,
-  opts?: { grantCredits?: number }
-): Promise<{ userId: string; email: string }> {
-  const email = `testuser+error_${Date.now()}@example.com`;
-  const password = "ViewCreatorTest123!";
-
-  const createRes = await fetch(`https://api.clerk.com/v1/users`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${CLERK_SECRET_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      email_address: [email],
-      password,
-      skip_password_checks: true,
-      skip_password_requirement: false,
-    }),
-  });
-
-  if (!createRes.ok) {
-    throw new Error(
-      `Clerk user creation failed: ${createRes.status} — ${await createRes.text()}`
-    );
-  }
-
-  const user = await createRes.json();
-  const userId = user.id;
-
-  await setupClerkTestingToken({ page });
-  await page.goto("/pricing");
-  await page.waitForLoadState("networkidle");
-  await clerk.signIn({ page, emailAddress: email });
-  await clerk.loaded({ page });
-  await page.waitForTimeout(1000);
-
-  if (opts?.grantCredits && opts.grantCredits > 0) {
-    const grantRes = await fetch(
-      `${API_BASE}/api/admin/payments/grant-credits`,
-      {
-        method: "POST",
-        headers: {
-          "x-admin-key": ADMIN_KEY,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          user_id: userId,
-          amount: opts.grantCredits,
-          description: "error test seed",
-        }),
-      }
-    );
-
-    if (!grantRes.ok) {
-      throw new Error(
-        `Credit grant failed: ${grantRes.status} — ${await grantRes.text()}`
-      );
-    }
-  }
-
-  await mockPlansEndpoint(page as any);
-
-  const hasRealCredits = opts?.grantCredits && opts.grantCredits > 0;
-  if (!hasRealCredits) {
-    await mockBalanceForPersona(page as any, "FREE");
-  }
-
-  // Navigate to a clean page so components fetch fresh data
-  await page.goto("/pricing");
-  await page.waitForLoadState("networkidle");
-  await page.waitForTimeout(2000);
-
-  return { userId, email };
-}
+import { signInUser, deleteClerkUser } from "./auth-helpers";
+import { setupPersona } from "./helpers";
 
 // ── Tests ───────────────────────────────────────────────────────────────────
 
@@ -234,7 +131,10 @@ test.describe("Error States — Generate Errors", () => {
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(2000);
 
-    // Mock the generate API to return 500
+    // IMPORTANT: signInUser in auth-helpers blocks /api/generate with a default
+    // success mock. We must override it AFTER signInUser completes.
+    // First, remove the existing route handler, then set our error mock.
+    await page.unroute("**/api/generate**");
     await page.route("**/api/generate**", async (route) => {
       await route.fulfill({
         status: 500,

@@ -9,6 +9,7 @@ import templateRoutes from './routes/templates.js';
 import generationRoutes from './routes/generations.js';
 import paymentRoutes from './routes/payments.js';
 import adminRoutes from './routes/admin.js';
+import analyzeRoutes from './routes/analyze.js';
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -29,6 +30,7 @@ app.use(templateRoutes);
 app.use(generationRoutes);
 app.use(paymentRoutes);
 app.use(adminRoutes);
+app.use(analyzeRoutes);
 
 // Start Server
 app.listen(port, () => {

@@ -15,10 +15,11 @@ import {
   Info,
   Palette,
 } from "lucide-react";
-import type { Template } from "@/types";
+import type { Template, TemplateAnalysis } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { generateImages } from "@/services/api/generation-service";
+import { analyzeTemplate } from "@/services/api/analysis-service";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -94,6 +95,14 @@ export function TemplateDetailModal({
   const [generationStep, setGenerationStep] = useState(0);
   const generationTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // ── AI Analysis (free — no credits consumed) ────────────────
+  const [analysis, setAnalysis] = useState<TemplateAnalysis | null>(
+    template?.config?.aiAnalysis ?? null
+  );
+  const [analysisLoading, setAnalysisLoading] = useState(
+    !template?.config?.aiAnalysis
+  );
+
   useEffect(() => {
     if (modalState !== "generating") {
       const raf = requestAnimationFrame(() => setGenerationStep(0));
@@ -118,6 +127,76 @@ export function TemplateDetailModal({
       if (generationTimerRef.current) clearInterval(generationTimerRef.current);
     };
   }, [modalState]);
+
+  // ── Trigger AI analysis on mount (if not already cached) ──
+  useEffect(() => {
+    if (!template) {
+      console.log('[TRACE TemplateModal] No template — skipping analysis');
+      return;
+    }
+
+    const modalTraceId = `m-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    console.log(`[TRACE:${modalTraceId}] === AI analysis useEffect fired ===`);
+    console.log(`[TRACE:${modalTraceId}] template.id:`, template.id);
+    console.log(`[TRACE:${modalTraceId}] template.title:`, template.title);
+    console.log(`[TRACE:${modalTraceId}] existing aiAnalysis in config:`, !!template.config?.aiAnalysis);
+    console.log(`[TRACE:${modalTraceId}] config dump:`, JSON.stringify(template.config));
+
+    // If already cached in config, no need to fetch
+    if (template.config?.aiAnalysis) {
+      console.log(`[TRACE:${modalTraceId}] ✓ CACHE HIT — using existing analysis`);
+      console.log(`[TRACE:${modalTraceId}] cached data:`, JSON.stringify(template.config.aiAnalysis).substring(0, 300));
+      setAnalysis(template.config.aiAnalysis);
+      setAnalysisLoading(false);
+      return;
+    }
+
+    console.log(`[TRACE:${modalTraceId}] CACHE MISS — initiating API call`);
+    let cancelled = false;
+    setAnalysisLoading(true);
+
+    (async () => {
+      const callStart = Date.now();
+      try {
+        console.log(`[TRACE:${modalTraceId}] Getting auth token...`);
+        const token = (await getToken().catch((e) => {
+          console.warn(`[TRACE:${modalTraceId}] getToken() failed:`, e);
+          return undefined;
+        })) || undefined;
+        console.log(`[TRACE:${modalTraceId}] Token obtained: ${!!token}${token ? ', preview: ' + token.substring(0, 10) + '...' : ''}`);
+
+        console.log(`[TRACE:${modalTraceId}] Calling analyzeTemplate("${template.id}", token)...`);
+        const result = await analyzeTemplate(template.id, token);
+        const elapsed = Date.now() - callStart;
+        console.log(`[TRACE:${modalTraceId}] ✓ analyzeTemplate returned in ${elapsed}ms`);
+        console.log(`[TRACE:${modalTraceId}] cached:`, result.cached);
+        console.log(`[TRACE:${modalTraceId}] analysis (full):`, JSON.stringify(result.analysis, null, 2));
+
+        if (!cancelled) {
+          console.log(`[TRACE:${modalTraceId}] Setting state with analysis...`);
+          setAnalysis(result.analysis);
+          setAnalysisLoading(false);
+          console.log(`[TRACE:${modalTraceId}] State updated ✓`);
+        } else {
+          console.log(`[TRACE:${modalTraceId}] Component was cancelled — discarding result`);
+        }
+      } catch (err: any) {
+        const elapsed = Date.now() - callStart;
+        console.warn(`[TRACE:${modalTraceId}] ✖ AI analysis FAILED after ${elapsed}ms`);
+        console.warn(`[TRACE:${modalTraceId}] Error message:`, err.message);
+        console.warn(`[TRACE:${modalTraceId}] Error stack:`, err.stack);
+        if (!cancelled) {
+          console.log(`[TRACE:${modalTraceId}] Falling back to hardcoded values`);
+          setAnalysisLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      console.log(`[TRACE:${modalTraceId}] Cleanup — cancelling`);
+      cancelled = true;
+    };
+  }, [template?.id, getToken]);
 
   if (!template) return null;
 
@@ -258,18 +337,29 @@ export function TemplateDetailModal({
 
         <h2 className="text-lg font-bold mb-3">{template.title}</h2>
 
-        {/* Works well for */}
+        {/* Works well for — AI-powered analysis */}
         <div className="space-y-1.5">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
             Works well for
+            {analysisLoading && (
+              <span className="size-2.5 rounded-full bg-muted-foreground/30 animate-pulse" />
+            )}
           </p>
           <div className="grid grid-cols-2 gap-x-3 gap-y-1">
-            {["Restaurants", "Product launches", "Seasonal offers", "Ecommerce", "Promotions", "Social media"].map((use) => (
-              <span key={use} className="text-[11px] text-muted-foreground flex items-center gap-1.5">
-                <span className="size-1 rounded-full bg-green-400 shrink-0" />
-                {use}
-              </span>
-            ))}
+            {analysisLoading ? (
+              <>
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <span key={i} className="h-3.5 w-20 bg-muted rounded animate-pulse" />
+                ))}
+              </>
+            ) : (
+              (analysis?.worksWellFor ?? ["Restaurants", "Product launches", "Seasonal offers", "Ecommerce", "Promotions", "Social media"]).slice(0, 8).map((use) => (
+                <span key={use} className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+                  <span className="size-1 rounded-full bg-green-400 shrink-0" />
+                  {use}
+                </span>
+              ))
+            )}
           </div>
         </div>
 
@@ -303,7 +393,14 @@ export function TemplateDetailModal({
       <div className="flex items-center gap-2">
         <span className="text-base">{template.media_type === "video" ? "🎬" : "🎨"}</span>
         <p className="text-xs font-semibold text-foreground">
-          You&apos;re creating from: <span className="text-primary">{template.title}</span>
+          You&apos;re creating from:{" "}
+          {analysisLoading ? (
+            <span className="inline-block h-3.5 w-32 bg-muted-foreground/20 rounded animate-pulse align-middle" />
+          ) : (
+            <span className="text-primary">
+              {analysis?.title || template.title}
+            </span>
+          )}
         </p>
       </div>
       <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[11px]">
@@ -311,17 +408,33 @@ export function TemplateDetailModal({
           <p className="font-medium text-emerald-600 mb-1 flex items-center gap-1">
             <Info className="size-3" /> The AI will preserve
           </p>
-          <p className="text-muted-foreground pl-4">✓ Layout</p>
-          <p className="text-muted-foreground pl-4">✓ Typography style</p>
-          <p className="text-muted-foreground pl-4">✓ Overall aesthetic</p>
+          {analysisLoading ? (
+            <div className="space-y-1.5 pl-4">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <p key={i} className="h-3 bg-muted rounded animate-pulse w-3/4" />
+              ))}
+            </div>
+          ) : (
+            (analysis?.preserves ?? ["Layout", "Typography style", "Overall aesthetic"]).map((item) => (
+              <p key={item} className="text-muted-foreground pl-4">✓ {item}</p>
+            ))
+          )}
         </div>
         <div>
           <p className="font-medium text-primary mb-1 flex items-center gap-1">
             <Palette className="size-3" /> The AI will customize
           </p>
-          <p className="text-muted-foreground pl-4">✓ Product / content</p>
-          <p className="text-muted-foreground pl-4">✓ Text & copy</p>
-          <p className="text-muted-foreground pl-4">✓ Colors & branding</p>
+          {analysisLoading ? (
+            <div className="space-y-1.5 pl-4">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <p key={i} className="h-3 bg-muted rounded animate-pulse w-2/3" />
+              ))}
+            </div>
+          ) : (
+            (analysis?.customizes ?? ["Product / content", "Text & copy", "Colors & branding"]).map((item) => (
+              <p key={item} className="text-muted-foreground pl-4">✓ {item}</p>
+            ))
+          )}
         </div>
       </div>
     </div>

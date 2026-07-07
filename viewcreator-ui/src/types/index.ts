@@ -80,6 +80,14 @@ export interface ImageEditorState {
   duration: number;
 }
 
+export interface TemplateAnalysis {
+  worksWellFor: string[];
+  preserves: string[];
+  customizes: string[];
+  title: string;
+  description: string;
+}
+
 export interface Template {
   id: string;
   title: string;
@@ -96,6 +104,8 @@ export interface Template {
     stylePreset?: string;
     aspectRatio?: string;
     recommendedPrompts?: string[];
+    /** AI-generated template analysis, populated on first open. Free — no credits consumed. */
+    aiAnalysis?: TemplateAnalysis;
   };
 }
 

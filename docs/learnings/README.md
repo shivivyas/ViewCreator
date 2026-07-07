@@ -38,3 +38,4 @@ This directory is the organization's collective memory. Every bug fixed, design 
 | 2026-07-04 | Dodo Payments Integration — Full Payment System | Systemic + Pattern | Multiple files (see learning doc) |
 | 2026-07-04 | Agent Organization Foundation | Systemic | Director constitution, agent files |
 | 2026-07-06 | Behavioral Spec via Lavish + Clerk Testing | Systemic + Pattern | Test files, Lavish artifact, KB |
+| 2026-07-07 | Gemini Template Analysis — model selection & thinking tokens | Pattern | `analyze.ts` |

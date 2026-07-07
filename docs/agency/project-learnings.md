@@ -66,6 +66,23 @@ Director (First Mate), Builder (test creation), Reviewer (test verification)
 
 ---
 
+## 2026-07-07: Gemini model discovery & structured output from vision
+
+### Context
+When calling Gemini for image→text analysis, model names are version-specific and thinking tokens can silently truncate output.
+
+### The Pattern
+1. Always list available models via `GET /v1beta/models?key=...` REST API before guessing names
+2. Disable `thinkingConfig` for structured JSON output tasks: `{ includeThoughts: false }`
+3. Set `maxOutputTokens` generously (8192) even for small expected output — thinking tokens consume budget silently
+4. Keep analysis endpoints separate from generation — no credit system involvement
+
+### Evidence
+Multiple 404 errors on `gemini-3.1-flash`, `gemini-2.0-flash`, `gemini-2.5-flash`. `gemini-3.5-flash` works. With thinking enabled, 984 output tokens were consumed by thoughts → only 19 chars of actual JSON returned.
+
+### Applied By
+Builder (any agent creating Gemini-powered features)
+
 ## 2026-07-06: Documentation structure & agent context optimization
 
 ### Context

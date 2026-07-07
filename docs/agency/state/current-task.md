@@ -1,23 +1,19 @@
 # Current Task
 
 **Agent**: Director (First Mate)
-**Status**: ✅ Complete — Documentation consolidated & KB updated
+**Status**: ✅ Complete — Template analysis feature shipped
 
 ## What Was Done
 
-### Documentation Audit & Reorganization
-- Audited all 38 project context files across 8 locations
-- Mapped hot vs cold: 11 files loaded every session, ~25 on-demand, 3 frozen/stale
-- Moved 6 root docs into `docs/product/`, `docs/ui/`, `docs/development/`, `docs/architecture/`, `docs/archive/`
-- Merged Gemini AI docs (2 → 1 comprehensive reference)
-- Archived stale payment dual-model design
-- Created `docs/README.md` master index
-- Updated all cross-references in AGENTS.md, agency README, root README
+### AI-Powered Template Analysis
+- Created `POST /api/templates/analyze` endpoint using `gemini-3.5-flash`
+- Dynamic "Works well for", "The AI will preserve/customize" sections
+- Results cached in `templates.config.aiAnalysis` JSONB
+- No credits consumed
+- Branch `feature/ai-template-analysis` pushed to GitHub
 
-### KB Updates
-- Session log appended with full doc reorg entry
-- Phase.md updated with doc structure + completed feature cycle
-- Current task updated (this file)
+### Next
+Awaiting next feature request.
 - All cross-references verified
 
 ## Documentation Structure (Current)

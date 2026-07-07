@@ -54,3 +54,6 @@ next-env.d.ts
 
 # Debug and Logs
 *.log
+
+# Playright
+.playright-mcp

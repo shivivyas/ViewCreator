@@ -1,5 +1,6 @@
 import { Router } from 'express';
-import { getAuth } from '@clerk/express';
+import { getAuth, clerkClient } from '@clerk/express';
+import DodoPayments from 'dodopayments';
 import { PlanRepository, CreditRepository, SubscriptionRepository, WebhookEventRepository } from 'viewcreator-database';
 
 const router = Router();
@@ -132,7 +133,6 @@ router.post('/api/payments/create-checkout', async (req, res) => {
     }
 
     // Get user info for Dodo checkout
-    const { clerkClient } = await import('@clerk/express');
     const clerkUser = await clerkClient.users.getUser(userId);
     const email = clerkUser.emailAddresses[0]?.emailAddress;
     const name = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ') || email;
@@ -142,7 +142,6 @@ router.post('/api/payments/create-checkout', async (req, res) => {
     }
 
     // Create Dodo checkout session via the SDK
-    const { default: DodoPayments } = await import('dodopayments');
     const dodoClient = new DodoPayments({
       bearerToken: process.env.DODO_PAYMENTS_API_KEY!,
       environment: process.env.DODO_PAYMENTS_ENVIRONMENT as 'test_mode' | 'live_mode' | undefined,

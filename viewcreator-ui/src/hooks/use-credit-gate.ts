@@ -3,11 +3,8 @@
 import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
 import { getBalance, createCheckoutSession, getPlans } from '@/services/api/payment-service';
+import type { PendingGenerate } from '@/hooks/use-post-purchase-resume';
 import type { GenerateParams, GenerateVideoParams } from '@/types';
-
-export type PendingGenerate =
-  | { type: 'image'; params: GenerateParams }
-  | { type: 'video'; params: GenerateVideoParams };
 
 interface UseCreditGateReturn {
   /** Whether the credit gate modal should be shown. */

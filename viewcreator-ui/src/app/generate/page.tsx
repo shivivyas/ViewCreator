@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, Suspense } from 'react';
+import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth, useUser, useClerk } from '@clerk/nextjs';
 import { toast } from 'sonner';
@@ -9,14 +9,14 @@ import {
   setImageEditorState, 
   addGenerationToHistory
 } from '@/store/slices/image-editor-slice';
-import type { Template, GenerationHistoryItem, GenerateParams, GenerateVideoParams, MediaType } from '@/types';
+import type { Template, GenerationHistoryItem, GenerateParams, GenerateVideoParams, GenerateImagesResponse, GenerateVideoResponse, MediaType } from '@/types';
 import { getTemplates, generateImages as apiGenerateImages, generateVideo as apiGenerateVideo, getUserCreations } from '@/services';
 import { Wand2, Video, Image as ImageIcon, Loader2 } from 'lucide-react';
-import { getBalance } from '@/services/api/payment-service';
 import { calculateGenerationCost, calculateVideoCost } from 'viewcreator-shared';
 import { Button } from '@/components/ui/button';
 import { CreditGateModal, type CreditPack } from '@/components/shared/credit-gate-modal';
 import { useCreditGate } from '@/hooks/use-credit-gate';
+import { usePostPurchaseResume, type PendingGenerate } from '@/hooks/use-post-purchase-resume';
 
 import { GenerateForm } from '@/components/generate/generate-form';
 import { HistoryPanel } from '@/components/generate/history-panel';
@@ -27,22 +27,41 @@ const CREDIT_PACKS: CreditPack[] = [
   { credits: 5,   price: "$0.05", id: "pdt_0NiZQ6jp5QSl7ZLZVlZ77" },
 ];
 
-/**
- * Call the confirm-purchase endpoint to grant credits immediately.
- * Uses a unique idempotency key per purchase flow to prevent double-grant
- * on page refresh while still allowing repeat purchases of the same plan.
- */
-async function grantPurchaseCredits(planId: string, token: string, idempotencyKey?: string) {
-  const body: Record<string, any> = { plan_id: planId };
-  if (idempotencyKey) body.idempotency_key = idempotencyKey;
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/payments/confirm-purchase`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-    body: JSON.stringify(body),
-  });
-  const data = await res.json();
-  console.log('[Purchase Confirm]', data);
-  if (!res.ok) console.error('[Purchase Confirm] Failed:', data);
+/** Generate a unique history item ID. */
+function historyId(prefix: string) {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+}
+
+/** Build a GenerationHistoryItem from generation params and API result. */
+function buildHistoryItem(
+  params: GenerateParams | GenerateVideoParams,
+  result: GenerateImagesResponse | GenerateVideoResponse,
+  mediaType: 'image' | 'video'
+): GenerationHistoryItem {
+  const isVideo = mediaType === 'video';
+  const videoResult = isVideo ? (result as GenerateVideoResponse) : null;
+  const imageResult = isVideo ? null : (result as GenerateImagesResponse);
+  const p = params as any;
+
+  return {
+    id: historyId(isVideo ? 'vid' : 'gen'),
+    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    prompt: p.prompt,
+    style: p.style,
+    aspectRatio: p.aspectRatio,
+    numberOfImages: isVideo ? 1 : (p.numberOfImages ?? 1),
+    imageSize: isVideo ? '1K' : p.imageSize,
+    thinkingLevel: 'minimal',
+    quality: isVideo ? p.quality : 'Standard',
+    mediaType,
+    imageUrls: isVideo ? [] : (imageResult?.imageUrls ?? []),
+    videoUrls: isVideo ? (videoResult?.videoUrls ?? []) : undefined,
+    duration: isVideo ? videoResult!.duration : undefined,
+    templateId: p.templateId ?? null,
+    creationId: result.creationId ?? undefined,
+    s3Urls: result.s3Urls,
+    referenceImages: !isVideo && p.referenceImages?.length ? [...p.referenceImages] : undefined,
+  };
 }
 
 function GenerateImagePageContent() {
@@ -59,6 +78,56 @@ function GenerateImagePageContent() {
 
   // ── Credit Gate Hook ────────────────────────────────────────
   const credit = useCreditGate(getToken);
+
+  // ── Post-Purchase Resume ──────────────────────────────────
+  const onGenerate = useCallback(async (pg: PendingGenerate) => {
+    setIsLoading(true);
+    if (pg.type === 'image') {
+      const ip = pg.params as GenerateParams;
+      setPrompt(ip.prompt);
+      setAspectRatio(ip.aspectRatio);
+      setNumberOfImages(ip.numberOfImages);
+      setImageSize(ip.imageSize);
+      setReferenceImages(ip.referenceImages || []);
+      if (ip.templateId) setSelectedTemplateId(ip.templateId);
+      setMediaType('image');
+    } else {
+      const vp = pg.params as GenerateVideoParams;
+      setPrompt(vp.prompt);
+      setAspectRatio(vp.aspectRatio);
+      setDuration(vp.duration);
+      if (vp.templateId) setSelectedTemplateId(vp.templateId);
+      setMediaType('video');
+    }
+
+    try {
+      const token = await getToken();
+      if (pg.type === 'video') {
+        const vp = pg.params as GenerateVideoParams;
+        const result = await apiGenerateVideo(vp, token || undefined);
+        if (result.videoUrls.length > 0) {
+          dispatch(addGenerationToHistory(buildHistoryItem(vp, result, 'video')));
+          setVideoUrls(result.videoUrls);
+          toast.success('Video generated successfully!');
+        }
+      } else {
+        const ip = pg.params as GenerateParams;
+        const result = await apiGenerateImages(ip, token || undefined);
+        const urls = result.imageUrls;
+        if (urls.length > 0) {
+          dispatch(addGenerationToHistory(buildHistoryItem(ip, result, 'image')));
+          setImageUrls(urls);
+          toast.success(`Successfully generated ${urls.length} image(s)!`);
+        }
+      }
+    } catch {
+      // Error already surfaced by the generation functions
+    } finally {
+      setIsLoading(false);
+    }
+  }, [dispatch, getToken]);
+
+  usePostPurchaseResume({ getToken, credit, onGenerate });
 
   // Shared params
   const [prompt, setPrompt] = useState(editorState.basePrompt || '');
@@ -97,199 +166,6 @@ function GenerateImagePageContent() {
     }, 0);
     return () => clearTimeout(timer);
   }, []);
-
-  // Check for post-purchase redirect (checkout=success param)
-  useEffect(() => {
-    const checkout = searchParams.get('checkout');
-
-    if (checkout === 'success') {
-      // Remove query params from URL without page reload
-      const url = new URL(window.location.href);
-      url.searchParams.delete('checkout');
-      url.searchParams.delete('plan');
-      url.searchParams.delete('status');
-      url.searchParams.delete('subscription_id');
-      url.searchParams.delete('email');
-      window.history.replaceState({}, '', url.toString());
-
-      toast.success('Purchase successful! Confirming credits...');
-
-      // Refresh balance in header
-      window.dispatchEvent(new CustomEvent('payment-updated'));
-
-      console.log('[Purchase Flow] checkout=success detected, grantCredits starting', {
-        pendingPlanId: sessionStorage.getItem('pending_plan_id'),
-        pendingKey: sessionStorage.getItem('pending_idempotency_key'),
-        pendingGenerate: sessionStorage.getItem('pending_generate') ? 'present' : 'absent',
-      });
-
-      // Step 1: Always grant credits (whether or not there's a pending generation)
-      const grantCredits = async () => {
-        const token = await getToken();
-        if (!token) return;
-        const storedPlanId = sessionStorage.getItem('pending_plan_id');
-        const storedKey = sessionStorage.getItem('pending_idempotency_key') || undefined;
-        console.log('[Purchase Flow] grantCredits executing', { storedPlanId, storedKey });
-        if (storedPlanId) {
-          try {
-            await grantPurchaseCredits(storedPlanId, token, storedKey);
-            console.log('[Purchase Flow] grantCredits completed successfully');
-          } catch (e) { console.error('[Purchase Flow] grantCredits failed', e); }
-          sessionStorage.removeItem('pending_plan_id');
-          sessionStorage.removeItem('pending_idempotency_key');
-          console.log('[Purchase Flow] sessionStorage cleared after grantCredits');
-        } else {
-          console.log('[Purchase Flow] grantCredits: no pending_plan_id found, skipping');
-        }
-      };
-      grantCredits();
-
-      // Restore pending generation from sessionStorage (survives Dodo redirect)
-      const stored = sessionStorage.getItem('pending_generate');
-      const savedPending: {
-        type: 'image' | 'video';
-        params: GenerateParams | GenerateVideoParams;
-      } | null = stored ? JSON.parse(stored) : null;
-
-      if (savedPending) {
-        const pg = savedPending;
-        console.log('[Purchase Flow] savedPending found, resumeGeneration will start', {
-          type: pg.type,
-          prompt: (pg.params as any).prompt?.substring(0, 50),
-        });
-
-        const resumeGeneration = async () => {
-          console.log('[Purchase Flow] resumeGeneration executing');
-          try {
-            const token = await getToken();
-            if (!token) return;
-
-            // Step 1: Check balance (credits were already granted by grantCredits() above)
-            const status = await getBalance(token);
-            const balance = status.credits?.balance ?? 0;
-            credit.setUserBalance(balance);
-
-            // Restore form fields from saved pending generation so the UI
-            // shows the prompt/settings and HistoryPanel shows loading skeleton.
-            setIsLoading(true);
-            if (pg.type === 'image') {
-              const ip = pg.params as GenerateParams;
-              setPrompt(ip.prompt);
-              setAspectRatio(ip.aspectRatio);
-              setNumberOfImages(ip.numberOfImages);
-              setImageSize(ip.imageSize);
-              setReferenceImages(ip.referenceImages || []);
-              if (ip.templateId) setSelectedTemplateId(ip.templateId);
-              setMediaType('image');
-            } else {
-              const vp = pg.params as GenerateVideoParams;
-              setPrompt(vp.prompt);
-              setAspectRatio(vp.aspectRatio);
-              setDuration(vp.duration);
-              if (vp.templateId) setSelectedTemplateId(vp.templateId);
-              setMediaType('video');
-            }
-
-            const cost = pg.type === 'video'
-              ? calculateVideoCost().total
-              : calculateGenerationCost((pg.params as GenerateParams).numberOfImages).total;
-
-            if (balance >= cost) {
-              toast.success('Credits confirmed. Starting generation...');
-              if (pg.type === 'video') {
-                const vp = pg.params as GenerateVideoParams;
-                const result = await apiGenerateVideo(vp, await getToken() || undefined);
-                if (result.videoUrls.length > 0) {
-                  const historyItem: GenerationHistoryItem = {
-                    id: `vid-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                    prompt: vp.prompt,
-                    style: vp.style,
-                    aspectRatio: vp.aspectRatio,
-                    numberOfImages: 1,
-                    imageSize: '1K',
-                    thinkingLevel: 'minimal',
-                    quality: vp.quality,
-                    mediaType: 'video',
-                    imageUrls: [],
-                    videoUrls: result.videoUrls,
-                    duration: result.duration,
-                    templateId: vp.templateId,
-                    creationId: result.creationId ?? undefined,
-                    s3Urls: result.s3Urls,
-                  };
-                  dispatch(addGenerationToHistory(historyItem));
-                  setVideoUrls(result.videoUrls);
-                  toast.success('Video generated successfully!');
-                }
-                setIsLoading(false);
-              } else {
-                const ip = pg.params as GenerateParams;
-                const result = await apiGenerateImages(ip, await getToken() || undefined);
-                const urls = result.imageUrls;
-                if (urls.length > 0) {
-                  const historyItem: GenerationHistoryItem = {
-                    id: `gen-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                    prompt: ip.prompt,
-                    style: ip.style,
-                    aspectRatio: ip.aspectRatio,
-                    numberOfImages: ip.numberOfImages,
-                    imageSize: ip.imageSize,
-                    thinkingLevel: 'minimal',
-                    quality: 'Standard',
-                    mediaType: 'image',
-                    imageUrls: urls,
-                    referenceImages: ip.referenceImages.length > 0 ? [...ip.referenceImages] : undefined,
-                    templateId: ip.templateId,
-                    creationId: result.creationId ?? undefined,
-                    s3Urls: result.s3Urls,
-                  };
-                  dispatch(addGenerationToHistory(historyItem));
-                  setImageUrls(urls);
-                  toast.success(`Successfully generated ${urls.length} image(s)!`);
-                }
-                setIsLoading(false);
-              }
-              credit.setPendingGenerate(null);
-              sessionStorage.removeItem('pending_generate');
-              credit.setShowCreditModal(false);
-            } else {
-              // Poll a few more times as fallback (webhook race)
-              toast.info('Waiting for credit confirmation...');
-              let retries = 0;
-              const poll = async () => {
-                if (retries >= 10) {
-                  credit.setRequiredCredits(cost);
-                  credit.setShowCreditModal(true);
-                  setIsLoading(false);
-                  return;
-                }
-                retries++;
-                const recheck = await getBalance(token);
-                if ((recheck.credits?.balance ?? 0) >= cost) {
-                  credit.setUserBalance(recheck.credits?.balance ?? 0);
-                  credit.setShowCreditModal(false);
-                  credit.setPendingGenerate(null);
-                  setIsLoading(false);
-                  sessionStorage.removeItem('pending_generate');
-                  toast.success('Credits confirmed! Try generating again.');
-                } else {
-                  setTimeout(poll, 2000);
-                }
-              };
-              poll();
-            }
-          } catch {
-            // Silently fail — modal will show again
-            setIsLoading(false);
-          }
-        };
-
-        resumeGeneration();
-      }
-    }
-  }, [searchParams, credit.pendingGenerate, getToken, dispatch]);
 
   useEffect(() => {
     const fetchTemplates = async () => {
@@ -455,24 +331,7 @@ function GenerateImagePageContent() {
       setImageUrls(generatedUrls);
 
       if (generatedUrls.length > 0) {
-        const historyItem: GenerationHistoryItem = {
-          id: `gen-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          prompt: params.prompt,
-          style: params.style,
-          aspectRatio: params.aspectRatio,
-          numberOfImages: params.numberOfImages,
-          imageSize: params.imageSize,
-          thinkingLevel: 'minimal',
-          quality: 'Standard',
-          mediaType: 'image',
-          imageUrls: generatedUrls,
-          referenceImages: params.referenceImages.length > 0 ? [...params.referenceImages] : undefined,
-          templateId: params.templateId,
-          creationId: result.creationId ?? undefined,
-          s3Urls: result.s3Urls,
-        };
-        dispatch(addGenerationToHistory(historyItem));
+        dispatch(addGenerationToHistory(buildHistoryItem(params, result, 'image')));
         toast.success(`Successfully generated ${generatedUrls.length} image(s)!`);
         window.dispatchEvent(new CustomEvent('payment-updated'));
       }
@@ -496,25 +355,7 @@ function GenerateImagePageContent() {
       setVideoUrls(result.videoUrls);
 
       if (result.videoUrls.length > 0) {
-        const historyItem: GenerationHistoryItem = {
-          id: `vid-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          prompt: params.prompt,
-          style: params.style,
-          aspectRatio: params.aspectRatio,
-          numberOfImages: 1,
-          imageSize: '1K',
-          thinkingLevel: 'minimal',
-          quality: params.quality,
-          mediaType: 'video',
-          imageUrls: [],
-          videoUrls: result.videoUrls,
-          duration: result.duration,
-          templateId: params.templateId,
-          creationId: result.creationId ?? undefined,
-          s3Urls: result.s3Urls,
-        };
-        dispatch(addGenerationToHistory(historyItem));
+        dispatch(addGenerationToHistory(buildHistoryItem(params, result, 'video')));
         toast.success("Video generated successfully!");
         window.dispatchEvent(new CustomEvent('payment-updated'));
       }

@@ -11,9 +11,8 @@
  *
  * Behavioral context (from Lavish spec):
  *   Q12 — Signed-in user can upvote templates (toggle on/off)
- *   Upload currently has a credit cost (calculateTemplateUploadCost = 1 credit),
- *   but the captain stated upload should be FREE. Tests mock sufficient credits
- *   as a workaround; the credit check should be removed from the upload flow.
+ *   Upload is FREE (R4) — no credit cost.
+ *   as a workaround (will be removed once credit gate is removed).
  */
 
 import { test, expect } from "@playwright/test";
@@ -405,9 +404,9 @@ test.describe("Templates — Auth-Gated Actions (Clerk)", () => {
       await expect(page.getByLabel(/title/i).first()).toBeVisible({ timeout: 5000 });
       await page.getByLabel(/title/i).first().fill("My Uploaded Template");
     } catch {
-      // If the upload form doesn't appear (credit gate or Clerk sign-up), document as known gap
-      console.log("[Upload] Upload form did not appear — may be credit-gated");
-      // The behavioral spec says upload should be FREE (R4) — credit gate needs removal
+      // If the upload form doesn't appear, document as known gap
+      console.log("[Upload] Upload form did not appear");
+      // Upload is free (R4) — no credit gate needed
       return;
     }
 

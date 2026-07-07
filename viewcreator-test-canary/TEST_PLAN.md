@@ -255,7 +255,7 @@
 | M1.5 | Public plans endpoint returns credit packs + subscriptions | None | None |
 | M1.6 | Public health endpoint returns healthy | None | None |
 | M1.7 | Deduct endpoint: standard deduction (1 credit) | Admin key | None |
-| M1.8 | Deduct endpoint: premium deduction (2 credits) | Admin key | None |
+| M1.8 | Deduct endpoint: 2 credits (standard cost variant) | Admin key | None |
 | M1.9 | Deduct endpoint: insufficient credits → 402 | Admin key | None |
 | M1.10 | Deduct endpoint: 0 credits → 400 | Admin key | None |
 | M1.11 | Deduct endpoint: negative credits → 400 | Admin key | None |
@@ -319,5 +319,3 @@ tests/
 ### Reminders (Future Sessions)
 1. **R1** — History panel pagination for 500+ creations (Q8d)
 2. **R2** — Marketing-focused landing page brainstorm
-3. **R3** — Remove Premium quality tier from codebase (only Standard, 1 credit/image)
-4. **R4** — Remove upload credit cost (upload should be free)

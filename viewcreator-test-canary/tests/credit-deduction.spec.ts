@@ -10,7 +10,7 @@
  *   - Deduction at 0 credits is rejected
  *   - Deduction with invalid ID is rejected
  *   - Idempotency: same idempotency key doesn't double-deduct
- *   - Cost variants: standard (1) and premium (2)
+ *   - Cost variants: standard (1) — Premium removed
  */
 
 import { test, expect } from "@playwright/test";
@@ -70,9 +70,12 @@ test.describe("Credit Deduction API", () => {
     expect(typeof body.balance_after).toBe("number");
   });
 
-  // ── Premium deduction ────────────────────────────────────────
+  // ── Premium deduction (removed — Premium tier no longer exists) ──
 
-  test("deducts 2 credits (premium cost)", async ({ request }) => {
+  test("premium deduction endpoint still works with standard cost", async ({ request }) => {
+    // Premium quality tier was removed (R3). The deduction API still accepts
+    // any amount via the amount parameter — this verifies a 2-credit deduction
+    // still works at the API level even though Premium UI is gone.
     const response = await deductCredits(request, 2);
     expect(response.status()).toBe(200);
 

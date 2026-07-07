@@ -10,7 +10,7 @@
  *          (CURRENT: button is identical, clicking it opens Clerk sign-up modal)
  *   Q3  — 0-credit users see the form, gate triggers on Generate click
  *   Q8  — Exhaustion: modal appears instantly when balance hits 0
- *   Q10 — Cost indicator shown next to Premium toggle ("2 credits")
+ *   Q10 — Cost indicator (removed — Premium tier no longer exists)
  *
  * Credit boundaries: 0 (blocked), 1 (allowed), 100 (allowed)
  */

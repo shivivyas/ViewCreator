@@ -130,35 +130,72 @@ export function TemplateDetailModal({
 
   // ── Trigger AI analysis on mount (if not already cached) ──
   useEffect(() => {
-    if (!template) return;
+    if (!template) {
+      console.log('[TRACE TemplateModal] No template — skipping analysis');
+      return;
+    }
+
+    const modalTraceId = `m-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    console.log(`[TRACE:${modalTraceId}] === AI analysis useEffect fired ===`);
+    console.log(`[TRACE:${modalTraceId}] template.id:`, template.id);
+    console.log(`[TRACE:${modalTraceId}] template.title:`, template.title);
+    console.log(`[TRACE:${modalTraceId}] existing aiAnalysis in config:`, !!template.config?.aiAnalysis);
+    console.log(`[TRACE:${modalTraceId}] config dump:`, JSON.stringify(template.config));
 
     // If already cached in config, no need to fetch
     if (template.config?.aiAnalysis) {
+      console.log(`[TRACE:${modalTraceId}] ✓ CACHE HIT — using existing analysis`);
+      console.log(`[TRACE:${modalTraceId}] cached data:`, JSON.stringify(template.config.aiAnalysis).substring(0, 300));
       setAnalysis(template.config.aiAnalysis);
       setAnalysisLoading(false);
       return;
     }
 
+    console.log(`[TRACE:${modalTraceId}] CACHE MISS — initiating API call`);
     let cancelled = false;
     setAnalysisLoading(true);
 
     (async () => {
+      const callStart = Date.now();
       try {
-        const token = (await getToken().catch(() => undefined)) || undefined;
+        console.log(`[TRACE:${modalTraceId}] Getting auth token...`);
+        const token = (await getToken().catch((e) => {
+          console.warn(`[TRACE:${modalTraceId}] getToken() failed:`, e);
+          return undefined;
+        })) || undefined;
+        console.log(`[TRACE:${modalTraceId}] Token obtained: ${!!token}${token ? ', preview: ' + token.substring(0, 10) + '...' : ''}`);
+
+        console.log(`[TRACE:${modalTraceId}] Calling analyzeTemplate("${template.id}", token)...`);
         const result = await analyzeTemplate(template.id, token);
+        const elapsed = Date.now() - callStart;
+        console.log(`[TRACE:${modalTraceId}] ✓ analyzeTemplate returned in ${elapsed}ms`);
+        console.log(`[TRACE:${modalTraceId}] cached:`, result.cached);
+        console.log(`[TRACE:${modalTraceId}] analysis (full):`, JSON.stringify(result.analysis, null, 2));
+
         if (!cancelled) {
+          console.log(`[TRACE:${modalTraceId}] Setting state with analysis...`);
           setAnalysis(result.analysis);
           setAnalysisLoading(false);
+          console.log(`[TRACE:${modalTraceId}] State updated ✓`);
+        } else {
+          console.log(`[TRACE:${modalTraceId}] Component was cancelled — discarding result`);
         }
-      } catch (err) {
-        console.warn("[TemplateModal] AI analysis failed (non-blocking):", err);
+      } catch (err: any) {
+        const elapsed = Date.now() - callStart;
+        console.warn(`[TRACE:${modalTraceId}] ✖ AI analysis FAILED after ${elapsed}ms`);
+        console.warn(`[TRACE:${modalTraceId}] Error message:`, err.message);
+        console.warn(`[TRACE:${modalTraceId}] Error stack:`, err.stack);
         if (!cancelled) {
+          console.log(`[TRACE:${modalTraceId}] Falling back to hardcoded values`);
           setAnalysisLoading(false);
         }
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      console.log(`[TRACE:${modalTraceId}] Cleanup — cancelling`);
+      cancelled = true;
+    };
   }, [template?.id, getToken]);
 
   if (!template) return null;

@@ -29,6 +29,51 @@ Knowledge base seeded. Awaiting next feature request or task.
 
 ---
 
+## 2026-07-07 — AI-powered template analysis with Gemini
+
+### Agent
+Director (First Mate) + Builder
+
+### Skill
+none
+
+### Summary
+Replaced hardcoded "Works well for", "The AI will preserve/customize" sections in the template detail modal with real-time Gemini analysis of each template's image.
+
+**Backend:**
+- Created `POST /api/templates/analyze` in `viewcreator-api/src/routes/analyze.ts`
+- Endpoint: DB fetch template → S3 download image → Gemini call → parse JSON → cache to `template.config.aiAnalysis` → return
+- No credit check or deduction — completely free
+- 12-step tracing throughout for debugging
+
+**Frontend:**
+- Added `analyzeTemplate()` service in `viewcreator-ui/src/services/api/analysis-service.ts`
+- Updated `template-detail-modal.tsx` — `useEffect` triggers analysis on mount
+- Loading skeletons while Gemini processes; falls back to hardcoded on error
+- Instant second-open via cache (`template.config.aiAnalysis`)
+
+**Key discoveries:**
+- Gemini model for image→text: `gemini-3.1-flash` (404) → `gemini-2.0-flash` (deprecated) → `gemini-2.5-flash` (404) → `gemini-3.5-flash` ✅ (discovered via `models.list()` REST API)
+- Thinking token truncation: at `maxOutputTokens: 1024`, Gemini burned ~984 tokens on "thoughts", outputting only 19 chars before `MAX_TOKENS`. Fix: `thinkingConfig: { includeThoughts: false }` + `maxOutputTokens: 8192`
+- Available models listed via `GET https://generativelanguage.googleapis.com/v1beta/models?key=...`
+
+### Decisions Made
+- Store analysis in `templates.config.aiAnalysis` (no new column/migration)
+- Separate free endpoint — no credit checks imported
+- Analysis fires on modal mount, cached server-side
+
+### Artifacts Produced
+- `viewcreator-api/src/routes/analyze.ts` (new)
+- `viewcreator-api/src/index.ts` (route registration)
+- `viewcreator-ui/src/services/api/analysis-service.ts` (new)
+- `viewcreator-ui/src/types/index.ts` (TemplateAnalysis type)
+- `viewcreator-ui/src/components/templates/template-detail-modal.tsx` (dynamic UI)
+
+### State At End
+Feature complete on `feature/ai-template-analysis`. Two commits pushed to GitHub.
+
+---
+
 ## 2026-07-05 — FirstMate integration into all agent files
 
 ### Agent

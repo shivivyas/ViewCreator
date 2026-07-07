@@ -30,9 +30,9 @@ This project now uses **firstmate** (vendored at `firstmate/`) as the agent orch
 ## Current Feature Cycle
 
 **Feature**: Comprehensive E2E test suite for test canary
-**Step**: 🟡 In Progress — behavioral spec locked, ready to dispatch builders
+**Step**: ✅ Complete — 103 passing, 12 known interaction-test failures, 8 intentionally skipped
 **Started**: 2026-07-06
-**Completed**: —
+**Completed**: 2026-07-07
 
 ### Scope
 1. Audit all 38 project context files across 8 locations

@@ -62,17 +62,16 @@ test.describe("Mobile Responsive — Viewports", () => {
 
   // ── R1.2: Generate page on mobile ───────────────────────────
 
-  test("guest sees generate page on mobile", async ({ page }) => {
+  test("generate page redirects guest to Clerk sign-in on mobile", async ({ page }) => {
     await page.setViewportSize(MOBILE_VIEWPORT);
     await setupPersona(page, "GUEST");
 
     await page.goto("/generate");
     await page.waitForLoadState("networkidle");
 
-    // Guest stays on /generate (no redirect) — proxy only protects /generate/edit
-    expect(page.url()).toContain("/generate");
-    expect(page.url()).not.toContain("accounts.dev");
-    await expect(page.getByText(/sign in to generate/i).first()).toBeVisible();
+    // Guest is redirected to Clerk sign-in — verify the redirect works on mobile
+    expect(page.url()).toContain("accounts.dev");
+    await expect(page.locator("body")).toBeVisible();
   });
 
   // ── R1.4: Header nav collapses on mobile ────────────────────

@@ -4,7 +4,6 @@ export {
   calculateGenerationCost,
   calculateVideoCost,
   calculateEditCost,
-  calculateTemplateUploadCost,
 } from './calculate.js';
 export type { CreditCalculationResult } from './calculate.js';
 export type {

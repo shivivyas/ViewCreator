@@ -12,8 +12,6 @@ export const CREDIT_COSTS = {
   VIDEO: 5,
   /** Image edit operation */
   EDIT: 1,
-  /** Template upload to the community library */
-  TEMPLATE_UPLOAD: 1,
 } as const;
 
 /** Union type of all available credit cost keys */

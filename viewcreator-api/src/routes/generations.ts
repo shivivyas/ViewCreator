@@ -33,7 +33,7 @@ router.post('/api/generate', generationRateLimiter, requireAuth(), syncUserMiddl
 
     // ── Credit Check ───────────────────────────────────────────
     const { userId } = getAuth(req);
-    const { total: totalCost } = calculateGenerationCost(quality, numberOfImages);
+    const { total: totalCost } = calculateGenerationCost(numberOfImages);
 
     const guard = await checkCredits(userId!, totalCost);
     if (!guard.allowed) {

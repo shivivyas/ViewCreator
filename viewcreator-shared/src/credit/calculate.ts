@@ -70,15 +70,3 @@ export function calculateEditCost(): CreditCalculationResult {
   };
 }
 
-/**
- * Calculate the credit cost for a template upload.
- *
- * @returns The total credit cost for a template upload
- */
-export function calculateTemplateUploadCost(): CreditCalculationResult {
-  return {
-    total: CREDIT_COSTS.TEMPLATE_UPLOAD,
-    perUnit: CREDIT_COSTS.TEMPLATE_UPLOAD,
-    label: `${CREDIT_COSTS.TEMPLATE_UPLOAD} credit per upload`,
-  };
-}

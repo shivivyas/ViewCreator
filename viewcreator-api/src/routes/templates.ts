@@ -3,8 +3,6 @@ import { getAuth } from '@clerk/express';
 import { requireAuth } from '@clerk/express';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { TemplateRepository, VoteRepository } from 'viewcreator-database';
-import { calculateTemplateUploadCost } from 'viewcreator-shared';
-import { checkCredits, deductForGeneration } from '../middleware/credit-guard.js';
 import { syncUserMiddleware } from '../middleware/auth-sync.js';
 import { s3Client } from '../services/s3-service.js';
 
@@ -106,18 +104,6 @@ router.post('/api/templates/upload', requireAuth(), syncUserMiddleware, async (r
       return res.status(400).json({ error: 'base64Video content is required for video templates' });
     }
 
-    // ── Credit Check ─────────────────────────────────────────
-    const { total: uploadCreditCost } = calculateTemplateUploadCost();
-    const guard = await checkCredits(userId!, uploadCreditCost);
-    if (!guard.allowed) {
-      return res.status(402).json({
-        error: 'Insufficient credits',
-        credits_balance: guard.credits_balance,
-        required: uploadCreditCost,
-        upgrade_url: '/pricing',
-      });
-    }
-
     const bucketName = process.env.AWS_S3_BUCKET;
     if (!bucketName) {
       return res.status(500).json({ error: 'S3 bucket name is not configured on the server. Please check the AWS_S3_BUCKET setting.' });
@@ -182,19 +168,7 @@ router.post('/api/templates/upload', requireAuth(), syncUserMiddleware, async (r
 
     console.log(`[S3 Upload] Successfully recorded template ${template.id} in Postgres.`);
 
-    // Deduct credits after successful upload
-    const deductResult = await deductForGeneration(
-      userId!,
-      uploadCreditCost,
-      `Uploaded template: ${title}`,
-      { template_id: template.id, media_type: mediaType, is_public: isPublic }
-    );
-
-    if (!deductResult.success) {
-      console.error(`[Credit] Template upload deduction FAILED for user ${userId}:`, deductResult);
-    }
-
-    res.json({ template, credit_deducted: deductResult.success });
+    res.json({ template });
   } catch (error: any) {
     console.error('Error uploading template to S3:', error);
     res.status(500).json({ error: error.message || 'Failed to upload template' });

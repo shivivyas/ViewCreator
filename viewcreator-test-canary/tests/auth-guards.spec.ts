@@ -47,78 +47,37 @@ test.describe("Auth Guards — Guest", () => {
 
   // ── A1.2: Generate API returns 401 without auth ────────────
 
-  test("POST /api/generate returns 401 without auth", async ({ page }) => {
-    // Make a direct fetch call to the API — no auth headers
-    const response = await page.evaluate(async () => {
-      try {
-        const res = await fetch("http://localhost:3000/api/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: "test" }),
-        });
-        return { status: res.status };
-      } catch {
-        // If the request is blocked or redirected, verify it didn't succeed
-        return { status: 0, error: "request blocked or redirected" };
-      }
+  test("POST /api/generate returns 401 without auth", async ({ request }) => {
+    const res = await request.post("http://localhost:3000/api/generate", {
+      data: { prompt: "test" },
     });
-
-    // Expect 401 Unauthorized or a redirect response
-    // Clerk middleware may return 401 or redirect to sign-in (which could appear
-    // as a redirect to the Clerk accounts domain)
-    expect(response.status === 401 || response.status === 0).toBe(true);
+    // Clerk middleware on Next.js API routes returns 401 without auth
+    expect(res.status()).toBe(401);
   });
 
   // ── A1.3: Balance API returns 401 without auth ─────────────
 
-  test("GET /api/payments/balance returns 401 without auth", async ({ page }) => {
-    const response = await page.evaluate(async () => {
-      try {
-        const res = await fetch("http://localhost:3001/api/payments/balance");
-        return { status: res.status };
-      } catch {
-        return { status: 0, error: "request blocked" };
-      }
-    });
-
-    expect(response.status === 401 || response.status === 0).toBe(true);
+  test("GET /api/payments/balance returns 401 without auth", async ({ request }) => {
+    const res = await request.get("http://localhost:3001/api/payments/balance");
+    // Express API without Clerk JWT returns 401 or redirects
+    expect(res.status() === 401 || res.status() === 403).toBe(true);
   });
 
   // ── A1.4: Upload API returns 401 without auth ──────────────
 
-  test("POST /api/templates/upload returns 401 without auth", async ({ page }) => {
-    const response = await page.evaluate(async () => {
-      try {
-        const res = await fetch("http://localhost:3001/api/templates/upload", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title: "test" }),
-        });
-        return { status: res.status };
-      } catch {
-        return { status: 0, error: "request blocked" };
-      }
+  test("POST /api/templates/upload returns 401 without auth", async ({ request }) => {
+    const res = await request.post("http://localhost:3001/api/templates/upload", {
+      data: { title: "test" },
     });
-
-    expect(response.status === 401 || response.status === 0).toBe(true);
+    // Express API requires Clerk auth — expects 401 without token
+    expect(res.status() === 401 || res.status() === 403).toBe(true);
   });
 
   // ── A1.5: Vote API returns 401 without auth ────────────────
 
-  test("POST /api/templates/:id/vote returns 401 without auth", async ({ page }) => {
-    const response = await page.evaluate(async () => {
-      try {
-        const res = await fetch("http://localhost:3001/api/templates/tmpl-1/vote", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-        });
-        return { status: res.status };
-      } catch {
-        return { status: 0, error: "request blocked" };
-      }
-    });
-
-    expect(response.status === 401 || response.status === 0).toBe(true);
+  test("POST /api/templates/:id/vote returns 401 without auth", async ({ request }) => {
+    const res = await request.post("http://localhost:3001/api/templates/tmpl-1/vote");
+    expect(res.status() === 401 || res.status() === 403).toBe(true);
   });
 });
 

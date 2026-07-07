@@ -65,7 +65,7 @@ export async function deleteClerkUser(userId: string) {
  */
 export async function signInUser(
   page: any,
-  opts?: { grantCredits?: number }
+  opts?: { grantCredits?: number; redirectUrl?: string }
 ): Promise<{ userId: string; email: string }> {
   const email = `testuser+clerk_test_${Date.now()}@example.com`;
   const password = "ViewCreatorTest123!";
@@ -97,8 +97,9 @@ export async function signInUser(
   // 2. Enable Clerk testing mode (bypasses bot detection on Clerk's FAPI)
   await setupClerkTestingToken({ page });
 
-  // 3. Navigate to a page so Clerk loads
-  await page.goto("/pricing");
+  // 3. Navigate to the redirect URL or a default page so Clerk loads
+  const startUrl = opts?.redirectUrl || "/pricing";
+  await page.goto(startUrl);
   await page.waitForLoadState("networkidle");
 
   // 4. Sign in through Clerk UI via email-based ticket

@@ -37,26 +37,6 @@ export async function createCheckoutSession(
 }
 
 /**
- * Create a Dodo Payments customer portal session
- */
-export async function createCustomerPortal(
-  customerId: string,
-  sendEmail: boolean = false
-): Promise<{ url: string }> {
-  const params = new URLSearchParams({
-    customer_id: customerId,
-    send_email: String(sendEmail),
-  });
-
-  const res = await fetch(`/api/dodo/customer-portal?${params.toString()}`);
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: 'Portal failed' }));
-    throw new Error(err.error || 'Failed to create portal session');
-  }
-  return res.json();
-}
-
-/**
  * Fetch the authenticated user's credit transaction history.
  */
 export async function getTransactions(token: string): Promise<{ transactions: CreditTransaction[] }> {

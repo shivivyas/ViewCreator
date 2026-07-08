@@ -10,6 +10,7 @@ import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { setImageEditorState, updateHistoryItemImages } from "@/store/slices/image-editor-slice";
 import { editImage } from "@/services";
 import type { EditTimelineEntry } from "@/components/editor/editor-timeline";
+import { safeToken } from "@/lib/helpers";
 
 import { EditorHeader } from "@/components/editor/editor-header";
 import { EditorSidebar } from "@/components/editor/editor-sidebar";
@@ -194,7 +195,7 @@ export default function EditImagePage() {
     setError(null);
 
     try {
-      const token = await getToken().catch(() => undefined) || undefined;
+      const token = await safeToken(getToken);
       const result = await editImage({
         referenceImage: currentImage,
         instruction,

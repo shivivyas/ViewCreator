@@ -25,6 +25,7 @@ import { generateImages } from "@/services/api/generation-service";
 import { useAppDispatch } from "@/store";
 import { setImageEditorState, addGenerationToHistory } from "@/store/slices/image-editor-slice";
 import type { GenerationHistoryItem } from "@/types";
+import { safeToken, cycleIndex } from "@/lib/helpers";
 
 // ─── Constants ─────────────────────────────────────────────────────────────
 
@@ -90,7 +91,7 @@ export function TemplateViewPage({ templateId }: TemplateViewPageProps) {
     const fetch = async () => {
       setLoading(true);
       try {
-        const token = (await getToken().catch(() => undefined)) || undefined;
+        const token = await safeToken(getToken);
         const [tmpl, allTemplates] = await Promise.all([
           getTemplate(templateId, token),
           getTemplates(token),
@@ -145,7 +146,7 @@ export function TemplateViewPage({ templateId }: TemplateViewPageProps) {
     setAnalysisLoading(true);
     (async () => {
       try {
-        const token = (await getToken().catch(() => undefined)) || undefined;
+        const token = await safeToken(getToken);
         const result = await analyzeTemplate(template.id, token);
         if (!cancelled) {
           setAnalysis(result.analysis);
@@ -215,7 +216,7 @@ export function TemplateViewPage({ templateId }: TemplateViewPageProps) {
   const handleDelete = useCallback(async () => {
     if (!template) return;
     try {
-      const token = (await getToken().catch(() => undefined)) || undefined;
+      const token = await safeToken(getToken);
       await deleteTemplate(template.id, token);
       toast.success("Template deleted");
       router.push("/templates");
@@ -239,7 +240,7 @@ export function TemplateViewPage({ templateId }: TemplateViewPageProps) {
     setSelectedVariation(null);
 
     try {
-      const token = (await getToken().catch(() => undefined)) || undefined;
+      const token = await safeToken(getToken);
       const style = template.config?.stylePreset || "None";
       const result = await generateImages(
         {
@@ -404,9 +405,7 @@ export function TemplateViewPage({ templateId }: TemplateViewPageProps) {
                   <button
                     type="button"
                     onClick={() =>
-                      setCarouselIndex((prev) =>
-                        prev === 0 ? carouselAssets.length - 1 : prev - 1
-                      )
+                      setCarouselIndex((prev) => cycleIndex(prev, carouselAssets.length, -1))
                     }
                     className="w-1/2 h-full cursor-pointer"
                     aria-label="Previous image"
@@ -414,9 +413,7 @@ export function TemplateViewPage({ templateId }: TemplateViewPageProps) {
                   <button
                     type="button"
                     onClick={() =>
-                      setCarouselIndex((prev) =>
-                        prev === carouselAssets.length - 1 ? 0 : prev + 1
-                      )
+                      setCarouselIndex((prev) => cycleIndex(prev, carouselAssets.length, 1))
                     }
                     className="w-1/2 h-full cursor-pointer"
                     aria-label="Next image"
@@ -450,11 +447,7 @@ export function TemplateViewPage({ templateId }: TemplateViewPageProps) {
                   {carouselAssets.length > 1 && !carouselAssets[carouselIndex]?.isVideo && (
                     <button
                       type="button"
-                      onClick={() =>
-                        setCarouselIndex((prev) =>
-                          prev === 0 ? carouselAssets.length - 1 : prev - 1
-                        )
-                      }
+                      onClick={() => setCarouselIndex((prev) => cycleIndex(prev, carouselAssets.length, -1))}
                       className="absolute left-2 top-1/2 -translate-y-1/2 size-9 rounded-full bg-background/80 backdrop-blur-sm flex items-center justify-center shadow-sm hover:bg-background transition-all opacity-0 group-hover:opacity-100 group-hover:scale-105 z-20"
                     >
                       <ChevronLeft className="size-4" />
@@ -465,11 +458,7 @@ export function TemplateViewPage({ templateId }: TemplateViewPageProps) {
                   {carouselAssets.length > 1 && !carouselAssets[carouselIndex]?.isVideo && (
                     <button
                       type="button"
-                      onClick={() =>
-                        setCarouselIndex((prev) =>
-                          prev === carouselAssets.length - 1 ? 0 : prev + 1
-                        )
-                      }
+                      onClick={() => setCarouselIndex((prev) => cycleIndex(prev, carouselAssets.length, 1))}
                       className="absolute right-2 top-1/2 -translate-y-1/2 size-9 rounded-full bg-background/80 backdrop-blur-sm flex items-center justify-center shadow-sm hover:bg-background transition-all opacity-0 group-hover:opacity-100 group-hover:scale-105 z-20"
                     >
                       <ChevronRight className="size-4" />

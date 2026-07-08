@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/select";
 import { useAppDispatch } from "@/store";
 import { setImageEditorState } from "@/store/slices/image-editor-slice";
+import { safeToken, cycleIndex } from "@/lib/helpers";
 
 // ─── Constants ─────────────────────────────────────────────────────────────
 
@@ -100,12 +101,12 @@ const TemplateCard = React.memo(function TemplateCard({
 
   const goToPrev = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    setCardImageIdx((p) => (p === 0 ? allImages.length - 1 : p - 1));
+    setCardImageIdx((p) => cycleIndex(p, allImages.length, -1));
   }, [allImages.length]);
 
   const goToNext = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    setCardImageIdx((p) => (p === allImages.length - 1 ? 0 : p + 1));
+    setCardImageIdx((p) => cycleIndex(p, allImages.length, 1));
   }, [allImages.length]);
 
   return (
@@ -363,7 +364,7 @@ export default function TemplatesPage() {
 
   const fetchTemplates = useCallback(
     async (force = false) => {
-      const token = (await getToken().catch(() => undefined)) || undefined;
+      const token = await safeToken(getToken);
       const cacheKey = `${token || "anonymous"}-saved=${savedOnly}`;
 
       if (
@@ -401,7 +402,7 @@ export default function TemplatesPage() {
   // Fetch categories from API (respects visibility: guests see public-only)
   useEffect(() => {
     const load = async () => {
-      const token = (await getToken().catch(() => undefined)) || undefined;
+      const token = await safeToken(getToken);
       const cats = await getCategories(token);
       setCategories(cats);
     };
@@ -459,7 +460,7 @@ export default function TemplatesPage() {
 
   const handleSave = async (e: React.MouseEvent, templateId: string) => {
     e.stopPropagation();
-    const token = (await getToken().catch(() => undefined)) || undefined;
+    const token = await safeToken(getToken);
     if (!token) return;
     try {
       const { template } = await saveTemplate(templateId, token);
@@ -535,7 +536,7 @@ export default function TemplatesPage() {
 
     setUploading(true);
     try {
-      const token = (await getToken().catch(() => undefined)) || undefined;
+      const token = await safeToken(getToken);
       const tags = uploadTagsInput.split(",").map((t) => t.trim()).filter(Boolean);
       const params: any = {
         mediaType: uploadFileType,
@@ -582,7 +583,7 @@ export default function TemplatesPage() {
     if (!templateToDelete) return;
     setDeleting(true);
     try {
-      const token = (await getToken().catch(() => undefined)) || undefined;
+      const token = await safeToken(getToken);
       await deleteTemplate(templateToDelete.id, token);
       toast.success("Template deleted successfully!");
       setShowDeleteModal(false);
@@ -606,7 +607,7 @@ export default function TemplatesPage() {
   const handleVote = async (e: React.MouseEvent, templateId: string) => {
     e.stopPropagation();
     try {
-      const token = (await getToken().catch(() => undefined)) || undefined;
+      const token = await safeToken(getToken);
       const updated = await voteTemplate(templateId, token);
       setTemplates((prev) => prev.map((t) => (t.id === templateId ? updated : t)));
     } catch (err) {

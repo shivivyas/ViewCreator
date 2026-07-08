@@ -70,12 +70,8 @@ export function SiteHeader() {
     const fetchBalance = async () => {
       try {
         const token = await getToken();
-        if (!token) {
-          console.log('[Header] No token, skipping balance fetch');
-          return;
-        }
+        if (!token) return;
         const status = await getBalance(token);
-        console.log('[Header] Balance fetched:', status.credits?.balance, 'credits');
         if (!cancelled) setPaymentStatus(status);
       } catch (err) {
         console.error('[Header] Balance fetch failed:', err);

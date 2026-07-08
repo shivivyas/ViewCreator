@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { CreditGateModal, type CreditPack } from '@/components/shared/credit-gate-modal';
 import { useCreditGate } from '@/hooks/use-credit-gate';
 import { usePostPurchaseResume, type PendingGenerate } from '@/hooks/use-post-purchase-resume';
+import { safeToken } from '@/lib/helpers';
 
 import { GenerateForm } from '@/components/generate/generate-form';
 import { HistoryPanel } from '@/components/generate/history-panel';
@@ -171,7 +172,7 @@ function GenerateImagePageContent() {
     const fetchTemplates = async () => {
       setIsLoadingTemplates(true);
       try {
-        const token = await getToken().catch(() => undefined) || undefined;
+        const token = await safeToken(getToken);
         const loadedTemplates = await getTemplates(token);
         setTemplates(loadedTemplates);
       } catch (err) {
@@ -325,7 +326,7 @@ function GenerateImagePageContent() {
     setImageUrls([]);
 
     try {
-      const token = await getToken().catch(() => undefined) || undefined;
+      const token = await safeToken(getToken);
       const result = await apiGenerateImages(params, token);
       const generatedUrls = result.imageUrls;
       setImageUrls(generatedUrls);
@@ -350,7 +351,7 @@ function GenerateImagePageContent() {
     setVideoUrls([]);
 
     try {
-      const token = await getToken().catch(() => undefined) || undefined;
+      const token = await safeToken(getToken);
       const result = await apiGenerateVideo(params, token);
       setVideoUrls(result.videoUrls);
 

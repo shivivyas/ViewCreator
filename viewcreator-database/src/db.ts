@@ -9,16 +9,16 @@ dotenv.config({ path: '../.env' });
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
   throw new Error(
-    'DATABASE_URL is not set. Configure it in viewcreator-database/.env or viewcreator-api/.env\n' +
-    'Example: DATABASE_URL=postgresql://postgres:password@db.example.supabase.co:5432/postgres'
+    'DATABASE_URL is not set. Set it in your environment or .env file.\n' +
+    'Example: DATABASE_URL=postgresql://user:password@host:5432/db'
   );
 }
 
-// Supabase requires SSL. If the host is a Supabase instance, force SSL on.
-// Also respect DB_SSL env var for explicit override.
-const isSupabase = databaseUrl.includes('supabase.co');
-const sslMode = process.env.DB_SSL;
-const ssl = sslMode === 'true' || sslMode === '1' || (isSupabase && sslMode !== 'false') || false;
+// SSL is controlled purely by the DB_SSL env var — no hostname sniffing.
+// This keeps the connection config provider-agnostic.
+// Set DB_SSL=true for cloud Postgres (Supabase, RDS, etc.).
+// Set DB_SSL=false or omit for local dev Postgres.
+const ssl = process.env.DB_SSL === 'true' || process.env.DB_SSL === '1';
 
 // `family: 4` forces IPv4-only DNS resolution in pg, avoiding EHOSTUNREACH
 // when macOS DNS resolves Supabase to an unreachable IPv6 address.

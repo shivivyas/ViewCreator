@@ -1,6 +1,8 @@
 import dotenv from 'dotenv';
-// Load environment variables immediately before importing other modules
+// Load environment variables immediately before importing other modules.
+// Tries package-level .env first, then falls back to monorepo root .env.
 dotenv.config();
+dotenv.config({ path: '../.env' });
 
 import express from 'express';
 import cors from 'cors';

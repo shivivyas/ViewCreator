@@ -37,7 +37,11 @@ no-mistakes/
 .pnpm-debug.log*
 
 # env files (can opt-in for committing if needed)
-.env*
+.env
+.env.local
+.env.*.local
+# Track .env.example as documentation (it contains no secrets)
+!.env.example
 
 # vercel
 .vercel

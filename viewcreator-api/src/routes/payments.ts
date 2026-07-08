@@ -271,7 +271,10 @@ router.post('/api/payments/confirm-purchase', validate(confirmPurchaseSchema), a
  *   description?:   string
  *   idempotency_key?: string
  */
-const ADMIN_KEY = process.env.ADMIN_API_KEY || 'dev-admin-key';
+const ADMIN_KEY = process.env.ADMIN_API_KEY;
+if (!ADMIN_KEY) {
+  console.warn('[Payments] ADMIN_API_KEY is not set — admin endpoints will reject all requests.');
+}
 
 function requireAdmin(req: any, res: any, next: any) {
   const key = req.headers['x-admin-key'];
@@ -327,7 +330,21 @@ router.post('/api/payments/deduct', requireAdmin, validate(deductCreditsSchema),
  * Internal endpoint called by the Next.js webhook handler.
  * Processes Dodo payment events and syncs them to our database.
  */
-router.post('/api/payments/webhook-event', async (req, res) => {
+const INTERNAL_KEY = process.env.INTERNAL_API_KEY;
+
+function requireInternalAuth(req: any, res: any, next: any) {
+  const key = req.headers['x-internal-key'];
+  if (!INTERNAL_KEY) {
+    // If INTERNAL_API_KEY is not configured, block for safety
+    return res.status(500).json({ error: 'Internal API key not configured.' });
+  }
+  if (!key || key !== INTERNAL_KEY) {
+    return res.status(401).json({ error: 'Unauthorized. Invalid internal key.' });
+  }
+  next();
+}
+
+router.post('/api/payments/webhook-event', requireInternalAuth, async (req, res) => {
   try {
     const { type, data } = req.body as {
       type: string;

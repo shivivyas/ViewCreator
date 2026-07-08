@@ -32,10 +32,14 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Dodo Webhook] Verified: ${eventType}`);
 
-    // Forward to Express API for processing
+    // Forward to Express API for processing (with internal auth)
+    const internalKey = process.env.INTERNAL_API_KEY;
     const res = await fetch(`${API_URL}/api/payments/webhook-event`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(internalKey ? { "x-internal-key": internalKey } : {}),
+      },
       body: JSON.stringify({ type: eventType, data: payload }),
     });
 

@@ -19,7 +19,9 @@ const port = process.env.PORT || 3001;
 // Middlewares
 // Use a large payload limit (e.g., 10mb) to support base64 encoded reference images
 app.use(express.json({ limit: '10mb' }));
-app.use(cors());
+app.use(cors({
+  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+}));
 app.use(clerkMiddleware());
 
 // Health Check Endpoint

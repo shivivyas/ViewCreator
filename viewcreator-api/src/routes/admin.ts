@@ -5,7 +5,10 @@ import { validate, grantCreditsSchema } from '../middleware/validate.js';
 
 const router = Router();
 
-const ADMIN_KEY = process.env.ADMIN_API_KEY || 'dev-admin-key';
+const ADMIN_KEY = process.env.ADMIN_API_KEY;
+if (!ADMIN_KEY) {
+  console.warn('[Admin] ADMIN_API_KEY is not set — admin endpoints will reject all requests.');
+}
 
 /**
  * Simple API key check for admin endpoints

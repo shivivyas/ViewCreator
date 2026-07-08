@@ -221,6 +221,70 @@ Configure monitoring in the Supabase dashboard so you know when things go wrong 
 
 ---
 
+## Step 5b: Configure S3 CORS
+
+### What
+
+If you use S3 for storing generated images/templates, the bucket needs a CORS policy to allow the browser to load those images when the page is on a different domain (localhost, tunnel, production domain).
+
+### Why
+
+- Browsers block cross-origin requests to S3 if the bucket doesn't explicitly allow it
+- You'll see: `Cross-Origin Request Blocked: CORS header 'Access-Control-Allow-Origin' missing`
+- This affects: image previews in the crop editor, template thumbnails, generated images
+
+### Action
+
+**Option A — AWS Console** (simplest):
+1. Go to S3 → your bucket → Permissions → CORS
+2. Paste:
+
+```json
+[
+  {
+    "AllowedOrigins": [
+      "http://localhost:3000",
+      "http://localhost:3001",
+      "http://localhost:3002",
+      "https://*.lhr.life",
+      "https://*.lhr.app",
+      "https://your-production-domain.com"
+    ],
+    "AllowedMethods": ["GET", "HEAD"],
+    "AllowedHeaders": ["*"],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3600
+  }
+]
+```
+
+**Option B — AWS SDK script** (if CLI is blocked):
+Create a one-time script using the project's existing `@aws-sdk/client-s3`:
+
+```ts
+import { S3Client, PutBucketCorsCommand } from '@aws-sdk/client-s3';
+
+const s3Client = new S3Client({ /* credentials from env */ });
+await s3Client.send(new PutBucketCorsCommand({
+  Bucket: process.env.AWS_S3_BUCKET,
+  CORSConfiguration: {
+    CORSRules: [{ AllowedOrigins: [...], AllowedMethods: ['GET', 'HEAD'], AllowedHeaders: ['*'] }]
+  },
+}));
+```
+
+**Option C — AWS CLI**:
+```bash
+aws s3api put-bucket-cors --bucket your-bucket --cors-configuration file://cors.json
+```
+
+### Verify
+
+- [ ] Load a page that displays S3 images — no more CORS errors in the console
+- [ ] The crop editor loads the source image
+
+---
+
 ## Step 6: Set Up Automated Backups
 
 ### What
@@ -397,6 +461,12 @@ Copy this into your project's ops docs and check off as you go.
 | **`dotenv.config()` fallback** | `db.ts` already had `dotenv.config()` + `dotenv.config({ path: '../.env' })` — the second call doesn't overwrite already-set vars. Added same pattern to `index.ts`. |
 | **Clerk needs BOTH keys** | The Clerk Express middleware needs **both** `CLERK_SECRET_KEY` AND `CLERK_PUBLISHABLE_KEY` — even for server-side use. Missing either causes "Publishable key is missing" error on every request. When consolidating env vars, check ALL packages for what vars they use — don't assume the backend only needs the secret key. |
 | **Always restart after .env changes** | `tsx watch` only watches source files, not `.env` files. After changing `.env`, must manually restart the server. |
+| **S3 CORS is required for crop editor** | The crop editor loads images from S3 via the browser (cross-origin). Without CORS, the image fails to load and the crop/save features don't work. The error is: `CORS header 'Access-Control-Allow-Origin' missing`. Fixed by setting a CORS policy on the S3 bucket. |
+| **AWS CLI may be blocked by corporate security** | On corporate machines, `aws` CLI and `npx` may be blocked. Alternative: write a one-time script using the project's own AWS SDK (`@aws-sdk/client-s3`) and run it with `node --require dotenv/config`. |
+| **S3 CORS + browser cache gotcha** | After setting CORS on S3, the browser may still use the cached no-CORS preflight response. Hard refresh (Cmd+Shift+R) or incognito window needed to see the fix. Playwright tests from `about:blank` origin (`page.setContent()`) get CORS blocked because the origin is `null` — always navigate to the app first so origin matches. |
+| **`crossOrigin="anonymous"` on data: URIs** | Works fine — data: URIs are same-origin and not affected by CORS. The `executeCrop` function in the edit page creates a new `Image()` with `crossOrigin="anonymous"` and copies `img.src`. If the image is a data: URI, it works. If S3 URL, CORS headers are required. |
+| **S3 CORS verification via curl** | `curl -s -I -H "Origin: http://localhost:3000" <S3_URL> \| grep -i "access-control"` — check before and after applying policy to confirm propagation. S3 CORS changes are usually instant but browser caches preflight for `MaxAgeSeconds` (we set 3600s = 1 hour). |
+| **History entry = crop persistence** | The edit page's `handleSave` only persists crops to Redux history if `activeHistoryItemId` is set. Any code path that navigates to the editor must: (1) call `addGenerationToHistory` to create a history entry, and (2) set `activeHistoryItemId` in the editor state. The template modal's "Continue to Workspace" was missing both — fix was 3 state vars + 1 dispatch in `template-detail-modal.tsx` and 1 history item builder + dispatch in `templates/page.tsx`. |
 
 ---
 

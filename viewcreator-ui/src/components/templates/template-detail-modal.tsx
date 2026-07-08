@@ -32,7 +32,9 @@ interface TemplateDetailModalProps {
     imageUrl: string,
     allUrls: string[],
     style: string,
-    aspectRatio: string
+    aspectRatio: string,
+    s3Urls?: string[],
+    creationId?: string | null
   ) => void;
   onDelete: (e: React.MouseEvent, template: Template) => void;
   userId: string | null | undefined;
@@ -89,6 +91,8 @@ export function TemplateDetailModal({
   );
   const [numberOfImages, setNumberOfImages] = useState<number>(4);
   const [generatedUrls, setGeneratedUrls] = useState<string[]>([]);
+  const [generatedS3Urls, setGeneratedS3Urls] = useState<string[]>([]);
+  const [generationCreationId, setGenerationCreationId] = useState<string | null>(null);
   const [selectedVariation, setSelectedVariation] = useState<number | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showComparison, setShowComparison] = useState(false);
@@ -246,6 +250,8 @@ export function TemplateDetailModal({
         setModalState("error");
       } else {
         setGeneratedUrls(urlsArray);
+        setGeneratedS3Urls(result.s3Urls || []);
+        setGenerationCreationId(result.creationId || null);
         setModalState("results");
       }
     } catch (err: unknown) {
@@ -275,7 +281,9 @@ export function TemplateDetailModal({
       generatedUrls[idx],
       generatedUrls,
       stylePreset,
-      aspectRatio
+      aspectRatio,
+      generatedS3Urls,
+      generationCreationId
     );
   };
 

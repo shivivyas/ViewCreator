@@ -33,7 +33,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAppDispatch } from "@/store";
-import { setImageEditorState } from "@/store/slices/image-editor-slice";
+import { setImageEditorState, addGenerationToHistory } from "@/store/slices/image-editor-slice";
+import type { GenerationHistoryItem } from "@/types";
 
 // ─── Constants ─────────────────────────────────────────────────────────────
 
@@ -415,8 +416,29 @@ export default function TemplatesPage() {
     imageUrl: string,
     allUrls: string[],
     style: string,
-    aspectRatio: string
+    aspectRatio: string,
+    s3Urls?: string[],
+    creationId?: string | null
   ) => {
+    // Build a history item so the edit page can persist crops to it
+    const historyItem: GenerationHistoryItem = {
+      id: `tmpl-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      prompt,
+      style,
+      aspectRatio,
+      numberOfImages: allUrls.length,
+      imageSize: '1K',
+      thinkingLevel: 'minimal',
+      quality: 'Standard',
+      mediaType: 'image',
+      imageUrls: allUrls,
+      templateId,
+      s3Urls: s3Urls || [],
+      creationId: creationId || undefined,
+    };
+
+    dispatch(addGenerationToHistory(historyItem));
     dispatch(
       setImageEditorState({
         imageUrls: allUrls,
@@ -425,6 +447,7 @@ export default function TemplatesPage() {
         style,
         aspectRatio,
         previewUrl: imageUrl,
+        activeHistoryItemId: historyItem.id,
       })
     );
     router.push(`/generate/edit`);

@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Template Visibility — Analysis</title>
+<style>
+  :root {
+    --bg: #0a0a0b;
+    --surface: #141416;
+    --surface2: #1a1a1e;
+    --border: #1f1f23;
+    --border2: #2a2a30;
+    --text: #e4e4e7;
+    --muted: #71717a;
+    --accent: #f59e0b;
+    --green: #22c55e;
+    --blue: #3b82f6;
+    --red: #ef4444;
+    --purple: #a855f7;
+    --amber: #f59e0b;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', 'Inter', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    padding: 2rem;
+  }
+  .container { max-width: 960px; margin: 0 auto; }
+
+  h1 { font-size: 1.75rem; font-weight: 700; margin-bottom: 0.25rem; }
+  .subtitle { color: var(--muted); font-size: 0.875rem; margin-bottom: 2rem; }
+
+  h2 {
+    font-size: 1.125rem; font-weight: 600;
+    margin: 2rem 0 1rem;
+    display: flex; align-items: center; gap: 0.5rem;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+  }
+  .card:hover { border-color: var(--border2); }
+
+  .flow {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    padding: 1rem;
+    background: var(--surface2);
+    border-radius: 10px;
+    margin: 0.75rem 0;
+    font-size: 0.8125rem;
+  }
+  .flow-step {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.5rem 0.75rem;
+    white-space: nowrap;
+  }
+  .flow-arrow { color: var(--muted); font-size: 1.25rem; }
+
+  .sql-block {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.75rem;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    margin: 0.75rem 0;
+    line-height: 1.6;
+    overflow-x: auto;
+  }
+  .sql-highlight { color: var(--amber); font-weight: 600; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8125rem;
+    margin: 0.75rem 0;
+  }
+  th, td {
+    padding: 0.625rem 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  th { color: var(--muted); font-weight: 600; font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.04em; }
+
+  .tag {
+    display: inline-flex;
+    font-size: 0.625rem;
+    font-weight: 600;
+    padding: 0.125rem 0.5rem;
+    border-radius: 999px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .tag-green { background: #22c55e20; color: var(--green); border: 1px solid #22c55e40; }
+  .tag-red { background: #ef444420; color: var(--red); border: 1px solid #ef444440; }
+  .tag-blue { background: #3b82f620; color: var(--blue); border: 1px solid #3b82f640; }
+  .tag-amber { background: #f59e0b20; color: var(--amber); border: 1px solid #f59e0b40; }
+
+  .option {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.25rem;
+    margin-bottom: 0.75rem;
+    transition: border-color 0.2s;
+  }
+  .option:hover { border-color: var(--border2); }
+  .option h3 { font-size: 0.9375rem; font-weight: 600; margin-bottom: 0.5rem; }
+  .option p { font-size: 0.8125rem; color: var(--muted); line-height: 1.6; }
+  .option .pros { margin-top: 0.5rem; }
+  .option .pros li { font-size: 0.75rem; color: var(--muted); margin-bottom: 0.25rem; }
+
+  .divider { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <h1>🧩 Template Visibility — Problem Analysis</h1>
+  <p class="subtitle">Why guests see user-uploaded templates, and how to fix it</p>
+
+  <!-- ── Problem Statement ── -->
+  <h2>🎯 The Problem</h2>
+  <div class="card">
+    <p style="font-size:0.875rem; line-height:1.7; margin-bottom:1rem;">
+      <strong>User uploads a template → signs out → guests see it.</strong> This shouldn't happen.
+      User-uploaded templates (even when marked "public") are showing up for guests who never signed in.
+    </p>
+
+    <div class="flow">
+      <span class="flow-step">👤 User uploads template</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-step">Toggle = Public</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-step" style="border-color:var(--amber)">user_id = NULL</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-step" style="border-color:var(--red)">👻 Guest sees it</span>
+    </div>
+  </div>
+
+  <!-- ── How It Works ── -->
+  <h2>🔍 Current Architecture</h2>
+  <div class="card">
+    <h3 style="font-size:0.875rem; font-weight:600; margin-bottom:0.5rem;">Upload Flow</h3>
+    <table>
+      <tr><th>Field</th><th>Frontend</th><th>Backend</th><th>DB</th></tr>
+      <tr>
+        <td><code>isPublic: true</code></td>
+        <td><span class="tag tag-blue">Default</span></td>
+        <td>Sets <code>user_id = null</code></td>
+        <td><code>t.user_id IS NULL</code></td>
+      </tr>
+      <tr>
+        <td><code>isPublic: false</code></td>
+        <td>User opt-in</td>
+        <td>Sets <code>user_id = userId</code></td>
+        <td><code>t.user_id = 'user_xxx'</code></td>
+      </tr>
+    </table>
+
+    <h3 style="font-size:0.875rem; font-weight:600; margin:1rem 0 0.5rem;">Guest Query (VoteRepository.findAllWithVotes)</h3>
+    <div class="sql-block">
+      WHERE (t.user_id IS NULL <span class="sql-highlight">OR t.user_id = $1</span>)
+    </div>
+    <p style="font-size:0.75rem; color:var(--muted);">
+      For guests: <code>$1 = null</code> → <code>t.user_id = null</code> is always FALSE in SQL.
+      But <span class="sql-highlight">t.user_id IS NULL</span> matches ALL public templates — including user uploads.
+    </p>
+  </div>
+
+  <!-- ── Data Model ── -->
+  <h2>📊 What's in the Database</h2>
+  <div class="card">
+    <table>
+      <tr><th>Type</th><th>user_id</th><th>Visible to Guests?</th><th>Source</th></tr>
+      <tr>
+        <td>Seeded templates</td>
+        <td><code>NULL</code></td>
+        <td><span class="tag tag-green">✅ Yes</span></td>
+        <td><code>seed.ts</code> — intentionally public</td>
+      </tr>
+      <tr>
+        <td>User uploads (public)</td>
+        <td><code>NULL</code></td>
+        <td><span class="tag tag-red">✅ Yes (bug)</span></td>
+        <td>Frontend defaults to public</td>
+      </tr>
+      <tr>
+        <td>User uploads (private)</td>
+        <td><code>user_xxx</code></td>
+        <td><span class="tag tag-green">❌ No</span></td>
+        <td>User explicitly toggled to private</td>
+      </tr>
+    </table>
+    <p style="font-size:0.75rem; color:var(--muted); margin-top:1rem;">
+      The problem: seeded templates and user-uploaded public templates are <strong>indistinguishable</strong> in the DB.
+      Both have <code>user_id = NULL</code>.
+    </p>
+  </div>
+
+  <!-- ── Options ── -->
+  <h2>💡 Possible Solutions</h2>
+
+  <div class="option">
+    <h3>Option A: Add <code>is_featured</code> column <span class="tag tag-amber">Recommended</span></h3>
+    <p>Add a boolean column <code>is_featured</code> to the templates table. Seeded templates get <code>true</code>; user uploads get <code>false</code>. The guest query filters for <code>is_featured = true</code> instead of <code>user_id IS NULL</code>.</p>
+    <div class="sql-block">
+      WHERE (t.is_featured = true <span style="color:var(--muted)">OR t.user_id = $1</span>)
+    </div>
+    <ul class="pros">
+      <li>✅ Clean separation: seeded vs user-uploaded are distinguishable</li>
+      <li>✅ Seeded templates are always world-visible</li>
+      <li>✅ User uploads (public or private) only visible to signed-in users</li>
+      <li>✅ Easy to promote user templates to featured later</li>
+      <li>⚠️ Requires a DB migration + updating seed.ts</li>
+    </ul>
+  </div>
+
+  <div class="option">
+    <h3>Option B: Filter by <code>user_id IS NULL AND config->>'source' = 'seed'</code></h3>
+    <p>Use the existing <code>config</code> JSONB column to tag seeded templates. No schema migration needed — just update the seed script to set <code>config.source = 'seed'</code>.</p>
+    <div class="sql-block">
+      WHERE (t.config->>'source' = 'seed' <span style="color:var(--muted)">OR t.user_id = $1</span>)
+    </div>
+    <ul class="pros">
+      <li>✅ No DB migration — just update seed.ts</li>
+      <li>✅ Leverages existing JSONB column</li>
+      <li>⚠️ Slightly slower query (JSONB access vs direct column)</li>
+      <li>⚠️ Less explicit — relies on convention</li>
+    </ul>
+  </div>
+
+  <div class="option">
+    <h3>Option C: Dual query — signed-in sees all, guest sees only seeded</h3>
+    <p>Use a hardcoded list of seeded template IDs in the query for guests. No schema changes.</p>
+    <div class="sql-block">
+      -- Guest: return only pre-seeded template IDs<br>
+      WHERE t.id IN ('uuid-1', 'uuid-2', ...)
+    </div>
+    <ul class="pros">
+      <li>✅ Simplest implementation (no migration)</li>
+      <li>⚠️ Brittle — adding new seeded templates requires code change</li>
+      <li>⚠️ Doesn't scale — what if admins want to feature templates later?</li>
+    </ul>
+  </div>
+
+  <div class="option">
+    <h3>Option D: What you originally tried — flip default to private</h3>
+    <p>Change <code>isPublic</code> default from <code>true</code> → <code>false</code>. User uploads stay private unless explicitly shared.</p>
+    <ul class="pros">
+      <li>✅ Simplest change (1 line)</li>
+      <li>⚠️ Contradicts your stated preference (default should be public)</li>
+      <li>⚠️ Changes the UX: users must opt-in to share templates</li>
+    </ul>
+  </div>
+
+  <hr class="divider">
+
+  <!-- ── Decision ── -->
+  <h2>🤔 Open Questions</h2>
+  <div class="card">
+    <ol style="font-size:0.875rem; line-height:1.8; padding-left:1.25rem;">
+      <li><strong>Should guests see any user-uploaded templates at all?</strong><br>
+      <span style="color:var(--muted);">Or only the seeded templates from <code>seed.ts</code>?</span></li>
+      <li style="margin-top:0.75rem;"><strong>When a user marks a template "Public", who should see it?</strong><br>
+      <span style="color:var(--muted);">Only signed-in users? Or everyone including guests?</span></li>
+      <li style="margin-top:0.75rem;"><strong>Do we need a "Featured" / "Community" concept?</strong><br>
+      <span style="color:var(--muted);">Where admins can promote user uploads to world-visibility?</span></li>
+      <li style="margin-top:0.75rem;"><strong>Migration preference?</strong><br>
+      <span style="color:var(--muted);">Schema change (Option A) vs convention-based (Option B)?</span></li>
+    </ol>
+  </div>
+
+</div>
+</body>
+</html>

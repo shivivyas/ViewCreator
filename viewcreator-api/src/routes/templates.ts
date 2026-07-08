@@ -19,8 +19,9 @@ router.get('/api/templates', syncUserMiddleware, async (req, res) => {
 
     const templates = await VoteRepository.findAllWithVotes(userId || undefined, limit, offset);
     
-    // Cache for 30s on the browser/CDN; stale data can be served while revalidating for up to 60s
-    res.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
+    // No browser caching — authenticated responses may contain private templates
+    // that should not be served to guests from cache after sign-out.
+    res.set('Cache-Control', 'private, no-cache');
     res.json({ templates });
   } catch (error: any) {
     console.error('Error fetching templates:', error);

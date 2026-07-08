@@ -265,7 +265,7 @@ export default function TemplatesPage() {
   const [uploadTagsInput, setUploadTagsInput] = useState("");
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [uploadFileType, setUploadFileType] = useState<MediaType>("image");
-  const [isPublic, setIsPublic] = useState(false);
+  const [isPublic, setIsPublic] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
 
   // Detail modal state

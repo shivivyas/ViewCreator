@@ -148,14 +148,14 @@ const TemplateCard = React.memo(function TemplateCard({
             <button
               type="button"
               onClick={goToPrev}
-              className="absolute left-1 top-1/2 -translate-y-1/2 size-6 rounded-full bg-background/70 backdrop-blur-sm flex items-center justify-center shadow-xs hover:bg-background/90 transition-all z-10"
+              className="absolute left-1 top-1/2 -translate-y-1/2 size-6 rounded-full bg-background/70 backdrop-blur-sm flex items-center justify-center shadow-xs hover:bg-background/90 transition-all z-30"
             >
               <ChevronLeft className="size-3.5" />
             </button>
             <button
               type="button"
               onClick={goToNext}
-              className="absolute right-1 top-1/2 -translate-y-1/2 size-6 rounded-full bg-background/70 backdrop-blur-sm flex items-center justify-center shadow-xs hover:bg-background/90 transition-all z-10"
+              className="absolute right-1 top-1/2 -translate-y-1/2 size-6 rounded-full bg-background/70 backdrop-blur-sm flex items-center justify-center shadow-xs hover:bg-background/90 transition-all z-30"
             >
               <ChevronRight className="size-3.5" />
             </button>
@@ -187,7 +187,7 @@ const TemplateCard = React.memo(function TemplateCard({
 
         {/* Carousel dots (bottom of image area) */}
         {hasCarousel && (
-          <div className="absolute bottom-0 inset-x-0 flex items-center justify-center gap-1 pb-2 z-10">
+          <div className="absolute bottom-0 inset-x-0 flex items-center justify-center gap-1 pb-2 z-30">
             {allImages.map((_, i) => (
               <button
                 key={i}

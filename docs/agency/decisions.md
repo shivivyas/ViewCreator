@@ -119,6 +119,110 @@ Full launch roadmap at `docs/operations/production-launch-roadmap.md`
 
 ---
 
+## 2026-07-08: CORS restricted to CORS_ORIGIN env var
+
+### Context
+`cors()` with no config allowed any origin to call the API.
+
+### Decision
+Use `cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:3000' })` instead of bare `cors()`.
+
+### Rationale
+Prevents unauthorized cross-origin requests in production. Defaults to localhost:3000 for development.
+
+---
+
+## 2026-07-08: ADMIN_API_KEY fails closed
+
+### Context
+`ADMIN_API_KEY` defaulted to `dev-admin-key` in production code, making it trivially guessable.
+
+### Decision
+Remove the fallback. If `process.env.ADMIN_API_KEY` is not set, the middleware fails with a clear error message.
+
+### Rationale
+Fail closed, not open. A missing env var should halt the operation, not silently allow access.
+
+---
+
+## 2026-07-08: Webhook endpoint internal auth (defense in depth)
+
+### Context
+The `/api/payments/webhook-event` endpoint had no auth — anyone who knew the URL could POST to it.
+
+### Decision
+Add `requireInternalAuth` middleware that checks for an `x-internal-key` header matching `INTERNAL_API_KEY`. The Next.js webhook handler sends this header when proxying events.
+
+### Rationale
+Defense in depth — even though Svix verifies webhook signatures, an additional layer of internal auth prevents accidental or malicious direct calls to the Express endpoint.
+
+---
+
+## 2026-07-08: Single root .env as source of truth
+
+### Context
+Environment variables were split across 3 packages with no single source of truth. 18+ vars undocumented.
+
+### Decision
+Consolidate to a single root `.env` file. Each package loads it via `dotenv.config({ path: '../.env' })`. `.env.example` at root documents all 20 vars.
+
+### Rationale
+Prevents drift between packages. One place to look for all configuration. Easier to set up new environments.
+
+---
+
+## 2026-07-09: Full-page template view over modal overlay
+
+### Context
+Template detail was a modal overlay. Users needed more space for carousel images + generate controls + footer.
+
+### Decision
+Replace `TemplateDetailModal` with a dedicated full-page route at `/templates/[id]`.
+
+### Rationale
+Shareable permalinks, more screen real estate for the 55/45 left-right layout, natural footer placement, no scrolling issues.
+
+---
+
+## 2026-07-09: Multi-image storage in `config.asset_urls`
+
+### Context
+Templates needed to support multiple images (carousel uploads) without a database migration.
+
+### Decision
+Store additional image URLs in `templates.config.asset_urls` as a JSON array. Primary URL remains in `s3_link`.
+
+### Rationale
+No schema migration needed. Backward compatible with existing single-image templates. Simple to read and query.
+
+---
+
+## 2026-07-09: Guest gates before API calls (not after)
+
+### Context
+Unauthenticated users clicking "Generate Content" or "Upload Template" got a confusing "Not Found" error because Clerk's `requireAuth()` returns a 302 redirect that `fetch` follows to a 404.
+
+### Decision
+Add client-side guest gates (`if (!isSignedIn) { openSignUp(); return; }`) that run BEFORE the API call.
+
+### Rationale
+Users see a clean sign-up modal instead of a cryptic 404. No wasted API calls.
+
+---
+
+## 2026-07-09: `pointer-events-none` for invisible overlays
+
+### Context
+Template card's "Use Template" overlay (`absolute inset-0 z-20 opacity-0`) was intercepting all clicks on carousel arrows, delete buttons, and other interactive elements beneath it — even when invisible.
+
+### Decision
+Use `pointer-events-none` by default and `group-hover:pointer-events-auto` on hover for the overlay.
+
+### Rationale
+Invisible elements should not block interactions. Only become clickable when actually visible (on hover).
+
+---
+
 ## 2026-07-05: FirstMate agent orchestration framework
 
 ### Context

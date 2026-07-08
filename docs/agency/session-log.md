@@ -198,6 +198,78 @@ none
 - Created `global.setup.ts` — calls `clerkSetup()` to obtain Clerk testing token
 - Created `clerk-auth.spec.ts` — uses Clerk Backend API to create real users and inject session cookies (bypasses UI sign-up modal which doesn't work in headless Playwright)
 - Created `generate-gate.spec.ts` — tests access control per persona
+
+---
+
+## 2026-07-09 — Template view page, carousel, multi-image upload
+
+### Agent
+Director (First Mate) + Builder
+
+### Skills
+- source-driven-development
+- frontend-ui-engineering
+- incremental-implementation
+
+### Summary
+Complete redesign of the template detail flow from a modal overlay to a full-page experience at `/templates/[id]`.
+
+**Template View Page (new):**
+- Full-page route replacing the old `TemplateDetailModal`
+- 55/45 left-right layout: left panel has an Instagram-style image carousel + AI prompt, right panel has generate controls
+- Left panel: images stack vertically in a fixed-height carousel with numbered badges, left/right navigation, dot indicators
+- AI prompt is read-only by default, click to edit (inline editable textarea)
+- Right panel: template title/tags, count selector (2/4), aspect ratio selector, "Generate Content" button
+- Sticky header with back navigation, minimal footer
+- Guest gate on "Generate Content" — opens Clerk sign-up modal
+
+**Mini Carousel on Template Cards:**
+- Template grid cards now show a mini carousel with `<` `>` arrows and dots when a template has multiple images (asset_urls)
+- Fixed pointer-events issue: "Use Template" overlay with `absolute inset-0` was intercepting all clicks
+- Fix: `pointer-events-none group-hover:pointer-events-auto` on the overlay
+- Card click handler uses `e.target.closest('button')` to prevent navigation from button clicks
+
+**Multi-Image Upload:**
+- Validation schema accepts `base64Images: string[]` alongside existing `base64Image`/`base64Video`
+- API upload route: loops through all images → uploads each to S3 → stores extras in `config.asset_urls`
+- Frontend: multi-file selection (`multiple` attribute), grid preview with X buttons, "Add more" button
+- Always appends for images (never replaces), video replaces
+- Guest gate on "Upload Template" button
+
+**Auth Flow:**
+| Action | Guest | Signed-in |
+|--------|-------|-----------|
+| Browse templates | ✅ | ✅ |
+| Visit `/templates/[id]` | ✅ full page | ✅ full page |
+| Generate Content | ⛔ sign-up modal | ✅ |
+| Upload Template | ⛔ sign-up modal | ✅ |
+
+### Key Discoveries
+- `absolute inset-0 z-20` overlays block clicks to elements underneath even when `opacity-0` — must use `pointer-events-none`
+- Turbopack HMR sometimes fails with `ChevronLeft is not defined` when adding new imports — full page reload fixes it
+- Clerk's `requireAuth()` middleware returns 302 redirect (not 401) for unauthenticated requests → `fetch` follows redirect → 404 error
+- Template config `asset_urls` works well for storing additional image URLs without schema migration
+
+### Artifacts Produced
+- `viewcreator-ui/src/app/templates/[id]/page.tsx` (new)
+- `viewcreator-ui/src/components/templates/template-view-page.tsx` (new)
+- `viewcreator-api/src/routes/templates.ts` — Added GET /:id + multi-image upload
+- `viewcreator-api/src/middleware/validate.ts` — Updated schema
+- `viewcreator-ui/src/components/templates/template-detail-modal.tsx` — Still exists, unused
+- `viewcreator-ui/src/app/templates/page.tsx` — Removed modal, cards navigate to /templates/:id
+- `viewcreator-ui/src/types/index.ts` — Added `asset_urls` to config
+- `viewcreator-ui/next.config.ts` — Added S3 remote image patterns
+
+### Decisions Made
+- Full-page route over modal overlay (shareable permalinks, more space, natural footer)
+- 55/45 left-right split
+- Store additional asset URLs in `config.asset_urls` (no schema migration)
+- Always append images in upload (never replace)
+- Use `pointer-events-none` for invisible overlays instead of relying on z-index
+- Guest gates before API calls (avoids misleading 404 from Clerk redirect)
+
+### State At End
+All changes committed and pushed to `main` on GitHub. The arrow navigation on template cards still has an unresolved issue — clicking arrows doesn't switch the image (likely a stale HMR bundle or pointer-events issue remaining). Will debug this next session.
 - Created `credit-deduction.spec.ts` — tests atomic deduction, idempotency, auth, boundaries
 - Implemented `POST /api/payments/deduct` endpoint with idempotency key in `routes/payments.ts`
 - Implemented `deductWithIdempotency()` method in `credit-repository.ts`

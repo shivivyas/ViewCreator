@@ -29,6 +29,19 @@ This project now uses **firstmate** (vendored at `firstmate/`) as the agent orch
 
 ## Current Feature Cycle
 
+### July 2026 — Template View Overhaul
+- **Template detail page**: Full-page route with Instagram-style carousel, AI prompt, generate controls ✅
+- **Template card mini carousel**: Arrows and dots on grid cards 🟡 (arrows not working)
+- **Multi-image upload**: Single, carousel, and video support ✅
+- **Guest auth gates**: Generate Content and Upload Template ✅
+- **Next**: Debug card arrow navigation, then resume test coverage
+
+### KB Status
+- `docs/agency/session-log.md` — Updated with 2026-07-09 session
+- `docs/agency/decisions.md` — 4 new decisions added
+- `docs/agency/state/current-task.md` — Updated with current state
+- `docs/learnings/` — New entry added for this session
+
 **Feature**: Comprehensive E2E test suite for test canary
 **Step**: ✅ Complete — 103 passing, 12 known interaction-test failures, 8 intentionally skipped
 **Started**: 2026-07-06

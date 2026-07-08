@@ -40,6 +40,79 @@ Director (First Mate), all specialist crewmate agents
 
 ---
 
+## 2026-07-08: Production security — fail closed, not open
+
+### Context
+Three security gaps found during production audit: CORS all origins, ADMIN_API_KEY with dev fallback, webhook endpoint with no auth.
+
+### The Pattern
+- `cors()` with no config is an instant vulnerability — always specify `origin`
+- Admin keys must never have a dev fallback — `fails closed` means `process.env.KEY` must be set or the operation errors
+- Every endpoint needs auth — even webhooks with signature verification get internal-key auth as defense in depth
+- Single root `.env` prevents config drift between packages
+
+### Evidence
+All three issues were found during audit and fixed in commit `ed21525`.
+
+### Applied By
+Reviewer (production audit), Builder (when adding new endpoints or env vars)
+
+## 2026-07-09: Overlays with `absolute inset-0` must use `pointer-events-none`
+
+### Context
+Positioned overlays (`absolute inset-0 z-20`) that fade in on hover block clicks to interactive elements beneath them even when invisible (`opacity-0`). This broke the template card's carousel arrows and delete buttons.
+
+### The Pattern
+Always add `pointer-events-none` by default and `group-hover:pointer-events-auto` to overlays that are conditionally visible:
+
+```tsx
+<div className="absolute inset-0 ... opacity-0 group-hover:opacity-100 
+                pointer-events-none group-hover:pointer-events-auto">
+```
+
+Also guard card-level `onClick` handlers with `if (e.target.closest('button')) return;` so button clicks never trigger card navigation.
+
+### Evidence
+The "Use Template" overlay on every template card was intercepting all clicks. Adding `pointer-events-none` fixed the carousel arrows, delete buttons, and save buttons.
+
+### Applied By
+Builder (when creating hover overlays), Reviewer (when reviewing z-index stacking)
+
+## 2026-07-09: Guest gates before API calls, not after
+
+### Context
+Clerk's `requireAuth()` middleware returns a 302 redirect (not 401) for unauthenticated requests. The frontend `fetch` follows the redirect and gets a 404, causing a confusing "Not Found" error.
+
+### The Pattern
+Check `isSignedIn` on the client side before making authenticated API calls. Use `openSignUp()` from `useClerk()` to show the sign-up modal:
+
+```tsx
+if (!isSignedIn) {
+  openSignUp();
+  return;
+}
+```
+
+### Evidence
+Upload and Generate Content were returning "Not Found" for guests. Adding the guest gate showed a clean sign-up modal instead.
+
+### Applied By
+Builder (when adding any auth-gated action)
+
+## 2026-07-09: Multi-image upload via `config.asset_urls`
+
+### Context
+Templates needed multiple images (carousel) without a database schema migration.
+
+### The Pattern
+Store the primary URL in `s3_link` and additional URLs in `config.asset_urls` (JSON array in the existing JSONB column). The frontend reads `[s3_link, ...(config?.asset_urls || [])]` for the carousel.
+
+### Evidence
+Works with existing single-image templates (no asset_urls = no carousel). No migration needed. Backward compatible.
+
+### Applied By
+API (upload route), Frontend (carousel component)
+
 ## 2026-07-06: Hybrid test architecture (mock API + real Clerk auth)
 
 ### Context

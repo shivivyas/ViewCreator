@@ -19,7 +19,7 @@ import { useCreditGate } from '@/hooks/use-credit-gate';
 import { usePostPurchaseResume, type PendingGenerate } from '@/hooks/use-post-purchase-resume';
 import { safeToken } from '@/lib/helpers';
 
-import { GenerateForm } from '@/components/generate/generate-form';
+import { GenerateForm, type GenerateFormData } from '@/components/generate/generate-form';
 import { HistoryPanel } from '@/components/generate/history-panel';
 
 /** Credit packs shown in the credit-gate modal. */
@@ -133,17 +133,15 @@ function GenerateImagePageContent() {
   // Shared params
   const [prompt, setPrompt] = useState(editorState.basePrompt || '');
 
-  // Image-only params
-  const [aspectRatio, setAspectRatio] = useState(editorState.aspectRatio || '1:1');
-  const [numberOfImages, setNumberOfImages] = useState(4);
-  const [imageSize, setImageSize] = useState('1K');
-  const [referenceImages, setReferenceImages] = useState<string[]>([]);
-
-  // Video-only params
-  const [duration, setDuration] = useState(6);
-
-  // Media type toggle
+  // Page-level state (needed for header toggle + editor state effect)
   const [mediaType, setMediaType] = useState<MediaType>('image');
+  const [prompt, setPrompt] = useState(editorState.basePrompt || '');
+  const [aspectRatio, setAspectRatio] = useState(editorState.aspectRatio || '1:1');
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+
+  // Form state sync (load settings from history / URL params into the form)
+  const [loadKey, setLoadKey] = useState(0);
+  const [loadValues, setLoadValues] = useState<Partial<GenerateFormData> | undefined>();
 
   const [imageUrls, setImageUrls] = useState<string[]>(editorState.imageUrls || []);
   const [, setVideoUrls] = useState<string[]>([]);
@@ -151,7 +149,6 @@ function GenerateImagePageContent() {
   const [error, setError] = useState<string | null>(null);
 
   const [templates, setTemplates] = useState<Template[]>([]);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
 
   const initialSelectionDone = useRef(false);
@@ -241,31 +238,41 @@ function GenerateImagePageContent() {
     fetchCreations();
   }, [isSignedIn, getToken, dispatch]);
 
+  // ── URL template param: set initial form values ──────
   useEffect(() => {
-    if (templates.length === 0 || initialSelectionDone.current) return;
-    const rafId = requestAnimationFrame(() => {
-      const urlTemplateId = searchParams.get('templateId');
-
-      if (urlTemplateId) {
-        const target = templates.find((t) => t.id === urlTemplateId);
-        if (target) {
-          setSelectedTemplateId(target.id);
-          if (target.media_type) setMediaType(target.media_type);
-          if (target.config?.aspectRatio) setAspectRatio(target.config.aspectRatio);
-          if (target.config?.recommendedPrompts?.length && !prompt.trim()) {
-            setPrompt(target.config.recommendedPrompts[0]);
-          }
-          initialSelectionDone.current = true;
-          return;
-        }
+    if (templates.length === 0) return;
+    const urlTemplateId = searchParams.get('templateId');
+    if (!urlTemplateId) {
+      // Default to first template
+      const firstId = templates[0].id;
+      setSelectedTemplateId(firstId);
+      setLoadValues({ selectedTemplateId: firstId });
+      setLoadKey(1);
+      return;
+    }
+    const target = templates.find((t) => t.id === urlTemplateId);
+    if (target) {
+      setSelectedTemplateId(target.id);
+      if (target.media_type) setMediaType(target.media_type);
+      const vals: Partial<GenerateFormData> = { selectedTemplateId: target.id };
+      if (target.config?.aspectRatio) {
+        vals.aspectRatio = target.config.aspectRatio;
+        setAspectRatio(target.config.aspectRatio);
       }
-
-      // No matching templateId in URL, default to first
+      if (target.config?.recommendedPrompts?.length) {
+        vals.prompt = target.config.recommendedPrompts[0];
+        setPrompt(target.config.recommendedPrompts[0]);
+      }
+      setLoadValues(vals);
+      setLoadKey(1);
+    } else {
       setSelectedTemplateId(templates[0].id);
-      initialSelectionDone.current = true;
-    });
-    return () => cancelAnimationFrame(rafId);
-  }, [templates, searchParams, prompt]);
+      setLoadValues({ selectedTemplateId: templates[0].id });
+      setLoadKey(1);
+    }
+  // Only run once on mount when templates first load
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [templates.length === 0]);
 
   useEffect(() => {
     if (imageUrls.length > 0) {
@@ -278,15 +285,17 @@ function GenerateImagePageContent() {
   const handleLoadSettings = (item: GenerationHistoryItem) => {
     setPrompt(item.prompt);
     setAspectRatio(item.aspectRatio);
-    setNumberOfImages(item.numberOfImages);
-    setImageSize(item.imageSize);
     setMediaType(item.mediaType || 'image');
-    if (item.duration) setDuration(item.duration);
-    if (item.templateId) {
-      setSelectedTemplateId(item.templateId);
-    } else {
-      setSelectedTemplateId(null);
-    }
+    setSelectedTemplateId(item.templateId ?? null);
+    setLoadValues({
+      prompt: item.prompt,
+      aspectRatio: item.aspectRatio,
+      numberOfImages: item.numberOfImages,
+      imageSize: item.imageSize,
+      selectedTemplateId: item.templateId,
+      duration: item.duration,
+    });
+    setLoadKey((k) => k + 1);
   };
 
   const handleSelectImageFromHistory = (item: GenerationHistoryItem, index: number) => {
@@ -369,8 +378,23 @@ function GenerateImagePageContent() {
     }
   };
 
-  const handleGenerate = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleGenerate = async (data: GenerateFormData) => {
+    const {
+      prompt,
+      aspectRatio,
+      numberOfImages,
+      imageSize,
+      referenceImages,
+      selectedTemplateId,
+      mediaType: mt,
+      duration,
+    } = data;
+
+    // Sync page-level state from form submission
+    setPrompt(prompt);
+    setAspectRatio(aspectRatio);
+    setSelectedTemplateId(selectedTemplateId);
+
     if (!prompt.trim()) return;
 
     // ── Guest Gate ─────────────────────────────────────────
@@ -380,11 +404,10 @@ function GenerateImagePageContent() {
     }
 
     // ── Credit Check ───────────────────────────────────────
-    if (mediaType === 'image') {
+    if (mt === 'image') {
       const { total: cost } = calculateGenerationCost(numberOfImages);
       const hasCredits = await credit.checkCredits(cost);
       if (!hasCredits) {
-        // Save form state for resume after purchase
         const pending = {
           type: 'image' as const,
           params: {
@@ -425,9 +448,8 @@ function GenerateImagePageContent() {
     }
 
     // ── Proceed with generation ────────────────────────────
-    if (mediaType === 'video') {
+    if (mt === 'video') {
       await generateVideo({
-        prompt,
         style: getSelectedTemplateStyle(),
         aspectRatio,
         quality: 'Standard',
@@ -475,11 +497,7 @@ function GenerateImagePageContent() {
     }
   };
 
-  const handleEnhancePrompt = () => {
-    if (!prompt.includes("highly detailed")) {
-      setPrompt(prev => prev.trim() + ", highly detailed, cinematic lighting, 8k resolution, photorealistic.");
-    }
-  };
+  // handleEnhancePrompt moved into GenerateForm (form now owns its prompt state)
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-background flex flex-col">
@@ -532,29 +550,18 @@ function GenerateImagePageContent() {
           <div className="grid lg:grid-cols-[400px_1fr] gap-6 h-full">
             <div className="self-start">
             <GenerateForm
-              prompt={prompt}
-              setPrompt={setPrompt}
-              aspectRatio={aspectRatio}
-              setAspectRatio={setAspectRatio}
-              numberOfImages={numberOfImages}
-              setNumberOfImages={setNumberOfImages}
-              imageSize={imageSize}
-              setImageSize={setImageSize}
-              referenceImages={referenceImages}
-              isSignedIn={!!isSignedIn}
-              setReferenceImages={setReferenceImages}
               templates={templates}
-              selectedTemplateId={selectedTemplateId}
-              setSelectedTemplateId={setSelectedTemplateId}
               isLoadingTemplates={isLoadingTemplates}
               isLoading={isLoading}
               mounted={mounted}
+              isSignedIn={!!isSignedIn}
               error={error}
-              handleGenerate={handleGenerate}
-              handleEnhancePrompt={handleEnhancePrompt}
               mediaType={mediaType}
-              duration={duration}
-              setDuration={setDuration}
+              onSubmit={handleGenerate}
+              loadKey={loadKey}
+              loadValues={loadValues}
+              onPromptChange={setPrompt}
+              onAspectRatioChange={setAspectRatio}
             />
             </div>
 

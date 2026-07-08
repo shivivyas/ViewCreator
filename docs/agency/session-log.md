@@ -18,6 +18,39 @@ agency-import
 - Continuous development loop model (not linear phases)
 - Existing decisions (3-package architecture, Dodo Payments, Clerk) documented
 
+---
+
+## 2026-07-08 — Production launch roadmap created
+
+### Agent
+Director
+
+### Skill
+Codebase audit
+
+### Summary
+- Conducted full production readiness audit across all 5 packages
+- Documented 18+ environment variables across the codebase
+- Identified 12 critical/moderate production gaps (security, infra, monitoring)
+- Created comprehensive `docs/operations/production-launch-roadmap.md`
+- Documented AWS hosting decision in `docs/agency/decisions.md`
+- Saved audit findings to repo memory for future reference
+
+### Key Findings
+- **Critical 🔴**: No CORS restriction, default `dev-admin-key`, unprotected webhook endpoint, no CI/CD, no containerization, no IaC
+- **Moderate 🟡**: No monitoring/logging, in-memory rate limiting, public S3 URLs, 18+ undocumented env vars
+- **Good ✅**: Atomic credit ops, webhook idempotency, Zod validation, rate limiting, Clerk auth, versioned DB migrations
+
+### Decisions Made
+- AWS over GCP for hosting (keeps S3 native, simpler stack)
+- Lightsail for launch → ECS Fargate for scale
+- 6-phase launch plan: Security → Isolation → Infra → Hardening → Testing → Launch
+
+### State At End
+- `docs/operations/production-launch-roadmap.md` — Full launch roadmap
+- `docs/agency/decisions.md` — Updated with AWS hosting decision
+- `docs/agency/state/current-task.md` — Updated to "Production planning"
+
 ### Artifacts Produced
 - `docs/agency/README.md` — Project context
 - `docs/agency/phase.md` — Phase status

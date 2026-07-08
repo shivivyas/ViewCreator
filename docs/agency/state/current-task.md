@@ -1,23 +1,18 @@
 # Current Task
 
 **Agent**: Director (First Mate)
-**Status**: ✅ Complete — Codebase simplification sprint (7 items)
+**Status**: 📋 Planned — Production launch preparation
 
 ## What Was Done
 
-See `docs/agency/session-log.md` for full details.
+Full production readiness audit completed. Launch roadmap documented at `docs/operations/production-launch-roadmap.md`.
 
-### Summary
-- Removed `credit-guard.ts` shim (dead re-export wrapper)
-- Fixed `svix` + `@dodopayments/nextjs` dependency buckets
-- Rate limiter factory (eliminated duplicate config)
-- History item factory (4 construction sites → 1 function)
-- Extracted `usePostPurchaseResume` hook (-159 lines from page)
-- Replaced 2 dynamic imports with static imports
-- Normalized workspace deps to `file:` protocol
+### Next Action
+Phase 0 — Emergency security patches (CORS restriction, ADMIN_API_KEY rotation, webhook auth, .env.example creation)
 
-### Key Metrics
-- `generate/page.tsx`: 758 → 599 lines (-21%)
+### Key Files
+- `docs/operations/production-launch-roadmap.md` — Full 6-phase launch plan
+- `docs/agency/decisions.md` — Updated with AWS hosting decision
 - 1 file added, 1 deleted, 8 modified
 - All type-check clean, committed to `main`, pushed to GitHub
 - KB updated with session log, decisions, and learnings

@@ -100,6 +100,25 @@ Need per-action credit costs that can be model-driven in the future.
 
 ---
 
+## 2026-07-08: Production launch — AWS over GCP
+
+### Context
+Production readiness audit completed. Need to decide hosting provider and launch strategy.
+
+### Decision
+Use **AWS** for production hosting, with **Lightsail** (single container) for launch, migrate to **ECS Fargate** when scaling requires it.
+
+### Rationale
+- The project already uses AWS S3 for asset storage — keeps storage native
+- Lower complexity than GCP for this stack (no cross-cloud data transfer)
+- Lightsail is the simplest path: one container runs both Next.js + Express
+- Can migrate to ECS Fargate for auto-scaling without changing providers
+
+### See Also
+Full launch roadmap at `docs/operations/production-launch-roadmap.md`
+
+---
+
 ## 2026-07-05: FirstMate agent orchestration framework
 
 ### Context

@@ -30,6 +30,15 @@ These files are automatically loaded or mandatorily read by AI agents at session
 
 ---
 
+## 🚀 Operations / Launch
+
+| What | Where |
+|------|-------|
+| **Production launch roadmap (6 phases)** | [`operations/production-launch-roadmap.md`](operations/production-launch-roadmap.md) |
+| Security patches, service isolation, infra | AWS Lightsail → ECS Fargate, CI/CD, monitoring |
+
+---
+
 ## 🛠️ Development Guides
 
 | What | Where |

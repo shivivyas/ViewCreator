@@ -395,6 +395,8 @@ Copy this into your project's ops docs and check off as you go.
 | **`.env.example` never committed** | Checked: the package-level `.env.example` files were never tracked by git because `.env*` ignored them. They existed only locally. Force-add needed for first commit. |
 | **Root `.env` consolidation** | Moving from 3 `.env` files (api, database, ui) to 1 root `.env`. API and database packages load root via `dotenv.config({ path: '../.env' })`. UI keeps `.env.local` (Next.js convention). |
 | **`dotenv.config()` fallback** | `db.ts` already had `dotenv.config()` + `dotenv.config({ path: '../.env' })` — the second call doesn't overwrite already-set vars. Added same pattern to `index.ts`. |
+| **Clerk needs BOTH keys** | The Clerk Express middleware needs **both** `CLERK_SECRET_KEY` AND `CLERK_PUBLISHABLE_KEY` — even for server-side use. Missing either causes "Publishable key is missing" error on every request. When consolidating env vars, check ALL packages for what vars they use — don't assume the backend only needs the secret key. |
+| **Always restart after .env changes** | `tsx watch` only watches source files, not `.env` files. After changing `.env`, must manually restart the server. |
 
 ---
 

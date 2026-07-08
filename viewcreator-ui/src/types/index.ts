@@ -98,6 +98,7 @@ export interface Template {
   created_at?: string;
   upvotes?: number;
   user_upvoted?: boolean;
+  is_saved?: boolean;
   config?: {
     category?: string;
     tags?: string[];

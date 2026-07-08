@@ -2,22 +2,23 @@ import { Router } from 'express';
 import { getAuth } from '@clerk/express';
 import { requireAuth } from '@clerk/express';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
-import { TemplateRepository, VoteRepository } from 'viewcreator-database';
+import { TemplateRepository, VoteRepository, SaveRepository } from 'viewcreator-database';
 import { syncUserMiddleware } from '../middleware/auth-sync.js';
 import { s3Client } from '../services/s3-service.js';
 import { validate, uploadTemplateSchema } from '../middleware/validate.js';
 
 const router = Router();
 
-// Get All Templates Endpoint (with vote counts, pagination, and caching)
+// Get All Templates Endpoint (with vote counts, save status, and pagination)
 // No requireAuth — guests can browse templates freely
 router.get('/api/templates', syncUserMiddleware, async (req, res) => {
   try {
     const { userId } = getAuth(req);
     const limit = Math.min(parseInt(req.query.limit as string) || 100, 200);
     const offset = parseInt(req.query.offset as string) || 0;
+    const savedOnly = req.query.saved === 'true';
 
-    const templates = await VoteRepository.findAllWithVotes(userId || undefined, limit, offset);
+    const templates = await VoteRepository.findAllWithVotes(userId || undefined, limit, offset, savedOnly);
     
     // No browser caching — authenticated responses may contain private templates
     // that should not be served to guests from cache after sign-out.
@@ -26,6 +27,45 @@ router.get('/api/templates', syncUserMiddleware, async (req, res) => {
   } catch (error: any) {
     console.error('Error fetching templates:', error);
     res.status(500).json({ error: 'Failed to retrieve templates from database' });
+  }
+});
+
+// Get All Categories Endpoint (dynamic — derived from template tags)
+// Respects visibility: guests only see categories from public templates
+router.get('/api/categories', syncUserMiddleware, async (req, res) => {
+  try {
+    const { userId } = getAuth(req);
+    const categories = await VoteRepository.findCategories(userId || undefined);
+    res.json({ categories });
+  } catch (error: any) {
+    console.error('Error fetching categories:', error);
+    res.status(500).json({ error: 'Failed to retrieve categories' });
+  }
+});
+
+// Toggle Save Template Endpoint
+router.post('/api/templates/:id/save', requireAuth(), syncUserMiddleware, async (req, res): Promise<any> => {
+  try {
+    const { userId } = getAuth(req);
+    const templateId = req.params.id;
+
+    if (!templateId) {
+      return res.status(400).json({ error: 'Template ID is required' });
+    }
+
+    const template = await TemplateRepository.findById(templateId);
+    if (!template) {
+      return res.status(404).json({ error: 'Template not found' });
+    }
+
+    const { saved } = await SaveRepository.toggle(templateId, userId!);
+    
+    // Return updated template with save status
+    const updatedTemplate = await VoteRepository.findByIdWithVotes(templateId, userId || undefined);
+    return res.json({ saved, template: updatedTemplate });
+  } catch (error: any) {
+    console.error('Error toggling save:', error);
+    res.status(500).json({ error: 'Failed to toggle save' });
   }
 });
 

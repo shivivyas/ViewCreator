@@ -34,7 +34,7 @@ const SEED_PLANS = [
         features: [
             'Generate up to 100 images or 20 videos',
             'All aspect ratios & sizes',
-            'Standard & premium quality output',
+            'Standard quality output',
             'Reference image upload',
             'Never expires',
         ],

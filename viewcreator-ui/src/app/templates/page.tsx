@@ -12,11 +12,12 @@ import {
   Wand2,
   Search,
   ThumbsUp,
+  Heart,
   Trash2,
   Grid3X3,
 } from "lucide-react";
 
-import { getTemplates, uploadTemplate, deleteTemplate, voteTemplate } from "@/services/api/template-service";
+import { getTemplates, uploadTemplate, deleteTemplate, voteTemplate, saveTemplate, getCategories } from "@/services/api/template-service";
 import type { Template, MediaType } from "@/types";
 import { Button } from "@/components/ui/button";
 import { TemplateDetailModal } from "@/components/templates/template-detail-modal";
@@ -55,6 +56,7 @@ interface TemplateCardProps {
   onView: (t: Template) => void;
   onVote: (e: React.MouseEvent, id: string) => void;
   onDelete: (e: React.MouseEvent, t: Template) => void;
+  onSave: (e: React.MouseEvent, id: string) => void;
 }
 
 const TemplateCard = React.memo(function TemplateCard({
@@ -65,6 +67,7 @@ const TemplateCard = React.memo(function TemplateCard({
   onView,
   onVote,
   onDelete,
+  onSave,
 }: TemplateCardProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -168,9 +171,25 @@ const TemplateCard = React.memo(function TemplateCard({
         </div>
       </div>
 
-      {/* Footer: upvote + tags */}
+      {/* Footer: save + upvote + tags */}
       <div className="flex items-center justify-between gap-2 px-3 py-2.5">
         <div className="flex items-center gap-1.5 min-w-0">
+          {/* Save button */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className={`h-7 gap-1 px-2 text-xs rounded-full ${
+              template.is_saved
+                ? "bg-rose-500/10 text-rose-500 hover:bg-rose-500/15"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+            onClick={(e) => onSave(e, template.id)}
+          >
+            <Heart
+              className={`size-3 ${template.is_saved ? "fill-current" : ""}`}
+            />
+          </Button>
+          {/* Upvote button */}
           <Button
             variant="ghost"
             size="sm"
@@ -256,6 +275,8 @@ export default function TemplatesPage() {
   const [activeCategory, setActiveCategory] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortOption, setSortOption] = useState<SortValue>("recent");
+  const [savedOnly, setSavedOnly] = useState(false);
+  const [categories, setCategories] = useState<string[]>([]);
 
   // Upload modal states
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -283,7 +304,7 @@ export default function TemplatesPage() {
   const fetchTemplates = useCallback(
     async (force = false) => {
       const token = (await getToken().catch(() => undefined)) || undefined;
-      const cacheKey = token || "anonymous";
+      const cacheKey = `${token || "anonymous"}-saved=${savedOnly}`;
 
       if (
         !force &&
@@ -297,11 +318,10 @@ export default function TemplatesPage() {
 
       setLoading(true);
       try {
-        // When force=true, add a cache-busting query param to bypass
-        // the 30s Cache-Control: public on the API response.
+        // When force=true, add a cache-busting query param
         const loaded = await (force
-          ? getTemplates(token, `_t=${Date.now()}`)
-          : getTemplates(token));
+          ? getTemplates(token, `_t=${Date.now()}`, savedOnly)
+          : getTemplates(token, undefined, savedOnly));
         cacheRef.current = { key: cacheKey, data: loaded, expiry: Date.now() + CACHE_TTL };
         setTemplates(loaded);
       } catch (err) {
@@ -311,25 +331,22 @@ export default function TemplatesPage() {
         setLoading(false);
       }
     },
-    [getToken]
+    [getToken, savedOnly]
   );
 
   useEffect(() => {
     fetchTemplates();
   }, [fetchTemplates]);
 
-  const { categories } = useMemo(() => {
-    const tags = Array.from(
-      new Set(
-        templates.flatMap((t) => {
-          if (t.config?.tags && t.config.tags.length > 0) return t.config.tags;
-          if (t.config?.category) return [t.config.category];
-          return ["Uncategorized"];
-        })
-      )
-    );
-    return { categories: tags };
-  }, [templates]);
+  // Fetch categories from API (respects visibility: guests see public-only)
+  useEffect(() => {
+    const load = async () => {
+      const token = (await getToken().catch(() => undefined)) || undefined;
+      const cats = await getCategories(token);
+      setCategories(cats);
+    };
+    load();
+  }, [getToken]);
 
   const filteredTemplates = useMemo(() => {
     let result =
@@ -340,6 +357,12 @@ export default function TemplatesPage() {
               return t.config.tags.includes(activeCategory);
             return (t.config?.category || "Uncategorized") === activeCategory;
           });
+
+    // If savedOnly is active, the API already filtered. But also handle client-side
+    // filtering when toggling category within saved results.
+    if (savedOnly) {
+      result = result.filter((t) => t.is_saved);
+    }
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -372,6 +395,18 @@ export default function TemplatesPage() {
   const handleUseTemplate = (templateId: string) => {
     dispatch(setImageEditorState({ previewUrl: null }));
     router.push(`/generate?templateId=${templateId}`);
+  };
+
+  const handleSave = async (e: React.MouseEvent, templateId: string) => {
+    e.stopPropagation();
+    const token = (await getToken().catch(() => undefined)) || undefined;
+    if (!token) return;
+    try {
+      const { template } = await saveTemplate(templateId, token);
+      setTemplates((prev) => prev.map((t) => (t.id === templateId ? { ...t, is_saved: template.is_saved } : t)));
+    } catch {
+      toast.error("Failed to save template");
+    }
   };
 
   const handleOpenWorkspace = (
@@ -580,21 +615,34 @@ export default function TemplatesPage() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-4 pb-2">
         <div className="flex gap-1.5 overflow-x-auto pb-2 scrollbar-none">
           <button
-            onClick={() => setActiveCategory("All")}
+            onClick={() => { setActiveCategory("All"); setSavedOnly(false); }}
             className={`shrink-0 px-3.5 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
-              activeCategory === "All"
+              activeCategory === "All" && !savedOnly
                 ? "bg-foreground text-background shadow-sm"
                 : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
             }`}
           >
             All
           </button>
+          {userId && (
+            <button
+              onClick={() => { setActiveCategory("All"); setSavedOnly(true); }}
+              className={`shrink-0 px-3.5 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
+                savedOnly
+                  ? "bg-rose-500 text-white shadow-sm"
+                  : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+              }`}
+            >
+              <Heart className={`size-3 inline mr-1 ${savedOnly ? "fill-current" : ""}`} />
+              My Saves
+            </button>
+          )}
           {categories.map((tag) => (
             <button
               key={tag}
-              onClick={() => setActiveCategory(tag)}
+              onClick={() => { setActiveCategory(tag); setSavedOnly(false); }}
               className={`shrink-0 px-3.5 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
-                activeCategory === tag
+                activeCategory === tag && !savedOnly
                   ? "bg-foreground text-background shadow-sm"
                   : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
               }`}
@@ -624,8 +672,7 @@ export default function TemplatesPage() {
                 onUse={handleUseTemplate}
                 onView={setViewTemplate}
                 onVote={handleVote}
-                onDelete={promptDeleteTemplate}
-              />
+                onDelete={promptDeleteTemplate}                onSave={handleSave}              />
             ))}
           </div>
         )}

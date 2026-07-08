@@ -6,5 +6,6 @@ export { SubscriptionPlan, PlanRepository, } from './repositories/plan-repositor
 export { UserCredits, CreditTransaction, CreditRepository, } from './repositories/credit-repository.js';
 export { UserSubscription, SubscriptionRepository, } from './repositories/subscription-repository.js';
 export { WebhookEventRepository, } from './repositories/webhook-repository.js';
+export { SavedTemplate, SaveRepository, } from './repositories/save-repository.js';
 export { UserCreation, CreateCreationParams, CreationRepository, } from './repositories/creation-repository.js';
 //# sourceMappingURL=index.d.ts.map

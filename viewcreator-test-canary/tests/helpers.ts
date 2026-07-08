@@ -167,6 +167,7 @@ export const MOCK_TEMPLATES: Template[] = [
     s3_link: "https://placehold.co/400x500?text=Summer+Sale",
     upvotes: 12,
     user_upvoted: false,
+    is_saved: false,
     user_id: "user-1",
     created_at: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
     config: {
@@ -188,6 +189,7 @@ export const MOCK_TEMPLATES: Template[] = [
     s3_link: "https://placehold.co/400x500?text=Product+Launch",
     upvotes: 8,
     user_upvoted: true,
+    is_saved: false,
     user_id: "user-2",
     created_at: new Date(Date.now() - 172800000).toISOString(), // 2 days ago
     config: {
@@ -209,6 +211,7 @@ export const MOCK_TEMPLATES: Template[] = [
     s3_link: "https://placehold.co/400x500?text=Social+Kit",
     upvotes: 5,
     user_upvoted: false,
+    is_saved: false,
     user_id: "user-3",
     created_at: new Date(Date.now() - 259200000).toISOString(), // 3 days ago
     config: {
@@ -240,5 +243,22 @@ export async function mockTemplatesEndpoint(page: Page, templates?: Template[]) 
     } else {
       await route.continue();
     }
+  });
+}
+
+/**
+ * Mock the GET /api/categories endpoint.
+ * Extracts unique tags from mock templates to mirror the API's behavior.
+ */
+export async function mockCategoriesEndpoint(page: Page) {
+  const categories = Array.from(
+    new Set(MOCK_TEMPLATES.flatMap((t) => t.config?.tags ?? []))
+  );
+  await page.route(/\/api\/categories(\?.*)?$/, async (route: Route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ categories }),
+    });
   });
 }

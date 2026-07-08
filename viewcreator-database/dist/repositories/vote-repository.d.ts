@@ -10,6 +10,7 @@ export interface TemplateWithVotes {
     updated_at: Date;
     upvotes: number;
     user_upvoted: boolean;
+    is_saved: boolean;
 }
 export declare class VoteRepository {
     /**
@@ -19,13 +20,19 @@ export declare class VoteRepository {
         upvoted: boolean;
     }>;
     /**
-     * Get all templates with upvote counts and whether the current user upvoted.
-     * Supports pagination via LIMIT/OFFSET.
+     * Get all templates with upvote counts, save status, and pagination.
+     * @param savedOnly When true, only returns templates saved by the current user.
      */
-    static findAllWithVotes(currentUserId?: string, limit?: number, offset?: number): Promise<TemplateWithVotes[]>;
+    static findAllWithVotes(currentUserId?: string, limit?: number, offset?: number, savedOnly?: boolean): Promise<TemplateWithVotes[]>;
     /**
-     * Get a single template with upvote count and whether the current user upvoted.
+     * Get a single template with upvote count, save status, and whether the current user upvoted.
      */
     static findByIdWithVotes(templateId: string, currentUserId?: string): Promise<TemplateWithVotes | null>;
+    /**
+     * Get unique category tags from templates visible to the current user.
+     * Guests only see tags from public templates (user_id IS NULL).
+     * Signed-in users see tags from public + their own templates.
+     */
+    static findCategories(currentUserId?: string): Promise<string[]>;
 }
 //# sourceMappingURL=vote-repository.d.ts.map

@@ -14,12 +14,13 @@
  */
 
 import { test, expect } from "@playwright/test";
-import { setupPersona, mockTemplatesEndpoint, MOCK_TEMPLATES } from "./helpers";
+import { setupPersona, mockTemplatesEndpoint, mockCategoriesEndpoint, MOCK_TEMPLATES } from "./helpers";
 
 test.describe("Templates — Guest Experience", () => {
   test.beforeEach(async ({ page }) => {
     await setupPersona(page, "GUEST");
     await mockTemplatesEndpoint(page);
+    await mockCategoriesEndpoint(page);
     await page.goto("/templates");
     await page.waitForLoadState("networkidle");
     // Wait for template cards to render (loading spinner gone)
@@ -73,13 +74,14 @@ test.describe("Templates — Guest Experience", () => {
   // ── 5. Category filter works ───────────────────────────────
 
   test("category filter works", async ({ page }) => {
-    // Categories are derived from template tags. Click the "promotion" category pill.
-    const categoryButton = page.getByRole("button", { name: "promotion" });
+    // Categories are dynamically derived from template tags via API.
+    // Click the "promotion" category pill (only "Summer Sale" has this tag).
+    const categoryButton = page.getByRole("button", { name: "promotion", exact: true });
     await expect(categoryButton).toBeVisible();
     await categoryButton.click();
     await page.waitForTimeout(500);
 
-    // Only "Summer Sale" has the "promotion" tag, so it should be visible
+    // Only "Summer Sale" has the "promotion" tag
     await expect(page.getByText("Summer Sale")).toBeVisible();
     // "Product Launch" and "Social Media Kit" should not match
     await expect(page.getByText("Product Launch")).not.toBeVisible();

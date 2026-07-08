@@ -72,6 +72,18 @@ CREATE TABLE IF NOT EXISTS template_upvotes (
 CREATE INDEX IF NOT EXISTS idx_template_upvotes_template_id ON template_upvotes(template_id);
 CREATE INDEX IF NOT EXISTS idx_template_upvotes_user_id ON template_upvotes(user_id);
 
+-- Saved Templates (Favorites/Bookmarks)
+CREATE TABLE IF NOT EXISTS saved_templates (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    template_id UUID NOT NULL REFERENCES templates(id) ON DELETE CASCADE,
+    user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    UNIQUE (template_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_saved_templates_user_id ON saved_templates(user_id);
+CREATE INDEX IF NOT EXISTS idx_saved_templates_template_id ON saved_templates(template_id);
+
 -- ── Payment & Subscription Tables ─────────────────────────────────────────────────────
 
 -- Subscription Plans: Defines available plans (credit packs and subscriptions)

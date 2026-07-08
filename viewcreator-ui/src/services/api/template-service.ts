@@ -7,10 +7,17 @@ export interface GetTemplatesResponse {
 
 /**
  * Fetches all viral image generation templates from the backend.
- * @param query Optional query string to append (e.g. "_t=123456" for cache busting).
+ * @param query Optional cache-busting timestamp or query string.
+ * @param savedOnly When true, only returns templates saved by current user.
  */
-export async function getTemplates(token?: string, query?: string): Promise<Template[]> {
-  const url = query ? `/api/templates?${query}` : '/api/templates';
+export async function getTemplates(token?: string, query?: string, savedOnly?: boolean): Promise<Template[]> {
+  const params = new URLSearchParams();
+  if (savedOnly) params.set('saved', 'true');
+  const qs = params.toString();
+  // Append cache-busting query param if provided (legacy callers pass "_t=123456")
+  const url = query
+    ? `/api/templates?${qs}${qs ? '&' : ''}${query}`
+    : qs ? `/api/templates?${qs}` : '/api/templates';
   const data = await request<GetTemplatesResponse>(url, {
     method: 'GET',
     token,
@@ -73,4 +80,40 @@ export async function voteTemplate(templateId: string, token?: string): Promise<
     token,
   });
   return data.template;
+}
+
+// ── Categories ────────────────────────────────────────────────
+
+export interface GetCategoriesResponse {
+  categories: string[];
+}
+
+/**
+ * Fetch unique category tags derived from templates visible to current user.
+ * Guests only see categories from public templates.
+ */
+export async function getCategories(token?: string): Promise<string[]> {
+  const data = await request<GetCategoriesResponse>('/api/categories', {
+    method: 'GET',
+    token,
+  });
+  return data.categories || [];
+}
+
+// ── Saved Templates ───────────────────────────────────────────
+
+export interface SaveResponse {
+  saved: boolean;
+  template: Template;
+}
+
+/**
+ * Toggle save (bookmark) on a template.
+ */
+export async function saveTemplate(templateId: string, token?: string): Promise<{ saved: boolean; template: Template }> {
+  return request<SaveResponse>(`/api/templates/${templateId}/save`, {
+    method: 'POST',
+    body: {},
+    token,
+  });
 }

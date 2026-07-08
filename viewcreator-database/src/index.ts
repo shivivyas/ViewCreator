@@ -49,6 +49,12 @@ export {
   WebhookEventRepository,
 } from './repositories/webhook-repository.js';
 
+// Save repository
+export {
+  SavedTemplate,
+  SaveRepository,
+} from './repositories/save-repository.js';
+
 // Creation repository (user-generated content persistence)
 export {
   UserCreation,

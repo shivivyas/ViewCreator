@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Dashboard — Strategy Analysis</title>
+<style>
+  :root {
+    --bg: #0a0a0b;
+    --surface: #141416;
+    --surface2: #1a1a1e;
+    --border: #1f1f23;
+    --border2: #2a2a30;
+    --text: #e4e4e7;
+    --muted: #71717a;
+    --accent: #f59e0b;
+    --green: #22c55e;
+    --blue: #3b82f6;
+    --red: #ef4444;
+    --purple: #a855f7;
+    --amber: #f59e0b;
+    --emerald: #10b981;
+    --rose: #f43f5e;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', 'Inter', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    padding: 2rem;
+  }
+  .container { max-width: 960px; margin: 0 auto; }
+
+  h1 { font-size: 1.75rem; font-weight: 700; margin-bottom: 0.25rem; }
+  .subtitle { color: var(--muted); font-size: 0.875rem; margin-bottom: 2rem; }
+
+  h2 { font-size: 1.125rem; font-weight: 600; margin: 2rem 0 1rem; display: flex; align-items: center; gap: 0.5rem; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+  }
+  .card:hover { border-color: var(--border2); }
+
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+  @media (max-width: 640px) { .grid-2 { grid-template-columns: 1fr; } }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8125rem;
+    margin: 0.75rem 0;
+  }
+  th, td {
+    padding: 0.625rem 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  th { color: var(--muted); font-weight: 600; font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.04em; }
+
+  .tag {
+    display: inline-flex;
+    font-size: 0.625rem;
+    font-weight: 600;
+    padding: 0.125rem 0.5rem;
+    border-radius: 999px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .tag-green { background: #22c55e20; color: var(--green); border: 1px solid #22c55e40; }
+  .tag-red { background: #ef444420; color: var(--red); border: 1px solid #ef444440; }
+  .tag-blue { background: #3b82f620; color: var(--blue); border: 1px solid #3b82f640; }
+  .tag-amber { background: #f59e0b20; color: var(--amber); border: 1px solid #f59e0b40; }
+  .tag-purple { background: #a855f720; color: var(--purple); border: 1px solid #a855f740; }
+  .tag-emerald { background: #10b98120; color: var(--emerald); border: 1px solid #10b98140; }
+
+  .tool-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.25rem;
+  }
+  .tool-card h3 { font-size: 0.875rem; font-weight: 600; margin-bottom: 0.375rem; }
+  .tool-card p { font-size: 0.75rem; color: var(--muted); line-height: 1.5; }
+  .tool-card .capabilities { margin-top: 0.5rem; }
+  .tool-card .capabilities li { font-size: 0.6875rem; color: var(--muted); margin-bottom: 0.125rem; }
+
+  .decision-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.25rem;
+    margin-bottom: 0.75rem;
+    border-left: 3px solid var(--amber);
+  }
+  .decision-card.recommended { border-left-color: var(--green); }
+  .decision-card h3 { font-size: 0.875rem; font-weight: 600; margin-bottom: 0.375rem; }
+  .decision-card p { font-size: 0.75rem; color: var(--muted); line-height: 1.5; }
+
+  .divider { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+
+  .flow {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    padding: 1rem;
+    background: var(--surface2);
+    border-radius: 10px;
+    margin: 0.75rem 0;
+    font-size: 0.8125rem;
+  }
+  .flow-step {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.4rem 0.6rem;
+    white-space: nowrap;
+    font-size: 0.75rem;
+  }
+  .flow-arrow { color: var(--muted); font-size: 1rem; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <h1>🛠️ Admin Dashboard — Build vs Use Strategy</h1>
+  <p class="subtitle">For a micro-SaaS: what to build, what to use off-the-shelf, and why</p>
+
+  <!-- ── First Principle ── -->
+  <h2>🎯 First Principle</h2>
+  <div class="card">
+    <p style="font-size:0.875rem; line-height:1.7;">
+      <strong>Don't build what you already have.</strong> ViewCreator already uses three SaaS tools that each
+      provide admin capabilities out of the box. Building a custom admin dashboard that duplicates
+      their functionality is wasted effort. The right approach is:
+    </p>
+    <div class="flow">
+      <span class="flow-step" style="border-color:var(--green)">✅ Use existing dashboards</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-step" style="border-color:var(--amber)">🔧 Build only app-specific needs</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-step" style="border-color:var(--blue)">📈 Add lightweight monitoring</span>
+    </div>
+  </div>
+
+  <!-- ── What You Already Have ── -->
+  <h2>📦 What You Already Have (Free)</h2>
+  <div class="grid-2">
+
+    <div class="tool-card">
+      <h3>🔐 Clerk Dashboard</h3>
+      <p style="color:var(--muted);">clerk.com — already configured</p>
+      <ul class="capabilities" style="list-style:none;padding:0;">
+        <li>✅ <strong>All users</strong> — list, search, view details</li>
+        <li>✅ <strong>User management</strong> — ban, delete, impersonate</li>
+        <li>✅ <strong>Sessions & devices</strong> — active sessions per user</li>
+        <li>✅ <strong>Webhook logs</strong> — delivery history</li>
+        <li>✅ <strong>Audit log</strong> — every sign-in, sign-up, update</li>
+        <li>✅ <strong>Analytics</strong> — MAU, sign-ups, active sessions</li>
+      </ul>
+    </div>
+
+    <div class="tool-card">
+      <h3>💳 Dodo Payments Dashboard</h3>
+      <p style="color:var(--muted);">app.dodopayments.com — already configured</p>
+      <ul class="capabilities" style="list-style:none;padding:0;">
+        <li>✅ <strong>All transactions</strong> — payments, refunds, disputes</li>
+        <li>✅ <strong>Customer list</strong> — email, purchase history</li>
+        <li>✅ <strong>Subscription management</strong> — active, cancelled, past due</li>
+        <li>✅ <strong>Revenue reporting</strong> — MRR, ARR, churn</li>
+        <li>✅ <strong>Webhook logs</strong> — delivery attempts, failures</li>
+        <li>✅ <strong>Refunds & disputes</strong> — process from dashboard</li>
+      </ul>
+    </div>
+
+    <div class="tool-card">
+      <h3>🐘 Supabase Dashboard</h3>
+      <p style="color:var(--muted);">supabase.com — already using for DB</p>
+      <ul class="capabilities" style="list-style:none;padding:0;">
+        <li>✅ <strong>Table browser</strong> — browse, query, edit any table</li>
+        <li>✅ <strong>SQL editor</strong> — run ad-hoc queries</li>
+        <li>✅ <strong>Database logs</strong> — query performance, errors</li>
+        <li>✅ <strong>Auth users</strong> — if using Supabase Auth (currently using Clerk)</li>
+        <li>✅ <strong>API logs</strong> — request volume, errors</li>
+      </ul>
+    </div>
+
+    <div class="tool-card">
+      <h3>📊 Supabase + Metabase (optional)</h3>
+      <p style="color:var(--muted);">Open-source BI tool, connects to Postgres</p>
+      <ul class="capabilities" style="list-style:none;padding:0;">
+        <li>✅ <strong>Usage dashboards</strong> — daily active users, generations, credits</li>
+        <li>✅ <strong>SQL → chart</strong> — write a query, get a graph</li>
+        <li>✅ <strong>Scheduled reports</strong> — email weekly summaries</li>
+        <li>⚡ 10-min setup: connect to Supabase Postgres URL</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ── What's Missing ── -->
+  <h2>🔍 What's NOT Covered by Existing Tools</h2>
+  <div class="card">
+    <table>
+      <tr><th>Need</th><th>Clerk</th><th>Dodo</th><th>Supabase</th><th>Build?</th></tr>
+      <tr>
+        <td>Look up user by email → see their credit balance</td>
+        <td style="color:var(--muted);">❌ No credit data</td>
+        <td style="color:var(--muted);">❌ No credit data</td>
+        <td><span class="tag tag-green">SQL works</span></td>
+        <td><span class="tag tag-amber">Nice to build</span></td>
+      </tr>
+      <tr>
+        <td>See user's generation history</td>
+        <td style="color:var(--muted);">❌</td>
+        <td style="color:var(--muted);">❌</td>
+        <td><span class="tag tag-green">SQL works</span></td>
+        <td><span class="tag tag-amber">Nice to build</span></td>
+      </tr>
+      <tr>
+        <td>Grant/revoke credits manually</td>
+        <td style="color:var(--muted);">❌</td>
+        <td style="color:var(--muted);">❌</td>
+        <td style="color:var(--muted);">SQL insert</td>
+        <td><span class="tag tag-red">Need to build</span></td>
+      </tr>
+      <tr>
+        <td>Total credits issued vs spent</td>
+        <td style="color:var(--muted);">❌</td>
+        <td style="color:var(--muted);">❌</td>
+        <td><span class="tag tag-green">SQL works</span></td>
+        <td><span class="tag tag-blue">Low effort</span></td>
+      </tr>
+      <tr>
+        <td>Daily active users, generations</td>
+        <td style="color:var(--muted);">MAU only</td>
+        <td style="color:var(--muted);">❌</td>
+        <td><span class="tag tag-green">SQL works</span></td>
+        <td><span class="tag tag-blue">Low effort</span></td>
+      </tr>
+      <tr>
+        <td>Template popularity / top creators</td>
+        <td style="color:var(--muted);">❌</td>
+        <td style="color:var(--muted);">❌</td>
+        <td><span class="tag tag-green">SQL works</span></td>
+        <td><span class="tag tag-blue">Low effort</span></td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- ── Recommendation ── -->
+  <h2>💡 Recommended Approach</h2>
+
+  <div class="decision-card recommended">
+    <h3>✅ Do NOT build — use existing tools</h3>
+    <p><strong>User management</strong> → Clerk Dashboard (search users, ban, view sessions)<br>
+    <strong>Payment transactions</strong> → Dodo Dashboard (revenue, refunds, subscriptions)<br>
+    <strong>Raw data queries</strong> → Supabase Table Editor + SQL Editor</p>
+  </div>
+
+  <div class="decision-card recommended">
+    <h3>✅ Build a lightweight /admin page (3 screens)</h3>
+    <p><strong>One page, three concerns, ~half a day to build:</strong></p>
+    <p style="margin-top:0.5rem;">
+      <strong>1. Overview Dashboard</strong> — aggregate metrics at a glance.<br>
+      Total users, total credits issued, credits spent (all-time + 24h), total generations, generations today, active users (last 7 days).
+    </p>
+    <p style="margin-top:0.25rem;">
+      <strong>2. User Lookup</strong> — search by email, see full profile.<br>
+      Credit balance, lifetime credits, generation count, recent transactions, recent creations. Grant credits button.
+    </p>
+    <p style="margin-top:0.25rem;">
+      <strong>3. System Status</strong> — the existing admin status endpoint.<br>
+      DB health, webhook health, webhook event log, grant credits form.
+    </p>
+  </div>
+
+  <div class="decision-card">
+    <h3>⚡ Optional: Add Metabase (free, open-source)</h3>
+    <p>Connect to Supabase Postgres and get drag-and-drop dashboards for:<br>
+    Daily active users chart · Credit balance distribution · Generation volume over time · Template popularity ranking · Revenue trends from Dodo data (if you sync it)</p>
+  </div>
+
+  <hr class="divider">
+
+  <!-- ── What to Build — MVP Scope ── -->
+  <h2>📋 MVP: What to Build (Half Day)</h2>
+  <div class="card">
+    <table>
+      <tr><th>Backend</th><th>Frontend</th></tr>
+      <tr>
+        <td>
+          <code>GET /api/admin/users?email=X</code> — user lookup with balance, generations, transactions<br><br>
+          <code>GET /api/admin/stats</code> — aggregate metrics (total users, credits, generations, active users)
+        </td>
+        <td>
+          Single <code>/admin</code> page with 3 tabs:<br>
+          1. 📊 Overview — stat cards<br>
+          2. 👥 Users — search + profile<br>
+          3. ⚙️ System — status + webhooks + grant
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- ── Decision Points ── -->
+  <h2>🤔 Open Questions</h2>
+  <div class="card">
+    <ol style="font-size:0.875rem; line-height:1.8; padding-left:1.25rem;">
+      <li><strong>Is Supabase's built-in SQL editor enough for ad-hoc queries?</strong><br>
+      <span style="color:var(--muted);">If yes, you only need the custom /admin page for credit management + user lookup by email.</span></li>
+      <li style="margin-top:0.75rem;"><strong>Do you want Metabase for pretty charts?</strong><br>
+      <span style="color:var(--muted);">Free, self-hosted or Supabase Marketplace. Connect to same Postgres.</span></li>
+      <li style="margin-top:0.75rem;"><strong>Who gets admin access?</strong><br>
+      <span style="color:var(--muted);">Currently: anyone with the <code>ADMIN_API_KEY</code>. Could add Clerk org-based auth later.</span></li>
+      <li style="margin-top:0.75rem;"><strong>Do you need a navigation link, or is /admin a secret URL?</strong><br>
+      <span style="color:var(--muted);">Recommend: not linked from nav. Access via <code>/admin</code> URL + admin key header. Clerk-based admin check optional.</span></li>
+    </ol>
+  </div>
+
+</div>
+</body>
+</html>

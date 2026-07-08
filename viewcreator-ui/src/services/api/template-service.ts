@@ -5,6 +5,22 @@ export interface GetTemplatesResponse {
   templates: Template[];
 }
 
+export interface GetTemplateResponse {
+  template: Template;
+}
+
+/**
+ * Fetches a single template by ID with vote count and save status.
+ * Guests can view individual templates without authentication.
+ */
+export async function getTemplate(id: string, token?: string): Promise<Template> {
+  const data = await request<GetTemplateResponse>(`/api/templates/${id}`, {
+    method: 'GET',
+    token,
+  });
+  return data.template;
+}
+
 /**
  * Fetches all viral image generation templates from the backend.
  * @param query Optional cache-busting timestamp or query string.
@@ -31,6 +47,7 @@ export interface UploadTemplateResponse {
 
 export interface UploadTemplateParams {
   base64Image?: string;
+  base64Images?: string[];
   base64Video?: string;
   mediaType?: 'image' | 'video';
   title: string;

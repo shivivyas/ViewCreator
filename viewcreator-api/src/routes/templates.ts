@@ -30,6 +30,29 @@ router.get('/api/templates', syncUserMiddleware, async (req, res) => {
   }
 });
 
+// Get Single Template by ID (with vote/save status for authenticated user)
+// No requireAuth — guests can view individual templates
+router.get('/api/templates/:id', syncUserMiddleware, async (req, res): Promise<any> => {
+  try {
+    const { userId } = getAuth(req);
+    const templateId = req.params.id;
+
+    if (!templateId) {
+      return res.status(400).json({ error: 'Template ID is required' });
+    }
+
+    const template = await VoteRepository.findByIdWithVotes(templateId, userId || undefined);
+    if (!template) {
+      return res.status(404).json({ error: 'Template not found' });
+    }
+
+    res.json({ template });
+  } catch (error: any) {
+    console.error('Error fetching template:', error);
+    res.status(500).json({ error: 'Failed to retrieve template from database' });
+  }
+});
+
 // Get All Categories Endpoint (dynamic — derived from template tags)
 // Respects visibility: guests only see categories from public templates
 router.get('/api/categories', syncUserMiddleware, async (req, res) => {
@@ -128,11 +151,26 @@ router.post('/api/templates/:id/vote', requireAuth(), syncUserMiddleware, async 
   }
 });
 
-// Upload Template Image to S3 and Save Reference Endpoint
+/** Upload a single file buffer to S3 and return its URL. */
+async function uploadToS3(buffer: Buffer, mimeType: string, prefix: string, userId: string | null | undefined, bucketName: string): Promise<string> {
+  const ext = mimeType.split('/')[1] || 'bin';
+  const s3Key = `${prefix}/${userId || 'public'}/${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${ext}`;
+  await s3Client.send(new PutObjectCommand({ Bucket: bucketName, Key: s3Key, Body: buffer, ContentType: mimeType }));
+  return `https://${bucketName}.s3.${process.env.AWS_REGION || 'us-east-1'}.amazonaws.com/${s3Key}`;
+}
+
+/** Parse a base64 data URI into buffer + mime type. */
+function parseBase64(dataUri: string): { buffer: Buffer; mimeType: string } {
+  const match = dataUri.match(/^data:([\w\/.+-]+);base64,(.+)$/);
+  if (!match) throw new Error('Invalid base64 data format');
+  return { mimeType: match[1], buffer: Buffer.from(match[2], 'base64') };
+}
+
+// Upload Template Assets to S3 and Save Reference Endpoint
 router.post('/api/templates/upload', validate(uploadTemplateSchema), requireAuth(), syncUserMiddleware, async (req, res): Promise<any> => {
   try {
     const { userId } = getAuth(req);
-    const { title, description, base64Image, base64Video, mediaType, tags, isPublic } = req.body;
+    const { title, description, base64Image, base64Images, base64Video, mediaType, tags, isPublic } = req.body;
     const isVideo = mediaType === 'video';
 
     const bucketName = process.env.AWS_S3_BUCKET;
@@ -140,60 +178,49 @@ router.post('/api/templates/upload', validate(uploadTemplateSchema), requireAuth
       return res.status(500).json({ error: 'S3 bucket name is not configured on the server. Please check the AWS_S3_BUCKET setting.' });
     }
 
-    let buffer: Buffer;
-    let mimeType: string;
-    let s3Key: string;
+    const prefix = 'templates';
+    const uploadedUrls: string[] = [];
 
     if (isVideo) {
-      // Handle video upload
-      const videoMatch = base64Video.match(/^data:(video\/[\w.+-]+);base64,(.+)$/);
-      if (!videoMatch) {
-        return res.status(400).json({ error: 'Invalid base64 video data format' });
-      }
-      mimeType = videoMatch[1];
-      const base64Data = videoMatch[2];
-      buffer = Buffer.from(base64Data, 'base64');
-      const fileExtension = mimeType.split('/')[1] || 'mp4';
-      s3Key = `templates/${userId || 'public'}/${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExtension}`;
+      // Single video upload
+      const { buffer, mimeType } = parseBase64(base64Video);
+      const url = await uploadToS3(buffer, mimeType, prefix, userId, bucketName);
+      uploadedUrls.push(url);
+      console.log(`[S3 Upload] Video uploaded: ${url}`);
     } else {
-      // Handle image upload (existing logic)
-      const match = base64Image.match(/^data:(image\/[\w.+-]+);base64,(.+)$/);
-      if (!match) {
-        return res.status(400).json({ error: 'Invalid base64 image data format' });
+      // Collect all base64 images (single + array)
+      const allBase64 = [];
+      if (base64Image) allBase64.push(base64Image);
+      if (base64Images?.length) allBase64.push(...base64Images);
+
+      for (const b64 of allBase64) {
+        const { buffer, mimeType } = parseBase64(b64);
+        const url = await uploadToS3(buffer, mimeType, prefix, userId, bucketName);
+        uploadedUrls.push(url);
       }
-      mimeType = match[1];
-      const base64Data = match[2];
-      buffer = Buffer.from(base64Data, 'base64');
-      const fileExtension = mimeType.split('/')[1] || 'png';
-      s3Key = `templates/${userId || 'public'}/${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExtension}`;
+      console.log(`[S3 Upload] ${uploadedUrls.length} image(s) uploaded`);
     }
 
-    console.log(`[S3 Upload] Uploading ${s3Key} to bucket ${bucketName}...`);
+    if (uploadedUrls.length === 0) {
+      return res.status(400).json({ error: 'No valid assets provided for upload' });
+    }
 
-    // Put Object in S3 Bucket
-    await s3Client.send(
-      new PutObjectCommand({
-        Bucket: bucketName,
-        Key: s3Key,
-        Body: buffer,
-        ContentType: mimeType,
-      })
-    );
-
-    const s3Url = `https://${bucketName}.s3.${process.env.AWS_REGION || 'us-east-1'}.amazonaws.com/${s3Key}`;
-    console.log(`[S3 Upload] Successfully uploaded template ${isVideo ? 'video' : 'image'} to S3: ${s3Url}`);
-
-    // Persist template metadata reference
+    // Primary URL is the first asset; additional ones go into config
     const configTags = isPublic ? tags : ['My Uploads'];
+    const config: Record<string, any> = {
+      tags: configTags,
+      uploadedAt: new Date().toISOString(),
+    };
+    if (uploadedUrls.length > 1) {
+      config.asset_urls = uploadedUrls.slice(1);
+    }
+
     const template = await TemplateRepository.create({
       title,
       description,
-      s3_link: s3Url,
+      s3_link: uploadedUrls[0],
       media_type: isVideo ? 'video' : 'image',
-      config: {
-        tags: configTags,
-        uploadedAt: new Date().toISOString()
-      },
+      config,
       user_id: isPublic ? null : userId
     });
 

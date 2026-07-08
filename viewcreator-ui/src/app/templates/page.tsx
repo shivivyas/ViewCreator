@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@clerk/nextjs";
+import { useAuth, useUser, useClerk } from "@clerk/nextjs";
 import { toast } from "sonner";
 import {
   UploadCloud,
@@ -15,12 +15,13 @@ import {
   Heart,
   Trash2,
   Grid3X3,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 import { getTemplates, uploadTemplate, deleteTemplate, voteTemplate, saveTemplate, getCategories } from "@/services/api/template-service";
 import type { Template, MediaType } from "@/types";
 import { Button } from "@/components/ui/button";
-import { TemplateDetailModal } from "@/components/templates/template-detail-modal";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,8 +34,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAppDispatch } from "@/store";
-import { setImageEditorState, addGenerationToHistory } from "@/store/slices/image-editor-slice";
-import type { GenerationHistoryItem } from "@/types";
+import { setImageEditorState } from "@/store/slices/image-editor-slice";
 
 // ─── Constants ─────────────────────────────────────────────────────────────
 
@@ -54,7 +54,6 @@ interface TemplateCardProps {
   index: number;
   userId: string | null | undefined;
   onUse: (id: string) => void;
-  onView: (t: Template) => void;
   onVote: (e: React.MouseEvent, id: string) => void;
   onDelete: (e: React.MouseEvent, t: Template) => void;
   onSave: (e: React.MouseEvent, id: string) => void;
@@ -65,13 +64,22 @@ const TemplateCard = React.memo(function TemplateCard({
   index,
   userId,
   onUse,
-  onView,
   onVote,
   onDelete,
   onSave,
 }: TemplateCardProps) {
+  const router = useRouter();
   const videoRef = useRef<HTMLVideoElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
+  const [cardImageIdx, setCardImageIdx] = useState(0);
+
+  // Collect all image URLs for carousel templates
+  const allImages = useMemo(() => {
+    if (template.media_type === "video") return [];
+    return [template.s3_link, ...(template.config?.asset_urls || [])];
+  }, [template]);
+
+  const hasCarousel = allImages.length > 1;
 
   useEffect(() => {
     const el = cardRef.current;
@@ -90,13 +98,27 @@ const TemplateCard = React.memo(function TemplateCard({
 
   const isFirstVisible = index < 4;
 
+  const goToPrev = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCardImageIdx((p) => (p === 0 ? allImages.length - 1 : p - 1));
+  }, [allImages.length]);
+
+  const goToNext = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCardImageIdx((p) => (p === allImages.length - 1 ? 0 : p + 1));
+  }, [allImages.length]);
+
   return (
     <div
       ref={cardRef}
       className="group relative cursor-pointer rounded-2xl overflow-hidden bg-card border border-border/50 hover:border-border hover:shadow-lg hover:shadow-primary/5 transition-all duration-300"
-      onClick={() => onView(template)}
+      onClick={(e) => {
+        // Don't navigate when clicking buttons inside the card (arrows, dots, save, delete, use template)
+        if ((e.target as HTMLElement).closest('button')) return;
+        router.push(`/templates/${template.id}`);
+      }}
     >
-      {/* Image */}
+      {/* Image / Carousel area */}
       <div className="relative aspect-[4/5] bg-muted overflow-hidden">
         {template.media_type === "video" ? (
           <video
@@ -111,7 +133,7 @@ const TemplateCard = React.memo(function TemplateCard({
         ) : (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img
-            src={template.s3_link}
+            src={allImages[cardImageIdx]}
             alt={template.title}
             className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
             loading={isFirstVisible ? "eager" : "lazy"}
@@ -120,8 +142,28 @@ const TemplateCard = React.memo(function TemplateCard({
           />
         )}
 
+        {/* Carousel arrows (always visible, small) */}
+        {hasCarousel && (
+          <>
+            <button
+              type="button"
+              onClick={goToPrev}
+              className="absolute left-1 top-1/2 -translate-y-1/2 size-6 rounded-full bg-background/70 backdrop-blur-sm flex items-center justify-center shadow-xs hover:bg-background/90 transition-all z-10"
+            >
+              <ChevronLeft className="size-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={goToNext}
+              className="absolute right-1 top-1/2 -translate-y-1/2 size-6 rounded-full bg-background/70 backdrop-blur-sm flex items-center justify-center shadow-xs hover:bg-background/90 transition-all z-10"
+            >
+              <ChevronRight className="size-3.5" />
+            </button>
+          </>
+        )}
+
         {/* Top-right actions (visible on hover) */}
-        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-all duration-200 translate-y-1 group-hover:translate-y-0 flex gap-1.5">
+        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-all duration-200 translate-y-1 group-hover:translate-y-0 flex gap-1.5 z-20">
           {userId && template.user_id === userId && (
             <Button
               variant="secondary"
@@ -143,6 +185,24 @@ const TemplateCard = React.memo(function TemplateCard({
           </div>
         )}
 
+        {/* Carousel dots (bottom of image area) */}
+        {hasCarousel && (
+          <div className="absolute bottom-0 inset-x-0 flex items-center justify-center gap-1 pb-2 z-10">
+            {allImages.map((_, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setCardImageIdx(i); }}
+                className={`rounded-full transition-all duration-200 ${
+                  i === cardImageIdx
+                    ? "bg-white size-1.5"
+                    : "bg-white/40 size-1 hover:bg-white/60"
+                }`}
+              />
+            ))}
+          </div>
+        )}
+
         {/* Bottom overlay — always visible */}
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent p-4 pt-12">
           <h3 className="text-sm font-semibold text-white line-clamp-1 drop-shadow-sm">
@@ -156,7 +216,7 @@ const TemplateCard = React.memo(function TemplateCard({
         </div>
 
         {/* Use button — appears on hover */}
-        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 bg-black/30">
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 bg-black/30 z-20 pointer-events-none group-hover:pointer-events-auto">
           <Button
             variant="secondary"
             size="sm"
@@ -269,6 +329,8 @@ function EmptyState({
 export default function TemplatesPage() {
   const router = useRouter();
   const { getToken, userId } = useAuth();
+  const { isSignedIn } = useUser();
+  const { openSignUp } = useClerk();
   const dispatch = useAppDispatch();
 
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -285,13 +347,10 @@ export default function TemplatesPage() {
   const [uploadTitle, setUploadTitle] = useState("");
   const [uploadDescription, setUploadDescription] = useState("");
   const [uploadTagsInput, setUploadTagsInput] = useState("");
-  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [previewImages, setPreviewImages] = useState<string[]>([]);
   const [uploadFileType, setUploadFileType] = useState<MediaType>("image");
   const [isPublic, setIsPublic] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
-
-  // Detail modal state
-  const [viewTemplate, setViewTemplate] = useState<Template | null>(null);
 
   // Delete modal state
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -410,67 +469,43 @@ export default function TemplatesPage() {
     }
   };
 
-  const handleOpenWorkspace = (
-    templateId: string,
-    prompt: string,
-    imageUrl: string,
-    allUrls: string[],
-    style: string,
-    aspectRatio: string,
-    s3Urls?: string[],
-    creationId?: string | null
-  ) => {
-    // Build a history item so the edit page can persist crops to it
-    const historyItem: GenerationHistoryItem = {
-      id: `tmpl-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      prompt,
-      style,
-      aspectRatio,
-      numberOfImages: allUrls.length,
-      imageSize: '1K',
-      thinkingLevel: 'minimal',
-      quality: 'Standard',
-      mediaType: 'image',
-      imageUrls: allUrls,
-      templateId,
-      s3Urls: s3Urls || [],
-      creationId: creationId || undefined,
-    };
-
-    dispatch(addGenerationToHistory(historyItem));
-    dispatch(
-      setImageEditorState({
-        imageUrls: allUrls,
-        selectedIndex: 0,
-        basePrompt: prompt,
-        style,
-        aspectRatio,
-        previewUrl: imageUrl,
-        activeHistoryItemId: historyItem.id,
-      })
-    );
-    router.push(`/generate/edit`);
+  const getFileType = (files: FileList): MediaType => {
+    for (const f of files) {
+      if (f.type.startsWith("video/")) return "video";
+    }
+    return "image";
   };
 
-  const getFileType = (file: File): MediaType | null => {
-    if (file.type.startsWith("image/")) return "image";
-    if (file.type.startsWith("video/")) return "video";
-    return null;
-  };
+  const processFiles = (files?: FileList) => {
+    if (!files || files.length === 0) return;
+    const fileType = getFileType(files);
+    setUploadFileType(fileType);
 
-  const processFile = (file?: File) => {
-    const fileType = file ? getFileType(file) : null;
-    if (file && fileType) {
-      setUploadFileType(fileType);
+    if (fileType === "video") {
+      // Video — single file only, replace any existing previews
       const reader = new FileReader();
-      reader.onloadend = () => setPreviewImage(reader.result as string);
-      reader.readAsDataURL(file);
+      reader.onloadend = () => setPreviewImages([reader.result as string]);
+      reader.readAsDataURL(files[0]);
+    } else {
+      // Images — always append to existing previews
+      const readers = Array.from(files).map((f) => {
+        return new Promise<string>((resolve) => {
+          const r = new FileReader();
+          r.onloadend = () => resolve(r.result as string);
+          r.readAsDataURL(f);
+        });
+      });
+      Promise.all(readers).then((newImages) => {
+        setPreviewImages((prev) => [...prev, ...newImages]);
+      });
     }
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) =>
-    processFile(e.target.files?.[0]);
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    processFiles(e.target.files ?? undefined);
+    // Reset so re-selecting the same file(s) fires onChange
+    e.target.value = "";
+  };
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -485,34 +520,44 @@ export default function TemplatesPage() {
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    processFile(e.dataTransfer.files?.[0]);
+    processFiles(e.dataTransfer.files ?? undefined);
   };
 
   const handleUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!previewImage || !uploadTitle) return;
+    if (previewImages.length === 0 || !uploadTitle) return;
+
+    // ── Guest Gate ─────────────────────────────────────────
+    if (!isSignedIn) {
+      openSignUp();
+      return;
+    }
 
     setUploading(true);
     try {
       const token = (await getToken().catch(() => undefined)) || undefined;
       const tags = uploadTagsInput.split(",").map((t) => t.trim()).filter(Boolean);
-      await uploadTemplate(
-        {
-          base64Image: uploadFileType === "image" ? previewImage : undefined,
-          base64Video: uploadFileType === "video" ? previewImage : undefined,
-          mediaType: uploadFileType,
-          title: uploadTitle,
-          description: uploadDescription,
-          tags: isPublic ? tags : ["My Uploads"],
-          isPublic,
-        },
-        token
-      );
+      const params: any = {
+        mediaType: uploadFileType,
+        title: uploadTitle,
+        description: uploadDescription,
+        tags: isPublic ? tags : ["My Uploads"],
+        isPublic,
+      };
+
+      if (uploadFileType === "video") {
+        params.base64Video = previewImages[0];
+      } else if (previewImages.length === 1) {
+        params.base64Image = previewImages[0];
+      } else {
+        params.base64Images = previewImages;
+      }
+
+      await uploadTemplate(params, token);
 
       setShowUploadModal(false);
       resetUploadForm();
       toast.success("Template uploaded successfully!");
-      // Refresh balance badge in header
       window.dispatchEvent(new CustomEvent("payment-updated"));
       cacheRef.current = null;
       await fetchTemplates(true);
@@ -528,7 +573,7 @@ export default function TemplatesPage() {
     setUploadTitle("");
     setUploadDescription("");
     setUploadTagsInput("");
-    setPreviewImage(null);
+    setPreviewImages([]);
     setUploadFileType("image");
     setIsPublic(true);
   };
@@ -542,7 +587,6 @@ export default function TemplatesPage() {
       toast.success("Template deleted successfully!");
       setShowDeleteModal(false);
       setTemplateToDelete(null);
-      if (viewTemplate?.id === templateToDelete.id) setViewTemplate(null);
       cacheRef.current = null;
       await fetchTemplates(true);
     } catch (err) {
@@ -693,9 +737,10 @@ export default function TemplatesPage() {
                 index={i}
                 userId={userId}
                 onUse={handleUseTemplate}
-                onView={setViewTemplate}
                 onVote={handleVote}
-                onDelete={promptDeleteTemplate}                onSave={handleSave}              />
+                onDelete={promptDeleteTemplate}
+                onSave={handleSave}
+              />
             ))}
           </div>
         )}
@@ -759,12 +804,14 @@ export default function TemplatesPage() {
                 </div>
               )}
 
-              {/* File dropzone */}
+              {/* File dropzone — supports single video or multiple images */}
               <div className="space-y-2">
-                <Label className="text-sm">File</Label>
+                <Label className="text-sm">
+                  {uploadFileType === "video" ? "Video" : `Images (${previewImages.length})`}
+                </Label>
                 <div
                   className={`relative rounded-xl border-2 border-dashed transition-colors cursor-pointer overflow-hidden ${
-                    previewImage ? "p-1" : "p-6"
+                    previewImages.length > 0 ? "p-2" : "p-6"
                   } ${
                     isDragging
                       ? "border-primary bg-primary/5"
@@ -775,36 +822,71 @@ export default function TemplatesPage() {
                   onDragLeave={handleDragLeave}
                   onDrop={handleDrop}
                 >
-                  {previewImage ? (
-                    <div className="relative group">
+                  {previewImages.length > 0 ? (
+                    <div className="relative">
                       {uploadFileType === "video" ? (
-                        <video
-                          src={previewImage}
-                          className="w-full aspect-video object-cover rounded-lg"
-                          controls
-                          muted
-                        />
+                        <div className="relative group">
+                          <video
+                            src={previewImages[0]}
+                            className="w-full aspect-video object-cover rounded-lg"
+                            controls
+                            muted
+                          />
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="icon"
+                            className="absolute top-2 right-2 h-7 w-7 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPreviewImages([]);
+                              if (fileInputRef.current) fileInputRef.current.value = "";
+                            }}
+                          >
+                            <X className="size-3.5" />
+                          </Button>
+                        </div>
                       ) : (
-                        /* eslint-disable-next-line @next/next/no-img-element */
-                        <img
-                          src={previewImage}
-                          alt="Preview"
-                          className="w-full aspect-video object-cover rounded-lg"
-                        />
+                        <div className="grid grid-cols-4 gap-2">
+                          {previewImages.map((img, idx) => (
+                            <div key={idx} className="relative group aspect-square rounded-lg overflow-hidden bg-muted">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={img}
+                                alt={`Preview ${idx + 1}`}
+                                className="w-full h-full object-cover"
+                              />
+                              {/* Cross button — always visible */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setPreviewImages((prev) => prev.filter((_, i) => i !== idx));
+                                }}
+                                className="absolute top-1 right-1 size-5 rounded-full bg-black/60 flex items-center justify-center hover:bg-black/80 transition-colors z-10"
+                              >
+                                <X className="size-3 text-white" />
+                              </button>
+                              {/* Hover overlay with index */}
+                              <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <span className="text-[10px] font-medium text-white">{idx + 1}</span>
+                              </div>
+                            </div>
+                          ))}
+                          {/* Add more button */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              fileInputRef.current?.click();
+                            }}
+                            className="aspect-square rounded-lg border-2 border-dashed border-border/60 hover:border-border flex flex-col items-center justify-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
+                          >
+                            <Plus className="size-4" />
+                            <span className="text-[10px] font-medium">Add</span>
+                          </button>
+                        </div>
                       )}
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="icon"
-                        className="absolute top-2 right-2 h-7 w-7 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setPreviewImage(null);
-                          if (fileInputRef.current) fileInputRef.current.value = "";
-                        }}
-                      >
-                        <X className="size-3.5" />
-                      </Button>
                     </div>
                   ) : (
                     <div className="flex flex-col items-center justify-center py-4 text-center">
@@ -812,16 +894,17 @@ export default function TemplatesPage() {
                         <Plus className="size-5 text-muted-foreground" />
                       </div>
                       <span className="text-sm font-medium text-foreground">
-                        Choose an image or video
+                        Choose images or a video
                       </span>
                       <span className="text-xs text-muted-foreground mt-1">
-                        Drag & drop or click to browse
+                        Select multiple images for carousel, or one video
                       </span>
                     </div>
                   )}
                   <input
                     type="file"
                     accept="image/*,video/*"
+                    multiple
                     className="hidden"
                     ref={fileInputRef}
                     onChange={handleFileSelect}
@@ -859,7 +942,7 @@ export default function TemplatesPage() {
               <Button
                 type="submit"
                 className="w-full h-10 rounded-xl"
-                disabled={!previewImage || !uploadTitle || uploading}
+                disabled={previewImages.length === 0 || !uploadTitle || uploading}
               >
                 {uploading ? (
                   <>
@@ -874,15 +957,6 @@ export default function TemplatesPage() {
           </div>
         </div>
       )}
-
-      {/* ── Detail Modal ────────────────────────────────────── */}
-      <TemplateDetailModal
-        template={viewTemplate}
-        onClose={() => setViewTemplate(null)}
-        onOpenWorkspace={handleOpenWorkspace}
-        onDelete={promptDeleteTemplate}
-        userId={userId}
-      />
 
       <ConfirmDialog
         open={showDeleteModal && !!templateToDelete}

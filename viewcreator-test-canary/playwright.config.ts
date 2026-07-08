@@ -32,6 +32,7 @@ export default defineConfig({
     trace: "on",
     screenshot: "on",
     video: "on",
+    channel: "chrome",  // Use system-installed Chrome (corporate machines may block Playwright's bundled Chromium)
   },
   projects: [
     {

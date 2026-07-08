@@ -56,6 +56,7 @@ export const uploadTemplateSchema = z.object({
   title: z.string().min(1, 'Title is required').max(255),
   description: z.string().max(2000).optional(),
   base64Image: z.string().optional(),
+  base64Images: z.array(z.string()).optional(),
   base64Video: z.string().optional(),
   mediaType: z.enum(['image', 'video']).default('image'),
   tags: z.array(z.string()).optional(),
@@ -64,8 +65,8 @@ export const uploadTemplateSchema = z.object({
   if (data.mediaType === 'video' && !data.base64Video) {
     ctx.addIssue({ code: 'custom', path: ['base64Video'], message: 'base64Video is required for video templates' });
   }
-  if (data.mediaType !== 'video' && !data.base64Image) {
-    ctx.addIssue({ code: 'custom', path: ['base64Image'], message: 'base64Image is required for image templates' });
+  if (data.mediaType !== 'video' && !data.base64Image && !data.base64Images?.length) {
+    ctx.addIssue({ code: 'custom', path: ['base64Image'], message: 'base64Image or base64Images is required for image templates' });
   }
 });
 

@@ -107,6 +107,8 @@ export interface Template {
     recommendedPrompts?: string[];
     /** AI-generated template analysis, populated on first open. Free — no credits consumed. */
     aiAnalysis?: TemplateAnalysis;
+    /** Additional asset URLs for carousel templates (beyond primary s3_link) */
+    asset_urls?: string[];
   };
 }
 

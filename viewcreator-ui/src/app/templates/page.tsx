@@ -19,7 +19,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 
-import { getTemplates, uploadTemplate, deleteTemplate, voteTemplate, saveTemplate, getCategories } from "@/services/api/template-service";
+import { getTemplates, uploadTemplate, deleteTemplate, voteTemplate, saveTemplate, getCategories, type UploadTemplateParams } from "@/services/api/template-service";
 import type { Template, MediaType } from "@/types";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -451,7 +451,7 @@ export default function TemplatesPage() {
     });
 
     return result;
-  }, [templates, activeCategory, searchQuery, sortOption]);
+  }, [templates, activeCategory, searchQuery, sortOption, savedOnly]);
 
   const handleUseTemplate = (templateId: string) => {
     dispatch(setImageEditorState({ previewUrl: null }));
@@ -538,7 +538,7 @@ export default function TemplatesPage() {
     try {
       const token = await safeToken(getToken);
       const tags = uploadTagsInput.split(",").map((t) => t.trim()).filter(Boolean);
-      const params: any = {
+      const params: UploadTemplateParams = {
         mediaType: uploadFileType,
         title: uploadTitle,
         description: uploadDescription,

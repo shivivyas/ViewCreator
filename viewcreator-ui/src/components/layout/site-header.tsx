@@ -62,7 +62,7 @@ export function SiteHeader() {
 
   useEffect(() => {
     if (!isSignedIn) {
-      setPaymentStatus(null);
+      // Initial state is already null; don't call setState synchronously
       return;
     }
 

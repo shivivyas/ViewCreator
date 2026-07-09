@@ -139,3 +139,166 @@ Uses `pg.Pool` → Supabase Postgres via `DATABASE_URL`.
 - Idle timeout: 30s
 - Connection timeout: 2s
 - Debug: `DEBUG_DB=true`
+
+---
+
+## Frontend Architecture (`viewcreator-ui/src/`)
+
+> Last updated: 2026-07-09
+> ~68 source files, ~8,700 lines, 0 compile errors, 3 external data flows
+
+### Directory Map
+
+```
+src/
+├── app/                        Next.js App Router pages
+├── components/                 UI components by domain
+│   ├── ui/                     shadcn/ui primitives (17 files)
+│   ├── layout/                 Site header
+│   ├── landing/                Marketing page + footer
+│   ├── shared/                 Credit gate modal
+│   ├── generate/               GenerateForm + HistoryPanel
+│   ├── editor/                 EditorHeader/Sidebar/Canvas/Timeline
+│   └── templates/              TemplateViewPage, TemplateGenerationPanel,
+│                               UploadTemplateModal
+├── hooks/                      useCreditGate, usePostPurchaseResume
+├── lib/                        cn(), cycleIndex(), safeToken(), webhookVerifier
+├── services/                   API layer (base client + 4 service modules)
+├── store/                      Redux (imageEditor slice only)
+├── types/                      All TypeScript interfaces
+└── proxy.ts                    Next.js 16 proxy (routes /api/* to Express)
+```
+
+### Page-by-Page Breakdown
+
+| Route | File | Lines | What It Does |
+|-------|------|-------|-------------|
+| `/` | `app/page.tsx` | ~10 | Imports `<LandingPage>` |
+| `/generate` | `app/generate/page.tsx` | 580 | AI Studio — media type toggle, credit gate, post-purchase resume, URL template selection, persisted history. Passes 11 props to `<GenerateForm>`. |
+| `/generate/edit` | `app/generate/edit/page.tsx` | 474 | Image editor — crop state, adjustments, AI edit, edit history timeline, unsaved-changes guard. |
+| `/templates` | `app/templates/page.tsx` | 560 | Template marketplace — `<TemplateCard>` grid with mini carousel (arrows+dots), search, sort, categories, save/vote/delete. |
+| `/templates/:id` | `app/templates/[id]/page.tsx` | ~10 | Async server component — renders `<TemplateViewPage>`. |
+| `/pricing` | `app/pricing/page.tsx` | 246 | Dodo Payments pricing table. |
+| `/payments/history` | `app/payments/history/page.tsx` | 139 | Transaction history table. |
+
+### Component Architecture
+
+**Three major component groups, each with a clear data flow:**
+
+#### 1. Generate Flow (`/generate`)
+
+```
+GenerateImagePageContent (page state: mediaType, credit gate, resume)
+  ├── GenerateForm          Owns prompt/aspectRatio/count/size/references
+  │   via useReducer.       Props: templates, loading, error, mediaType,
+  │                         onSubmit(formData), loadKey/loadValues
+  ├── HistoryPanel          Read-only display of Redux history items.
+  │                         Callbacks: loadSettings, regenerate, selectImage
+  └── CreditGateModal       Buy credits modal (shared with templates)
+```
+
+Key: `GenerateForm` was refactored in July 2026 to own its state internally. The page no longer manages 13 form-specific state variables.
+
+#### 2. Template View (`/templates/:id`)
+
+```
+TemplateViewPage (data layer: fetch template + related + AI analysis)
+  ├── Carousel (inline)     Instagram-style image carousel with arrows/dots.
+  │                         Falls back to related templates if < 2 own images.
+  ├── AI Prompt Section     Editable prompt textarea or displayed analysis.
+  └── TemplateGenerationPanel
+      (owns: prompt, aspectRatio, numberOfImages, modal state:
+       idle→generating→results→error, step timer, download, workspace routing)
+```
+
+Key: The generation concern was extracted into its own component in July 2026. The view page dropped from 825 to 548 lines.
+
+#### 3. Editor (`/generate/edit`)
+
+```
+EditImagePage (page state: crop, adjustments, edit history timeline)
+  ├── EditorHeader          Back, title, save status, download
+  ├── EditorCanvas          Image display + pointer-based crop overlay
+  ├── EditorSidebar         Adjustments sliders + AI edit input + crop controls
+  └── EditorTimeline        Edit history with thumbnails, undo/redo
+```
+
+#### 4. Templates Marketplace (`/templates`)
+
+```
+TemplatesPage (state: search, sort, categories, saved filter)
+  ├── Search + Sort Bar
+  ├── Category Pills (All, My Saves, + dynamic tags)
+  ├── TemplateCard Grid (inline component, ~180 lines)
+  │   - Mini carousel (arrows + dots for multi-image templates)
+  │   - Save / Upvote / Delete buttons
+  │   - "Use Template" hover overlay
+  ├── UploadTemplateModal   Owns all upload state (title, tags, files, drag-drop)
+  └── ConfirmDialog         Delete confirmation
+```
+
+Key: The upload modal was extracted into its own component in July 2026. The page dropped from 982 to 560 lines.
+
+### Data Flow
+
+```
+User Action → Page Component → Service Function → api-client.ts
+                                                     │
+                                                     ├── fetch() → Express API (port 3001)
+                                                     │              → DB / S3 / Gemini
+                                                     │
+                                                     └── fetch() → Next.js API route (/api/dodo/*)
+                                                                    → Dodo Payments SDK
+```
+
+**Auth flow:** Clerk → `getToken()` → `safeToken()` helper → Bearer header → Express middleware (`clerkClient.verifyToken`)
+
+**Credit check flow:**
+```
+Generate → useCreditGate.checkCredits(cost)
+  → GET /api/payments/balance
+  → Insufficient? show modal → Dodo checkout → webhook → poll → retry
+  → Sufficient? generate → POST /api/generate → deduct credits
+```
+
+### State Management
+
+| Layer | Technology | What It Stores |
+|-------|-----------|----------------|
+| **Redux** | RTK (1 slice) | Image editor state: URLs, selection, prompt, style, adjustments, crop, history |
+| **React state** | useState / useReducer | Everything else — form state, modals, loading, errors |
+| **URL params** | next/navigation | `?templateId=`, `?checkout=success` |
+| **sessionStorage** | Raw API | Pending generation params for post-purchase resume |
+
+Redux is used minimally — only the image editor slice, which needs to persist across page navigations. Everything else is local component state.
+
+### API Layer
+
+```
+services/
+├── base/api-client.ts    request<T>(endpoint, { method, body, token })
+│                         → Adds Content-Type + Authorization
+│                         → Parses JSON, throws typed errors
+│                         → Prepends NEXT_PUBLIC_API_URL (localhost:3001)
+├── api/template-service.ts    CRUD + vote + save + categories
+├── api/generation-service.ts  generate + edit + video + user creations
+├── api/analysis-service.ts    analyzeTemplate (free, no credit cost)
+└── api/payment-service.ts     plans + balance + checkout + transactions
+```
+
+All 17 API functions follow the same pattern: `request<ResponseType>(endpoint, options)`. Consistent, predictable.
+
+### Key Files Reference
+
+| File | Purpose |
+|------|---------|
+| `proxy.ts` | Routes `/api/*` to Express, except `/api/dodo/*` (Next.js API routes) |
+| `lib/helpers.ts` | `cycleIndex()` for carousels, `safeToken()` for Clerk auth |
+| `hooks/use-credit-gate.ts` | Credit checking + purchase flow encapsulation |
+| `hooks/use-post-purchase-resume.ts` | Post-checkout credit polling + re-generation |
+| `components/generate/generate-form.tsx` | Form with useReducer, owns its state, 11 props |
+| `components/templates/template-view-page.tsx` | Template detail: data + carousel + layout |
+| `components/templates/template-generation-panel.tsx` | Generation concern: modal states, results, workspace |
+| `components/templates/upload-template-modal.tsx` | Upload form with multi-image drag-drop |
+| `components/shared/credit-gate-modal.tsx` | Buy credits modal (reusable) |
+| `store/slices/image-editor-slice.ts` | Single Redux slice, 6 reducers |

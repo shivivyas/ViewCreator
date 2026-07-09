@@ -234,9 +234,9 @@ export function TemplateViewPage({ templateId }: TemplateViewPageProps) {
   };
 
   return (
-    <div className="flex-1 bg-black overflow-hidden relative">
+    <div className="flex-1 bg-background overflow-hidden relative">
       {/* ── Left: Image area — fills all space, sidebar overlays on right ── */}
-      <div className="absolute inset-0 right-0 overflow-hidden group">
+      <div className="absolute inset-0 right-0 overflow-hidden group bg-black/5 dark:bg-black/20">
         <div className="absolute inset-0" style={{ right: '20rem' }}>
           {displayAssets.length > 0 ? (
             <>
@@ -352,22 +352,7 @@ export function TemplateViewPage({ templateId }: TemplateViewPageProps) {
       </div>
 
         {/* ── Right: Sidebar — independent height ── */}
-        <div className="absolute top-0 right-0 bottom-0 w-80 border-l border-white/10 overflow-y-auto bg-black/80 flex flex-col"
-          style={{
-            '--foreground': 'oklch(0.985 0 0)',
-            '--card': 'oklch(0.205 0 0)',
-            '--card-foreground': 'oklch(0.985 0 0)',
-            '--muted': 'oklch(0.269 0 0)',
-            '--muted-foreground': 'oklch(0.708 0 0)',
-            '--border': 'oklch(1 0 0 / 10%)',
-            '--primary': 'oklch(0.922 0 0)',
-            '--primary-foreground': 'oklch(0.205 0 0)',
-            '--accent': 'oklch(0.269 0 0)',
-            '--accent-foreground': 'oklch(0.985 0 0)',
-            '--destructive': 'oklch(0.704 0.191 22.216)',
-            '--background': 'oklch(0.145 0 0)',
-          } as React.CSSProperties}
-        >
+        <div className="absolute top-0 right-0 bottom-0 w-80 border-l border-border/50 overflow-y-auto bg-background/95 backdrop-blur-xl flex flex-col">
           {/* ── Sidebar header: back + title + actions ── */}
           <div className="flex items-center gap-2 px-4 pt-4 pb-2 shrink-0">
             <button

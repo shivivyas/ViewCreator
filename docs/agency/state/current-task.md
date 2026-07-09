@@ -1,18 +1,19 @@
 # Current Task
 
 **Agent**: Director (First Mate)
-**Status**: � Unresolved — Template card arrow navigation not working
+**Status**: ✅ Complete — GenerateForm refactor cleanup
 
 ## What Was Done
 
-Complete redesign of template detail flow:
-- Full-page `/templates/[id]` route with Instagram-style carousel
-- Mini carousel on template grid cards with arrows and dots
-- Multi-image upload (single, carousel, video)
-- Guest auth gates for Generate/Upload
-- All committed and pushed to `main`
+Fixed two dangling references from the GenerateForm `useReducer` refactor (0afe904):
+1. Duplicate `prompt` declaration removed from `page.tsx` — commit `907ad04`
+2. `imageSize` removed from `loadingParams`, `HistoryPanelProps`, and `LoadingSkeleton` — commit `f7c6905`
 
-### Remaining Issue
+Both pushed to `main`.
+
+### Next Action
+- Run full `npx playwright test --project=chromium-auth` to confirm all 25 previously-failing tests now pass
+- This takes ~45 minutes — requires both API (port 3001) and UI (port 3000) servers running
 Clicking the `<` `>` arrows on template cards in the grid still doesn't switch images. Suspected causes:
 1. `pointer-events-none` fix applied but may not have been picked up by HMR (Turbopack issues)
 2. Stale browser bundle — hard refresh (Cmd+Shift+R) needed

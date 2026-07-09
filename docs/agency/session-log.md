@@ -107,6 +107,41 @@ Feature complete on `feature/ai-template-analysis`. Two commits pushed to GitHub
 
 ---
 
+## 2026-07-09 — GenerateForm refactor cleanup (duplicate prompt + dangling imageSize)
+
+### Agent
+Director (First Mate) + Analyst + Builder
+
+### Skill
+none
+
+### Summary
+Investigated and fixed two dangling references left by the GenerateForm `useReducer` refactor (0afe904):
+
+1. **Duplicate `prompt` declaration**: Page generated had `const [prompt, setPrompt]` twice — one leftover from old code, one from new. Turbopack caught it at compile time → 500 on `/generate` and `/pricing`. Removed the duplicate (commit `907ad04`).
+
+2. **Missing `imageSize` reference**: `imageSize` was moved into GenerateForm's internal reducer but the parent page's `loadingParams` still referenced `const imageSize`. Caused `ReferenceError: imageSize is not defined` at runtime → 25 failing auth tests. Removed `imageSize` from `loadingParams`, `HistoryPanelProps`, and `LoadingSkeleton` badge (commit `f7c6905`).
+
+Both fixes verified: `/generate` loads without errors, triggers Clerk sign-in redirect for unauthenticated users.
+
+### Root Cause
+State ownership transfer during refactor was incomplete — the old variables were removed from the child but the parent still referenced them. Neither was caught because:
+- Duplicate: both declarations were syntactically valid `useState` calls
+- Dangling: `imageSize` was valid JS (just scoped to the wrong module)
+
+### Decisions Made
+- `imageSize` removed from loading UI entirely — it's internal form state, not relevant to the loading indicator
+- No re-exposure via callback — kept form internal state truly internal
+
+### State At End
+- Two commits pushed to `main`: `907ad04`, `f7c6905`
+- Learning doc created: `docs/learnings/2026-07-09-state-ownership-leftovers-after-refactor.md`
+- Pattern added to `docs/agency/project-learnings.md`
+- Full auth test run not yet re-executed (~45 min) — recommended as next action
+- Two non-blocking UUID issues noted: "tmpl-1" and "plan-credits-5" fail UUID validation in Postgres but may be pre-existing test data issues
+
+---
+
 ## 2026-07-05 — FirstMate integration into all agent files
 
 ### Agent

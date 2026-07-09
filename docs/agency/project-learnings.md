@@ -99,6 +99,27 @@ Upload and Generate Content were returning "Not Found" for guests. Adding the gu
 ### Applied By
 Builder (when adding any auth-gated action)
 
+---
+
+## 2026-07-09: State ownership refactors leave dangling references
+
+### Context
+When extracting state from a parent component into a child (or reducer), the parent often still references those variables in prop objects passed to other children.
+
+### The Pattern
+After any state-ownership refactor:
+1. Grep the parent for ALL variable names that moved — use their exact names as search patterns
+2. Check every prop object literal (`loadingParams={{...}}`, etc.) — these are the most common hiding spots
+3. Check child component interfaces for required fields that reference the removed state
+4. Load every affected page in a browser and check the console for ReferenceErrors before committing
+5. Cosmetic loading-state previews of internal form state are candidates for removal rather than re-exposing via callbacks
+
+### Evidence
+Two dangling references survived a GenerateForm refactor (0afe904), causing 25 failing auth tests and JS 500 errors on `/generate`. Both were invisible to the linter because they were valid variable declarations — just the wrong ones.
+
+### Applied By
+Builder (when implementing state ownership refactors), Reviewer (when reviewing refactor PRs)
+
 ## 2026-07-09: Multi-image upload via `config.asset_urls`
 
 ### Context

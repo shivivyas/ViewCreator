@@ -29,7 +29,6 @@ export interface HistoryPanelProps {
   loadingParams: {
     prompt: string;
     aspectRatio: string;
-    numberOfImages: number;
     mediaType?: MediaType;
   };
   handleLoadSettings: (item: GenerationHistoryItem) => void;
@@ -80,18 +79,8 @@ function LoadingSkeleton({
         </span>
       </div>
 
-      <div
-        className={`grid gap-3 ${
-          params.mediaType === "video"
-            ? "grid-cols-1"
-            : params.numberOfImages === 1
-            ? "grid-cols-1 max-w-sm"
-            : params.numberOfImages === 2
-            ? "grid-cols-2"
-            : "grid-cols-2 lg:grid-cols-4"
-        }`}
-      >
-        {Array.from({ length: params.numberOfImages }).map((_, i) => (
+      <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
           <div
             key={i}
             className="aspect-square rounded-xl bg-muted/40 border border-dashed border-border/50 flex flex-col items-center justify-center gap-1.5 animate-pulse"

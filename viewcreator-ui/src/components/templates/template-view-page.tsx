@@ -50,6 +50,7 @@ export function TemplateViewPage({ templateId }: TemplateViewPageProps) {
 
   // ── Carousel state ───────────────────────────────────────
   const [carouselIndex, setCarouselIndex] = useState(0);
+  const [naturalAspectRatio, setNaturalAspectRatio] = useState<number | null>(null);
 
   // ── AI prompt state (shared with generation panel) ──────
   const [prompt, setPrompt] = useState("");
@@ -151,7 +152,10 @@ export function TemplateViewPage({ templateId }: TemplateViewPageProps) {
     return assets;
   }, [template, relatedTemplates]);
 
-  // ── Handlers ─────────────────────────────────────────────
+  // ── Reset natural aspect ratio when carousel index changes ──
+  useEffect(() => {
+    setNaturalAspectRatio(null);
+  }, [carouselIndex]);
 
   const handleDelete = useCallback(async () => {
     if (!template) return;
@@ -198,191 +202,192 @@ export function TemplateViewPage({ templateId }: TemplateViewPageProps) {
   // ── Render ────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      {/* ════════════ Sticky Header ════════════ */}
-      <header className="sticky top-0 z-20 bg-background/80 backdrop-blur-lg border-b border-border/50 shrink-0">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3 h-14">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 rounded-full shrink-0"
-              onClick={() => router.push("/templates")}
-            >
-              <ArrowLeft className="size-4" />
-            </Button>
+    <div className="flex-1 bg-black overflow-hidden relative">
+      {/* ════════════ Side-by-side: image | panel ════════════ */}
+      <div className="flex h-full">
+        {/* ── Left: Image area ── */}
+        <div className="flex-1 relative min-w-0 group">
+          {/* Image backdrop */}
+          <div className="absolute inset-0 flex items-center justify-center">
+            {carouselAssets.length > 0 ? (
+              <>
+                {carouselAssets[carouselIndex].isVideo ? (
+                  <video
+                    src={carouselAssets[carouselIndex].src}
+                    className="w-full h-full object-contain"
+                    autoPlay muted loop playsInline controls
+                  />
+                ) : (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={carouselAssets[carouselIndex].src}
+                    alt={carouselAssets[carouselIndex].alt}
+                    className="w-full h-full object-contain"
+                    onLoad={(e) => {
+                      const img = e.currentTarget;
+                      const ratio = img.naturalHeight / img.naturalWidth;
+                      setNaturalAspectRatio(ratio);
+                    }}
+                  />
+                )}
+              </>
+            ) : (
+              <div className="flex items-center justify-center">
+                <p className="text-sm text-muted-foreground">No assets</p>
+              </div>
+            )}
+          </div>
 
-            <div className="min-w-0 flex-1">
-              <h1 className="text-sm font-semibold truncate">{template.title}</h1>
-            </div>
+          {/* ── Floating controls (over image only) ── */}
+          <div className="absolute inset-0 pointer-events-none z-10">
+            {/* Carousel hit zones */}
+            {carouselAssets.length > 1 && !carouselAssets[carouselIndex]?.isVideo && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setCarouselIndex((prev) => cycleIndex(prev, carouselAssets.length, -1))}
+                  className="absolute left-0 top-0 w-1/3 h-full cursor-pointer z-10 pointer-events-auto"
+                  aria-label="Previous image"
+                />
+                <button
+                  type="button"
+                  onClick={() => setCarouselIndex((prev) => cycleIndex(prev, carouselAssets.length, 1))}
+                  className="absolute right-0 top-0 w-1/3 h-full cursor-pointer z-10 pointer-events-auto"
+                  aria-label="Next image"
+                />
+              </>
+            )}
 
-            <div className="flex items-center gap-1 shrink-0">
-              {userId && template.user_id === userId && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 gap-1.5 rounded-lg text-xs text-muted-foreground hover:text-destructive"
-                  onClick={handleDelete}
+            {/* Carousel arrow buttons (visible on hover) */}
+            {carouselAssets.length > 1 && !carouselAssets[carouselIndex]?.isVideo && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setCarouselIndex((prev) => cycleIndex(prev, carouselAssets.length, -1))}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 size-9 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center shadow-sm hover:bg-black/60 transition-all z-20 text-white opacity-0 group-hover:opacity-100 pointer-events-auto"
                 >
-                  <Trash2 className="size-3.5" />
-                  Delete
-                </Button>
+                  <ChevronLeft className="size-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCarouselIndex((prev) => cycleIndex(prev, carouselAssets.length, 1))}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 size-9 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center shadow-sm hover:bg-black/60 transition-all z-20 text-white opacity-0 group-hover:opacity-100 pointer-events-auto"
+                >
+                  <ChevronRight className="size-4" />
+                </button>
+              </>
+            )}
+
+            {/* Carousel counter & dots */}
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3 z-20 pointer-events-auto">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/40 backdrop-blur-sm text-[11px] font-medium text-white/80 shadow-xs">
+                <span className="size-1.5 rounded-full bg-white" />
+                {carouselAssets[carouselIndex]?.isVideo ? "Video" : `${carouselIndex + 1}/${carouselAssets.length}`}
+              </div>
+              {carouselAssets.length > 1 && !carouselAssets[carouselIndex]?.isVideo && (
+                <div className="flex items-center gap-1.5">
+                  {carouselAssets.map((asset, i) => (
+                    !asset.isVideo && (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => setCarouselIndex(i)}
+                        className={`rounded-full transition-all duration-300 ${
+                          i === carouselIndex
+                            ? "bg-white size-2"
+                            : "bg-white/40 size-1.5 hover:bg-white/60"
+                        }`}
+                      />
+                    )
+                  ))}
+                </div>
               )}
             </div>
           </div>
         </div>
-      </header>
 
-      {/* ════════════ Main Content ════════════ */}
-      <main className="flex-1 mx-auto max-w-7xl w-full px-4 sm:px-6 lg:px-8 py-4 min-h-0">
-        <div className="flex gap-6 lg:gap-8 h-full min-h-0">
-          {/* ── Left Panel: Reference Images + Prompt ── */}
-          <div className="w-[55%] flex flex-col gap-4 min-h-0">
-            {/* Carousel */}
-            <div className="relative flex-1 min-h-0 rounded-xl overflow-hidden bg-black/5 border border-border/50 shadow-sm group">
-              {carouselAssets.length > 1 && !carouselAssets[carouselIndex]?.isVideo && (
-                <div className="absolute inset-0 flex z-10">
-                  <button
-                    type="button"
-                    onClick={() => setCarouselIndex((prev) => cycleIndex(prev, carouselAssets.length, -1))}
-                    className="w-1/2 h-full cursor-pointer"
-                    aria-label="Previous image"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setCarouselIndex((prev) => cycleIndex(prev, carouselAssets.length, 1))}
-                    className="w-1/2 h-full cursor-pointer"
-                    aria-label="Next image"
-                  />
-                </div>
-              )}
+        {/* ── Right: Sidebar ── */}
+        <div className="w-80 shrink-0 border-l border-white/10 overflow-y-auto bg-black/80 flex flex-col"
+          style={{
+            '--foreground': 'oklch(0.985 0 0)',
+            '--card': 'oklch(0.205 0 0)',
+            '--card-foreground': 'oklch(0.985 0 0)',
+            '--muted': 'oklch(0.269 0 0)',
+            '--muted-foreground': 'oklch(0.708 0 0)',
+            '--border': 'oklch(1 0 0 / 10%)',
+            '--primary': 'oklch(0.922 0 0)',
+            '--primary-foreground': 'oklch(0.205 0 0)',
+            '--accent': 'oklch(0.269 0 0)',
+            '--accent-foreground': 'oklch(0.985 0 0)',
+            '--destructive': 'oklch(0.704 0.191 22.216)',
+            '--background': 'oklch(0.145 0 0)',
+          } as React.CSSProperties}
+        >
+          {/* ── Sidebar header: back + title + actions ── */}
+          <div className="flex items-center gap-2 px-4 pt-4 pb-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => router.push("/templates")}
+              className="size-7 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-all text-white/70 hover:text-white shrink-0"
+            >
+              <ArrowLeft className="size-3.5" />
+            </button>
+            <h1 className="text-sm font-semibold text-white truncate flex-1">{template.title}</h1>
+            {userId && template.user_id === userId && (
+              <button
+                type="button"
+                onClick={handleDelete}
+                className="size-7 rounded-full bg-white/10 flex items-center justify-center hover:bg-red-400/20 transition-all text-white/50 hover:text-red-400 shrink-0"
+              >
+                <Trash2 className="size-3.5" />
+              </button>
+            )}
+          </div>
 
-              {carouselAssets.length > 0 ? (
-                <>
-                  {carouselAssets[carouselIndex].isVideo ? (
-                    <video
-                      src={carouselAssets[carouselIndex].src}
-                      className="absolute inset-0 w-full h-full object-contain p-4"
-                      autoPlay muted loop playsInline controls
-                    />
-                  ) : (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img
-                      src={carouselAssets[carouselIndex].src}
-                      alt={carouselAssets[carouselIndex].alt}
-                      className="absolute inset-0 w-full h-full object-contain p-4"
-                    />
-                  )}
-
-                  {carouselAssets.length > 1 && !carouselAssets[carouselIndex]?.isVideo && (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => setCarouselIndex((prev) => cycleIndex(prev, carouselAssets.length, -1))}
-                        className="absolute left-2 top-1/2 -translate-y-1/2 size-9 rounded-full bg-background/80 backdrop-blur-sm flex items-center justify-center shadow-sm hover:bg-background transition-all opacity-0 group-hover:opacity-100 group-hover:scale-105 z-20"
-                      >
-                        <ChevronLeft className="size-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setCarouselIndex((prev) => cycleIndex(prev, carouselAssets.length, 1))}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 size-9 rounded-full bg-background/80 backdrop-blur-sm flex items-center justify-center shadow-sm hover:bg-background transition-all opacity-0 group-hover:opacity-100 group-hover:scale-105 z-20"
-                      >
-                        <ChevronRight className="size-4" />
-                      </button>
-                    </>
-                  )}
-
-                  <div className="absolute top-3 left-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-background/70 backdrop-blur-sm text-[11px] font-medium text-foreground shadow-xs z-20">
-                    <span className="size-1.5 rounded-full bg-primary" />
-                    {carouselAssets[carouselIndex].isVideo ? "Video" : `${carouselIndex + 1}/${carouselAssets.length}`}
-                  </div>
-
-                  {carouselAssets.length > 1 && !carouselAssets[carouselIndex]?.isVideo && (
-                    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 z-20">
-                      {carouselAssets.map((asset, i) => (
-                        !asset.isVideo && (
-                          <button
-                            key={i}
-                            type="button"
-                            onClick={() => setCarouselIndex(i)}
-                            className={`rounded-full transition-all duration-300 ${
-                              i === carouselIndex
-                                ? "bg-foreground size-2"
-                                : "bg-foreground/30 size-1.5 hover:bg-foreground/50"
-                            }`}
-                          />
-                        )
-                      ))}
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <p className="text-sm text-muted-foreground">No assets</p>
-                </div>
-              )}
-            </div>
-
-            {/* ── AI Prompt Section ── */}
-            <div className="rounded-xl border border-border/50 bg-card p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+          {/* ── Prompt section ── */}
+          <div className="px-4 pb-3 shrink-0">
+            <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3.5">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-white/40 flex items-center gap-1.5">
                   <Sparkles className="size-3" />
-                  Suggested Content Direction
+                  Content Direction
                   {analysisLoading && (
-                    <span className="size-2 rounded-full bg-muted-foreground/30 animate-pulse" />
+                    <span className="size-2 rounded-full bg-white/20 animate-pulse" />
                   )}
                 </p>
-                <div className="flex items-center gap-1">
-                  {isEditingPrompt ? (
-                    <button
-                      type="button"
-                      onClick={() => setIsEditingPrompt(false)}
-                      className="text-[10px] font-medium text-primary hover:text-primary/80 transition-colors"
-                    >
-                      Done
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setIsEditingPrompt(true)}
-                      className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      Edit
-                    </button>
-                  )}
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsEditingPrompt(!isEditingPrompt)}
+                  className="text-[10px] font-medium text-white/40 hover:text-white/70 transition-colors"
+                >
+                  {isEditingPrompt ? "Done" : "Edit"}
+                </button>
               </div>
 
               {isEditingPrompt ? (
                 <Textarea
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
-                  className="min-h-[80px] resize-none rounded-xl text-sm leading-relaxed focus-visible:ring-primary/30"
+                  className="min-h-[72px] resize-none rounded-xl text-sm leading-relaxed bg-black/20 border-white/[0.06] text-white/80 placeholder:text-white/20 focus-visible:ring-white/10"
                   autoFocus
-                  onBlur={() => setIsEditingPrompt(false)}
                 />
               ) : (
                 <div
                   onClick={() => prompt && setIsEditingPrompt(true)}
-                  className={`cursor-pointer transition-colors ${
-                    prompt ? "hover:bg-muted/50 -mx-2 px-2 py-1 rounded-lg" : ""
-                  }`}
+                  className="cursor-pointer"
                 >
                   {analysisLoading ? (
                     <div className="space-y-2">
-                      <div className="h-4 bg-muted rounded animate-pulse w-full" />
-                      <div className="h-4 bg-muted rounded animate-pulse w-3/4" />
-                      <div className="h-4 bg-muted rounded animate-pulse w-5/6" />
+                      <div className="h-3 bg-white/[0.06] rounded animate-pulse w-full" />
+                      <div className="h-3 bg-white/[0.06] rounded animate-pulse w-3/4" />
                     </div>
                   ) : prompt ? (
-                    <p className="text-sm text-foreground/90 leading-relaxed selection:bg-primary/20">
+                    <p className="text-xs text-white/60 leading-relaxed line-clamp-3">
                       {prompt}
                     </p>
                   ) : (
-                    <p className="text-sm text-muted-foreground italic">
-                      No prompt available. Click to add one.
+                    <p className="text-xs text-white/30 italic">
+                      No prompt available
                     </p>
                   )}
                 </div>
@@ -390,33 +395,19 @@ export function TemplateViewPage({ templateId }: TemplateViewPageProps) {
             </div>
           </div>
 
-          {/* ── Right Panel: Generation Controls ── */}
-          <div className="w-[45%]">
-            <div className="sticky top-20">
-              <TemplateGenerationPanel
-                template={template}
-                isSignedIn={!!isSignedIn}
-                onSignUp={openSignUp}
-              />
-            </div>
-          </div>
-        </div>
-      </main>
+          {/* ── Divider ── */}
+          <div className="border-t border-white/[0.06] mx-4" />
 
-      {/* ════════════ Footer ════════════ */}
-      <footer className="border-t border-border/50 mt-auto">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-14">
-            <div className="flex items-center gap-2">
-              <Wand2 className="size-3.5 text-primary" />
-              <span className="text-xs font-semibold">ViewCreator</span>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              &copy; {new Date().getFullYear()} ViewCreator. All rights reserved.
-            </p>
+          {/* ── Generation panel ── */}
+          <div className="flex-1 px-4 py-3 overflow-y-auto">
+            <TemplateGenerationPanel
+              template={template}
+              isSignedIn={!!isSignedIn}
+              onSignUp={openSignUp}
+            />
           </div>
         </div>
-      </footer>
+      </div>
     </div>
   );
 }

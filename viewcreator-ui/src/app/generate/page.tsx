@@ -130,9 +130,6 @@ function GenerateImagePageContent() {
 
   usePostPurchaseResume({ getToken, credit, onGenerate });
 
-  // Shared params
-  const [prompt, setPrompt] = useState(editorState.basePrompt || '');
-
   // Page-level state (needed for header toggle + editor state effect)
   const [mediaType, setMediaType] = useState<MediaType>('image');
   const [prompt, setPrompt] = useState(editorState.basePrompt || '');

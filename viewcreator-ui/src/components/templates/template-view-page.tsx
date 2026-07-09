@@ -52,6 +52,10 @@ export function TemplateViewPage({ templateId }: TemplateViewPageProps) {
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [naturalAspectRatio, setNaturalAspectRatio] = useState<number | null>(null);
 
+  // ── Generated preview state ────────────────────────────
+  const [previewAssets, setPreviewAssets] = useState<{ src: string; alt: string; isVideo: boolean }[] | null>(null);
+  const [previewCarouselIndex, setPreviewCarouselIndex] = useState(0);
+
   // ── AI prompt state (shared with generation panel) ──────
   const [prompt, setPrompt] = useState("");
   const [isEditingPrompt, setIsEditingPrompt] = useState(false);
@@ -157,6 +161,21 @@ export function TemplateViewPage({ templateId }: TemplateViewPageProps) {
     setNaturalAspectRatio(null);
   }, [carouselIndex]);
 
+  const handlePreviewResult = useCallback((urls: string[]) => {
+    const assets = urls.map((url, i) => ({
+      src: url,
+      alt: `Generated ${i + 1}`,
+      isVideo: false,
+    }));
+    setPreviewAssets(assets);
+    setPreviewCarouselIndex(0);
+  }, []);
+
+  const handleClearPreview = useCallback(() => {
+    setPreviewAssets(null);
+    setPreviewCarouselIndex(0);
+  }, []);
+
   const handleDelete = useCallback(async () => {
     if (!template) return;
     try {
@@ -201,113 +220,139 @@ export function TemplateViewPage({ templateId }: TemplateViewPageProps) {
 
   // ── Render ────────────────────────────────────────────────
 
+  // Determine what to show in the main display
+  const displayAssets = previewAssets ?? carouselAssets;
+  const displayIndex = previewAssets ? previewCarouselIndex : carouselIndex;
+  const displayAsset = displayAssets[displayIndex];
+  const isMultiAsset = displayAssets.length > 1;
+  const showCarousel = isMultiAsset && !displayAsset?.isVideo;
+  const navigateDisplay = (dir: number) => {
+    const total = displayAssets.length;
+    const next = ((displayIndex + dir + total) % total + total) % total;
+    if (previewAssets) setPreviewCarouselIndex(next);
+    else setCarouselIndex(next);
+  };
+
   return (
     <div className="flex-1 bg-black overflow-hidden relative">
-      {/* ════════════ Side-by-side: image | panel ════════════ */}
-      <div className="flex h-full">
-        {/* ── Left: Image area ── */}
-        <div className="flex-1 relative min-w-0 group">
-          {/* Image backdrop */}
-          <div className="absolute inset-0 flex items-center justify-center">
-            {carouselAssets.length > 0 ? (
-              <>
-                {carouselAssets[carouselIndex].isVideo ? (
+      {/* ── Left: Image area — fills all space, sidebar overlays on right ── */}
+      <div className="absolute inset-0 right-0 overflow-hidden group">
+        <div className="absolute inset-0" style={{ right: '20rem' }}>
+          {displayAssets.length > 0 ? (
+            <>
+              {/* Media — absolute positioned so container stays fixed */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                {displayAsset?.isVideo ? (
                   <video
-                    src={carouselAssets[carouselIndex].src}
-                    className="w-full h-full object-contain"
+                    src={displayAsset.src}
+                    className="max-w-full max-h-full object-contain"
                     autoPlay muted loop playsInline controls
                   />
                 ) : (
                   /* eslint-disable-next-line @next/next/no-img-element */
                   <img
-                    src={carouselAssets[carouselIndex].src}
-                    alt={carouselAssets[carouselIndex].alt}
-                    className="w-full h-full object-contain"
+                    src={displayAsset?.src}
+                    alt={displayAsset?.alt}
+                    className="max-w-full max-h-full object-contain"
                     onLoad={(e) => {
                       const img = e.currentTarget;
-                      const ratio = img.naturalHeight / img.naturalWidth;
-                      setNaturalAspectRatio(ratio);
+                      setNaturalAspectRatio(img.naturalHeight / img.naturalWidth);
                     }}
                   />
                 )}
-              </>
-            ) : (
-              <div className="flex items-center justify-center">
-                <p className="text-sm text-muted-foreground">No assets</p>
               </div>
-            )}
-          </div>
 
-          {/* ── Floating controls (over image only) ── */}
-          <div className="absolute inset-0 pointer-events-none z-10">
-            {/* Carousel hit zones */}
-            {carouselAssets.length > 1 && !carouselAssets[carouselIndex]?.isVideo && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setCarouselIndex((prev) => cycleIndex(prev, carouselAssets.length, -1))}
-                  className="absolute left-0 top-0 w-1/3 h-full cursor-pointer z-10 pointer-events-auto"
-                  aria-label="Previous image"
-                />
-                <button
-                  type="button"
-                  onClick={() => setCarouselIndex((prev) => cycleIndex(prev, carouselAssets.length, 1))}
-                  className="absolute right-0 top-0 w-1/3 h-full cursor-pointer z-10 pointer-events-auto"
-                  aria-label="Next image"
-                />
-              </>
-            )}
+              {/* ── Floating controls ── */}
+              <div className="absolute inset-0 pointer-events-none z-10">
+                {/* Hit zones */}
+                {showCarousel && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => navigateDisplay(-1)}
+                      className="absolute left-0 top-0 w-1/3 h-full cursor-pointer z-10 pointer-events-auto"
+                      aria-label="Previous image"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => navigateDisplay(1)}
+                      className="absolute right-0 top-0 w-1/3 h-full cursor-pointer z-10 pointer-events-auto"
+                      aria-label="Next image"
+                    />
+                  </>
+                )}
 
-            {/* Carousel arrow buttons (visible on hover) */}
-            {carouselAssets.length > 1 && !carouselAssets[carouselIndex]?.isVideo && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setCarouselIndex((prev) => cycleIndex(prev, carouselAssets.length, -1))}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 size-9 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center shadow-sm hover:bg-black/60 transition-all z-20 text-white opacity-0 group-hover:opacity-100 pointer-events-auto"
-                >
-                  <ChevronLeft className="size-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCarouselIndex((prev) => cycleIndex(prev, carouselAssets.length, 1))}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 size-9 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center shadow-sm hover:bg-black/60 transition-all z-20 text-white opacity-0 group-hover:opacity-100 pointer-events-auto"
-                >
-                  <ChevronRight className="size-4" />
-                </button>
-              </>
-            )}
+                {/* Arrow buttons */}
+                {showCarousel && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => navigateDisplay(-1)}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 size-9 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center shadow-sm hover:bg-black/60 transition-all z-20 text-white opacity-0 group-hover:opacity-100 pointer-events-auto"
+                    >
+                      <ChevronLeft className="size-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigateDisplay(1)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 size-9 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center shadow-sm hover:bg-black/60 transition-all z-20 text-white opacity-0 group-hover:opacity-100 pointer-events-auto"
+                    >
+                      <ChevronRight className="size-4" />
+                    </button>
+                  </>
+                )}
 
-            {/* Carousel counter & dots */}
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3 z-20 pointer-events-auto">
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/40 backdrop-blur-sm text-[11px] font-medium text-white/80 shadow-xs">
-                <span className="size-1.5 rounded-full bg-white" />
-                {carouselAssets[carouselIndex]?.isVideo ? "Video" : `${carouselIndex + 1}/${carouselAssets.length}`}
-              </div>
-              {carouselAssets.length > 1 && !carouselAssets[carouselIndex]?.isVideo && (
-                <div className="flex items-center gap-1.5">
-                  {carouselAssets.map((asset, i) => (
-                    !asset.isVideo && (
-                      <button
-                        key={i}
-                        type="button"
-                        onClick={() => setCarouselIndex(i)}
-                        className={`rounded-full transition-all duration-300 ${
-                          i === carouselIndex
-                            ? "bg-white size-2"
-                            : "bg-white/40 size-1.5 hover:bg-white/60"
-                        }`}
-                      />
-                    )
-                  ))}
+                {/* Counter & dots */}
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3 z-20 pointer-events-auto">
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/40 backdrop-blur-sm text-[11px] font-medium text-white/80 shadow-xs">
+                    <span className="size-1.5 rounded-full bg-white" />
+                    {displayAsset?.isVideo ? "Video" : `${displayIndex + 1}/${displayAssets.length}`}
+                  </div>
+                  {showCarousel && (
+                    <div className="flex items-center gap-1.5">
+                      {displayAssets.map((_, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => {
+                            if (previewAssets) setPreviewCarouselIndex(i);
+                            else setCarouselIndex(i);
+                          }}
+                          className={`rounded-full transition-all duration-300 ${
+                            i === displayIndex
+                              ? "bg-white size-2"
+                              : "bg-white/40 size-1.5 hover:bg-white/60"
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          </div>
-        </div>
 
-        {/* ── Right: Sidebar ── */}
-        <div className="w-80 shrink-0 border-l border-white/10 overflow-y-auto bg-black/80 flex flex-col"
+                {/* Preview back button */}
+                {previewAssets && (
+                  <div className="absolute top-4 left-4 z-20 pointer-events-auto">
+                    <button
+                      type="button"
+                      onClick={handleClearPreview}
+                      className="size-8 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center hover:bg-black/70 transition-all text-white/70 hover:text-white"
+                    >
+                      <ArrowLeft className="size-3.5" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="flex items-center justify-center">
+              <p className="text-sm text-muted-foreground">No assets</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+        {/* ── Right: Sidebar — independent height ── */}
+        <div className="absolute top-0 right-0 bottom-0 w-80 border-l border-white/10 overflow-y-auto bg-black/80 flex flex-col"
           style={{
             '--foreground': 'oklch(0.985 0 0)',
             '--card': 'oklch(0.205 0 0)',
@@ -404,10 +449,10 @@ export function TemplateViewPage({ templateId }: TemplateViewPageProps) {
               template={template}
               isSignedIn={!!isSignedIn}
               onSignUp={openSignUp}
+              onPreviewResult={handlePreviewResult}
             />
           </div>
         </div>
-      </div>
     </div>
   );
 }

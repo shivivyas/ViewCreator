@@ -511,3 +511,44 @@ grill-me
 
 ### State At End
 Behavioral test suite complete. 103 passing, 12 known failures requiring manual debugging. Ready for next feature.
+
+---
+
+## 2026-07-09 — Template view page: full-screen layout, independent panels, preview feature
+
+### Agent
+Director (First Mate) + Builder
+
+### Skill
+frontend-ui-engineering
+
+### Summary
+Redesigned the template detail view page (`/templates/[id]`) for a full-screen, design-first experience:
+
+**Layout overhaul:**
+- Moved from flex row sharing to absolute-positioned panels — left (image) and right (sidebar) now have independent heights
+- Image panel uses `absolute inset-0` with `object-contain` — fixed container never changes size between carousel items, images show fully with black bars
+- No floating overlays over the image (back button, title, prompt all moved to sidebar)
+- Clean sidebar hierarchy: back → title → Content Direction prompt → generation controls
+- Removed footer; dark glass-morphism aesthetic with `backdrop-blur`
+
+**Generation preview feature:**
+- Added `onPreviewResult` callback — clicking a generated result in the panel replaces the main display
+- Added `handleClearPreview` — back button to return to template carousel
+- Preview shares the same image/video/carousel display logic as the template
+
+**Fixes en route:**
+- Fixed JSX parse error (missing `</div>` after left panel closure)
+- Fixed stale Turbopack cache issues
+- Fixed `numberOfImages` dangling reference in `loadingParams` (same class of bug as previous session)
+
+### Files Changed
+- `viewcreator-ui/src/components/templates/template-view-page.tsx` — major layout restructure
+- `viewcreator-ui/src/components/templates/template-generation-panel.tsx` — added `onPreviewResult` prop
+
+### Decisions Made
+- Image container uses `absolute inset-0` for fixed sizing (not flex-dependent)
+- Remaining `numberOfImages` removed from `loadingParams` (consistent with `imageSize` removal)
+
+### State At End
+Layout redesign complete. Both panels independently sized. Generation preview wiring in place. Pending: carousel-aware generation grouping (each idea = full carousel for multi-asset templates).

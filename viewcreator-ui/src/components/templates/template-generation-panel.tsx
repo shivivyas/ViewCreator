@@ -42,6 +42,7 @@ interface TemplateGenerationPanelProps {
   template: Template;
   isSignedIn: boolean;
   onSignUp: () => void;
+  onPreviewResult?: (urls: string[]) => void;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────
@@ -50,6 +51,7 @@ export function TemplateGenerationPanel({
   template,
   isSignedIn,
   onSignUp,
+  onPreviewResult,
 }: TemplateGenerationPanelProps) {
   const router = useRouter();
   const dispatch = useAppDispatch();
@@ -307,7 +309,10 @@ export function TemplateGenerationPanel({
                   <button
                     key={i}
                     type="button"
-                    onClick={() => setSelectedVariation(i)}
+                    onClick={() => {
+                      setSelectedVariation(i);
+                      onPreviewResult?.([url]);
+                    }}
                     className={`group relative rounded-xl overflow-hidden border-2 transition-all duration-200 ${
                       isSelected
                         ? "border-primary ring-1 ring-primary shadow-md"

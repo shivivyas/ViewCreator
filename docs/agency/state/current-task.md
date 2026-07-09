@@ -1,18 +1,20 @@
 # Current Task
 
 **Agent**: Director (First Mate)
-**Status**: ✅ Complete — GenerateForm refactor cleanup
+**Status**: ✅ Complete — Template view page layout redesign
 
 ## What Was Done
 
-Fixed two dangling references from the GenerateForm `useReducer` refactor (0afe904):
-1. Duplicate `prompt` declaration removed from `page.tsx` — commit `907ad04`
-2. `imageSize` removed from `loadingParams`, `HistoryPanelProps`, and `LoadingSkeleton` — commit `f7c6905`
-
-Both pushed to `main`.
+Full redesign of `/templates/[id]`:
+- Full-screen layout with image on left, sidebar on right (absolute positioned, independent heights)
+- Images fit with `object-contain` — full image visible, black bars, no cropping
+- All floating controls moved into the sidebar (back, title, prompt, generate)
+- Generation preview: clicking a result replaces the main display
+- Fixed `numberOfImages` dangling reference
+- Fixed JSX parse error
 
 ### Next Action
-- Run full `npx playwright test --project=chromium-auth` to confirm all 25 previously-failing tests now pass
+- Carousel-aware generation: each "idea" should produce a full carousel matching the template's asset count
 - This takes ~45 minutes — requires both API (port 3001) and UI (port 3000) servers running
 Clicking the `<` `>` arrows on template cards in the grid still doesn't switch images. Suspected causes:
 1. `pointer-events-none` fix applied but may not have been picked up by HMR (Turbopack issues)

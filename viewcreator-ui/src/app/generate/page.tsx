@@ -567,7 +567,6 @@ function GenerateImagePageContent() {
               loadingParams={{
                 prompt,
                 aspectRatio,
-                imageSize,
                 numberOfImages,
                 mediaType
               }}

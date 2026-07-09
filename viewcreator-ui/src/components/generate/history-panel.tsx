@@ -29,7 +29,6 @@ export interface HistoryPanelProps {
   loadingParams: {
     prompt: string;
     aspectRatio: string;
-    imageSize: string;
     numberOfImages: number;
     mediaType?: MediaType;
   };
@@ -75,11 +74,7 @@ function LoadingSkeleton({
         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-muted text-muted-foreground">
           {params.aspectRatio}
         </span>
-        {params.mediaType !== "video" && (
-          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-muted text-muted-foreground">
-            {params.imageSize}
-          </span>
-        )}
+
         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-muted text-muted-foreground">
           Standard
         </span>
